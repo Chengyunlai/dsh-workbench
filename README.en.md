@@ -14,6 +14,7 @@ Inspect projects, follow code, and debug programs beside DeepSeek Harness conver
 ## Contents
 
 - [Capabilities](#capabilities)
+- [Capability demos](#capability-demos)
 - [Language support](#language-support)
 - [Install](#install)
 - [Use](#use)
@@ -40,6 +41,39 @@ flowchart LR
   Workbench --> Git["Git changes and history"]
   Workbench --> Debug["Breakpoint debugging"]
 ```
+
+## Capability demos
+
+These demonstrations use the fictional Sample Shop project, with sample code, commit authors, and business data.
+
+**Documents and code navigation**: preview Markdown, switch to source, then follow a definition across files.
+
+![Document preview, source mode, and cross-file definition navigation](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif)
+
+<details>
+<summary>Git diffs and commit history</summary>
+
+Inspect working-tree changes, line diffs, the commit graph, and individual commit details.
+
+![Git working-tree diffs and commit history](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif)
+
+</details>
+
+<details>
+<summary>Breakpoints, stepping, variables, and expression evaluation</summary>
+
+Hit a Python breakpoint, step into a function, inspect variables, evaluate and expand an object, then remove breakpoints and resume.
+
+![Python breakpoints, stepping, expression evaluation, and breakpoint removal](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif)
+
+</details>
+
+<details>
+<summary>Recording and privacy notes</summary>
+
+Recorded in an isolated Harness Web 0.2.1-rc.5 instance on macOS using [this workbench revision](https://github.com/Chengyunlai/dsh-workbench/tree/c0f7910947fba167619a6526c84b343348ebfcea). Git, Pyright, and debugpy are real services; no model call ran. Account and absolute-path areas are excluded, and no existing conversation or real project appears. The GIFs present verified screenshots from the interaction sequence; hold times are edited for reading and do not represent response latency.
+
+</details>
 
 ## Language support
 

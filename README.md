@@ -14,6 +14,7 @@ kind: package-bundle
 ## 目录
 
 - [能力](#能力)
+- [能力演示](#能力演示)
 - [语言支持](#语言支持)
 - [安装](#安装)
 - [使用](#使用)
@@ -40,6 +41,39 @@ flowchart LR
   Workbench --> Git["Git 变更与历史"]
   Workbench --> Debug["断点调试"]
 ```
+
+## 能力演示
+
+场景使用虚构的 Sample Shop 项目，代码、提交作者和业务数据均为演示内容。
+
+**文档与代码导航**：预览 Markdown、切回源码，再通过定义跳转跨文件阅读。
+
+![文档预览、源码切换与跨文件定义跳转](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif)
+
+<details>
+<summary>Git 差异与提交历史</summary>
+
+查看工作区变更、逐行差异、提交图和单次提交详情。
+
+![Git 工作区差异与提交历史](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif)
+
+</details>
+
+<details>
+<summary>断点、单步、变量与表达式求值</summary>
+
+命中 Python 断点、进入函数、查看变量、计算并展开对象结果，最后清理断点并继续运行。
+
+![Python 断点、单步、表达式求值与清理断点](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif)
+
+</details>
+
+<details>
+<summary>录制与脱敏说明</summary>
+
+录制于 macOS 上独立的 Harness Web 0.2.1-rc.5 实例，使用[此版本的工作台](https://github.com/Chengyunlai/dsh-workbench/tree/c0f7910947fba167619a6526c84b343348ebfcea)。Git、Pyright 和 debugpy 均为真实服务，未调用模型。画面排除了账号与绝对路径区域，未录入现有会话或真实项目。GIF 由连续操作中验证过的截图按步骤组成，停留时长为便于阅读而编辑，不代表响应耗时。
+
+</details>
 
 ## 语言支持
 
