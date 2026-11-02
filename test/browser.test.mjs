@@ -373,13 +373,17 @@ test('host theme changes preserve source position and reach code, menus and Git 
   const view = ui.editor();
   const caret = source['src/main.ts'].indexOf('render');
   await ui.caret(caret);
-  // JSDOM retains var() references; resolved light/dark colors are verified in the desktop host.
-  const colors = element => {
+  // JSDOM cannot resolve var() inside background shorthands; inspect their CSS declarations.
+  const colors = (element, selector) => {
     const style = ui.dom.window.getComputedStyle(element);
-    return { background: style.background || style.backgroundColor, foreground: style.color };
+    if (!selector) return { background: style.backgroundColor, foreground: style.color };
+    assert.ok(element.matches(selector));
+    const rule = [...ui.dom.window.document.styleSheets].flatMap(sheet => [...sheet.cssRules]).find(rule => rule.selectorText === selector);
+    assert.ok(rule, selector);
+    return { background: rule.style.background, foreground: style.color };
   };
   const output = {
-    panel: colors(ui.container.querySelector('.jb-root')),
+    panel: colors(ui.container.querySelector('.jb-root'), '.jb-root'),
     editor: colors(ui.container.querySelector('.cm-editor')),
     gutter: colors(ui.container.querySelector('.cm-gutters')),
   };
@@ -390,11 +394,11 @@ test('host theme changes preserve source position and reach code, menus and Git 
   await ui.key('F10', { shiftKey: true });
   const menu = ui.dom.window.document.querySelector('[role=menu]');
   assert.equal(menu.parentElement, ui.dom.window.document.body);
-  output.menu = colors(menu);
+  output.menu = colors(menu, '.jb-editor-popup');
   await act(async () => menu.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
   await ui.menu(ui.container.querySelector('.cm-content'), 'files.diff');
-  output.added = colors(ui.container.querySelector('.jb-dline-add .jb-dline-text'));
-  output.deleted = colors(ui.container.querySelector('.jb-dline-del .jb-dline-text'));
+  output.added = colors(ui.container.querySelector('.jb-dline-add .jb-dline-text'), '.jb-dline-add .jb-dline-text');
+  output.deleted = colors(ui.container.querySelector('.jb-dline-del .jb-dline-text'), '.jb-dline-del .jb-dline-text');
   ui.dom.window.document.body.removeAttribute('data-ds-dark-theme');
   assert.deepEqual(output, JSON.parse(readFileSync(new URL('./fixtures/theme.expected.json', import.meta.url), 'utf8')));
 });

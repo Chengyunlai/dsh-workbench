@@ -12,7 +12,7 @@ Remove API keys, tokens, personal paths, and business data from reproductions, l
 
 ## Local verification
 
-Use Node.js 24 and Git, and work on a separate branch. Run `npm ci` initially, then:
+For development tests, use Node.js 24.15.0 or a newer 24.x release and Git, and work on a separate branch. Run `npm ci` initially, then:
 
 ```sh
 npm run verify

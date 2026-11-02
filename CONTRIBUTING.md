@@ -12,7 +12,7 @@
 
 ## 本地验证
 
-使用 Node.js 24 和 Git，在独立分支中修改。首次运行 `npm ci`，之后执行：
+开发测试使用 Node.js 24.15.0 或更新的 24.x 版本和 Git，在独立分支中修改。首次运行 `npm ci`，之后执行：
 
 ```sh
 npm run verify
