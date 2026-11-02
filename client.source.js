@@ -66,6 +66,17 @@ window.__ModuleLoader__.load({
 
     // ------------------------------------------------------------- i18n
     const en = {
+      "debug.clearBreakpoints": "Remove all breakpoints",
+      "debug.evaluate": "Evaluate expression",
+      "debug.inspection": "Inspection controls",
+      "debug.expression": "Expression",
+      "debug.result": "Result",
+      "debug.closeEvaluation": "Close evaluation",
+      "debug.evaluateHint": "Enter to evaluate · Shift Enter for a new line",
+      "debug.evaluateEffects": "Evaluation may call functions and change program state.",
+      "debug.invalidExpression": "Enter an expression of 1 to 8192 characters.",
+      "debug.evaluateFailed": "Evaluation failed; the expression may have executed. No automatic retry. {message}",
+
       "debug.next": "Step over", "debug.stepIn": "Step into", "debug.stepOut": "Step out", "debug.pause": "Pause",
       "debug.title": "Debugger",
       "debug.launch": "Start debugging",
@@ -80,6 +91,7 @@ window.__ModuleLoader__.load({
       "debug.pythonPort": "Use the debugpy listen port, not a Python process ID.",
       "debug.goPort": "Use a Delve DAP server port, or select Go process ID.",
       "debug.nodePort": "Use the Node inspector port (--inspect).",
+      "debug.breakpointsFailed": "Could not update all adapter breakpoints. Their state is unverified; apply your changes again. {message}",
       "debug.failed": "Debugging failed: {message}",
       "debug.starting": "Starting",
       "debug.running": "Running",
@@ -181,6 +193,17 @@ window.__ModuleLoader__.load({
       'status.untracked': 'Untracked',
     };
     const zh = {
+      "debug.clearBreakpoints": "清理全部断点",
+      "debug.evaluate": "计算表达式",
+      "debug.inspection": "检查操作",
+      "debug.expression": "表达式",
+      "debug.result": "计算结果",
+      "debug.closeEvaluation": "关闭表达式求值",
+      "debug.evaluateHint": "Enter 计算 · Shift Enter 换行",
+      "debug.evaluateEffects": "求值可能调用函数并改变程序状态。",
+      "debug.invalidExpression": "请输入 1～8192 个字符的表达式。",
+      "debug.evaluateFailed": "求值失败，表达式可能已执行；未自动重试。{message}",
+
       "debug.next": "单步跳过", "debug.stepIn": "单步进入", "debug.stepOut": "跳出", "debug.pause": "暂停",
       "debug.title": "调试",
       "debug.launch": "启动调试",
@@ -195,6 +218,7 @@ window.__ModuleLoader__.load({
       "debug.pythonPort": "填写 debugpy 的监听端口，不能直接填写 Python 进程 ID",
       "debug.goPort": "填写 Delve DAP 服务端口，或切换为 Go 进程 ID",
       "debug.nodePort": "填写 Node inspector（--inspect）的监听端口",
+      "debug.breakpointsFailed": "未能更新全部调试器断点，实际状态尚未确认；请重新应用断点。{message}",
       "debug.failed": "调试失败：{message}",
       "debug.starting": "正在启动",
       "debug.running": "运行中",
@@ -437,6 +461,12 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-editor-popup [role=menuitem]:focus-visible{outline:none;background:${C.selection}}
 .jb-editor-popup [role=menuitem]:disabled{opacity:.45}
 .jb-editor-popup kbd{font:inherit;white-space:nowrap;color:inherit}
+.jb-evaluate{width:620px;max-height:calc(88vh - 16px);left:50%;top:12%;transform:translateX(-50%);padding:14px;display:flex;flex-direction:column;gap:10px}
+.jb-evaluate-heading,.jb-evaluate-submit{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.jb-evaluate-heading{font-weight:500}.jb-evaluate-frame{color:${C.textDim};overflow-wrap:anywhere}
+.jb-evaluate label{display:flex;flex-direction:column;gap:6px}.jb-evaluate textarea{box-sizing:border-box;width:100%;min-height:72px;resize:vertical;background:${C.bg};color:${C.text};border:1px solid ${C.border};border-radius:3px;padding:8px;font:13px/20px monospace}
+.jb-evaluate button{background:${C.panel};color:${C.text};border:1px solid ${C.border};border-radius:3px;padding:4px 10px;font:inherit}.jb-evaluate button:disabled{opacity:.45}.jb-evaluate :focus-visible{outline:2px solid ${C.accent};outline-offset:2px}
+.jb-evaluate small{color:${C.textDim}}.jb-evaluate-result{border-top:1px solid ${C.border};padding-top:10px;overflow:auto;max-height:40vh}
 .jb-editor-popup-title{padding:4px 8px;font-weight:500;overflow-wrap:anywhere}
 .jb-goto{width:320px;padding:10px;left:50%;top:25%;transform:translateX(-50%)}
 .jb-goto label{display:block;margin-bottom:6px}
@@ -1059,7 +1089,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('small', { role: error ? 'alert' : undefined }, error ? t('files.invalidLine') : t('files.linePrompt'))), document.body);
     }
 
-    const { useDebugger, useDebugDock, DebugPane, controlItems: debugControlItems, isDebugVisible } = createDebugUI(React, api);
+    const { useDebugger, useDebugDock, DebugPane, EvaluationDialog, controlItems: debugControlItems, isDebugVisible } = createDebugUI(React, api, { createPortal, usePopupDismiss });
 
     /** An explicit local port/PID prompt uses the editor's Enter/Escape interaction. */
     function AttachPrompt({ debug, t, onClose }) {
@@ -1105,7 +1135,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         setMenu({ ...anchor, items: [
         { id: 'debug-start', label: t(debug.session?.state === 'paused' ? 'debug.continue' : 'debug.launch'), shortcut: 'F5', disabled: debug.busy || (debug.session?.id && !['paused', 'ended'].includes(debug.session.state)), run: () => debug.run() },
         { id: 'debug-attach', label: t('debug.attach'), disabled: debug.busy || (debug.session?.id && debug.session.state !== 'ended'), run: () => debug.start('attach') },
-        ...debugControlItems(debug, t).filter(item => item.id !== 'debug-continue'),
+        ...debugControlItems(debug, t).filter(item => item.id !== 'debug-continue').map(item => item.id === 'debug-evaluate' ? { ...item, run: () => debug.openEvaluation(editor.current.selectedText()) } : item),
         { id: 'debug-breakpoint', label: t('debug.breakpoint'), shortcut: 'F9', run: () => debug.toggle(at.line + 1) },
         { id: 'definition', label: t('files.definition'), shortcut: 'F12', disabled: callbacks.current.busy, run: () => callbacks.current.onDefinition(at.line, at.character) },
         { id: 'line', label: t('files.goLine'), shortcut: '⌘L / Ctrl G', run: () => setGoLine(true) },
@@ -1121,7 +1151,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           onDefinition: at => { if (!callbacks.current.busy && !callbacks.current.blocked) callbacks.current.onDefinition(at.line, at.character); },
           onBack: at => callbacks.current.onNavigate(-1, at), onForward: at => callbacks.current.onNavigate(1, at),
           onToggleBreakpoint: line => { if (!callbacks.current.blocked) callbacks.current.debug.toggle(line); }, breakpointLabel: t('debug.breakpoint'),
-          onDebug: action => { if (!callbacks.current.blocked) action === 'run' ? callbacks.current.debug.run() : callbacks.current.debug.action(action); },
+          onDebug: action => { if (!callbacks.current.blocked) action === 'evaluate' ? callbacks.current.debug.openEvaluation(editor.current.selectedText()) : action === 'run' ? callbacks.current.debug.run() : callbacks.current.debug.action(action); },
           onGoLine: () => { if (!callbacks.current.blocked) setGoLine(true); }, onContextMenu: (anchor, at) => { if (!callbacks.current.blocked) showMenu(anchor, at); }, onPosition: setPosition,
         });
         editor.current = instance; applied.current = source;
@@ -1320,7 +1350,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => { controller.abort(); navigationRef.current?.abort(); };
       }, [cwd, target?.path, view, changes, readRevision]);
-      const debug = useDebugger(cwd, t, at => visit(at));
+      const debug = useDebugger(cwd, t, at => visit(at), () => reader.current?.selectedText?.() ?? '');
+      const debugRef = useRef(debug); debugRef.current = debug;
+      const closeEvaluation = useCallback(() => debugRef.current.closeEvaluation(), []);
       const debugLayout = useDebugDock(t);
       const paneLayout = usePaneLayout(t);
       debug.cwd = cwd; debug.path = target?.path; debug.setPath(target?.path); debug.sourcePending = loading || (Boolean(loaded) && !contentMatches);
@@ -1385,6 +1417,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           { id: 'source', label: t('files.read'), shortcut: 'Enter / F4', disabled: !frame.path, run: () => debug.selectFrame(frame.id, true) },
           ...debugControlItems(debug, t),
         ] }) }),
+        debug.evaluation && debug.session?.state === 'paused' && debug.selectedFrameId != null ? h(EvaluationDialog, { key: `${cwd}:${debug.session.id}:${debug.session.pauseId}:${debug.selectedFrameId}`, debug, t, onClose: closeEvaluation }) : null,
         paneLayout.error ? h('div', { className: 'jb-layout-notice', role: 'alert' }, paneLayout.error) : null,
         menu ? h(EditorMenu, { menu, onClose: closeMenu }) : null);
     }

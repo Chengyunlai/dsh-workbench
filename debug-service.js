@@ -12,6 +12,8 @@ const deferred = () => { let resolve; const promise = new Promise(done => { reso
 
 /**
  * Register project configuration and session actions behind the plugin's authenticated routes.
+ * Evaluation requires a frame from the supplied pause generation, uses DAP repl context, and never retries.
+ * Failed or stale evaluation may have changed the target; callers must not infer rollback.
  * @param ctx - Scoped host with filesystem and managed subprocess services.
  * @param config - Validated plugin adapter commands and timeouts.
  * @param validateWorkspace - Registered workspace validator.
@@ -163,10 +165,14 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
     for (const path of Object.keys(session.breakpoints)) session.breakpointPaths.add(path);
     for (const path of session.breakpointPaths) {
       const lines = session.breakpoints[path] ?? [];
-      const source = await readWorkspaceSource(ctx, session.cwd, path);
-      const count = source.text.split('\n').length;
-      if (!lines.every(line => Number.isSafeInteger(line) && line > 0 && line <= count)) throw fail('invalid breakpoint line');
-      const result = await peer.request('setBreakpoints', { source: { path: ctx.fs.processPath(source.file) }, breakpoints: lines.map(line => ({ line })), sourceModified: false });
+      let processPath = session.breakpointSources.get(path);
+      if (lines.length || !processPath) {
+        const source = await readWorkspaceSource(ctx, session.cwd, path);
+        const count = source.text.split('\n').length;
+        if (!lines.every(line => Number.isSafeInteger(line) && line > 0 && line <= count)) throw fail('invalid breakpoint line');
+        processPath = ctx.fs.processPath(source.file); session.breakpointSources.set(path, processPath);
+      }
+      const result = await peer.request('setBreakpoints', { source: { path: processPath }, breakpoints: lines.map(line => ({ line })), sourceModified: false });
       results.push(...(result.breakpoints ?? []).map(item => ({ ...item, path })));
     }
     session.breakpointResults = results; changed(session);
@@ -187,7 +193,7 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
     const points = await validatePoints(cwd, body.breakpoints ?? {});
     if (disposed) throw fail('debugger is unloaded', 503);
     const session = { id: randomUUID(), cwd, processRoot: ctx.fs.processPath(root), name: target.name, language, mode: target.request, state: 'starting', peers: [], sockets: [], child: null,
-      port: null, activePeer: null, frames: [], scopes: [], breakpoints: points, breakpointPaths: new Set(), breakpointResults: [], output: '', revision: 0, refresh: Promise.resolve() };
+      port: null, activePeer: null, frames: [], scopes: [], breakpoints: points, breakpointPaths: new Set(), breakpointSources: new Map(), breakpointResults: [], output: '', revision: 0, refresh: Promise.resolve() };
     sessions.set(session.id, session);
     try {
       if (target.request === 'attach' && target.arguments.connect && language !== 'javascript') {
@@ -248,8 +254,14 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
       if (session.state === 'ended') throw fail('debug session has ended', 409, 'DEBUG_SESSION_ENDED');
       if (body.action === 'breakpoints') {
         if (!body.breakpoints || typeof body.breakpoints !== 'object' || Array.isArray(body.breakpoints)) throw fail('invalid breakpoints');
+        const previous = session.breakpointResults;
         session.breakpoints = await validatePoints(session.cwd, body.breakpoints);
-        for (const p of session.peers) await setBreakpoints(session, p);
+        try { for (const p of session.peers) await setBreakpoints(session, p); }
+        catch (error) {
+          session.breakpointResults = previous.map(point => ({ ...point, verified: false }));
+          changed(session);
+          throw fail(error.message, 409, 'DEBUG_BREAKPOINTS_FAILED');
+        }
       } else if (['continue', 'next', 'stepIn', 'stepOut', 'pause'].includes(body.action)) {
         if (body.action !== 'pause' && session.state !== 'paused') throw fail('program is not paused', 409);
         if (!Number.isSafeInteger(session.threadId)) session.threadId = (await peer.request('threads')).threads?.[0]?.id;
@@ -259,8 +271,18 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
       } else if (body.action === 'scopes') {
         if (session.state !== 'paused' || !session.frames.some(frame => frame.id === body.frameId)) throw fail('stale stack frame', 409);
         return json(await peer.request('scopes', { frameId: body.frameId }));
+      } else if (body.action === 'evaluate') {
+        if (session.state !== 'paused' || !Number.isSafeInteger(body.frameId) || body.pauseId !== (session.stopEpoch ?? 0) || !session.frames.some(frame => frame.id === body.frameId)) throw fail('stale stack frame', 409, 'DEBUG_EVALUATION_STALE');
+        if (typeof body.expression !== 'string' || !body.expression.trim() || body.expression.length > 8192) throw fail('expression must contain 1 to 8192 characters', 400, 'DEBUG_EXPRESSION_INVALID');
+        const epoch = session.stopEpoch ?? 0;
+        let result;
+        try { result = await peer.request('evaluate', { expression: body.expression, frameId: body.frameId, context: 'repl' }); }
+        catch (error) { throw fail(error.message, 409, 'DEBUG_EVALUATION_FAILED'); }
+        if (session.state !== 'paused' || epoch !== (session.stopEpoch ?? 0)) throw fail('program changed while evaluating; the expression may have executed', 409, 'DEBUG_EVALUATION_STALE');
+        if (typeof result.result !== 'string' || !Number.isSafeInteger(result.variablesReference) || result.variablesReference < 0) throw fail('invalid evaluation response; the expression may have executed', 502, 'DEBUG_EVALUATION_FAILED');
+        return json({ result: result.result, type: typeof result.type === 'string' ? result.type : undefined, variablesReference: result.variablesReference });
       } else if (body.action === 'variables') {
-        if (session.state !== 'paused' || !Number.isSafeInteger(body.reference) || body.reference <= 0) throw fail('invalid variable reference');
+        if ((body.pauseId !== undefined && body.pauseId !== (session.stopEpoch ?? 0)) || session.state !== 'paused' || !Number.isSafeInteger(body.reference) || body.reference <= 0) throw fail('invalid variable reference');
         return json(await peer.request('variables', { variablesReference: body.reference, start: 0, count: 100 }));
       } else throw fail('unsupported debug action');
       return json(snapshot(session));

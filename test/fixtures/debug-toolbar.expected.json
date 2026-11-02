@@ -31,6 +31,16 @@
       "disabled": true
     },
     {
+      "action": "evaluate",
+      "label": "计算表达式",
+      "disabled": true
+    },
+    {
+      "action": "clearBreakpoints",
+      "label": "清理全部断点",
+      "disabled": true
+    },
+    {
       "action": "attach",
       "label": "接入已有进程",
       "disabled": false
@@ -68,6 +78,16 @@
       "disabled": false
     },
     {
+      "action": "evaluate",
+      "label": "计算表达式",
+      "disabled": false
+    },
+    {
+      "action": "clearBreakpoints",
+      "label": "清理全部断点",
+      "disabled": true
+    },
+    {
       "action": "attach",
       "label": "接入已有进程",
       "disabled": true
@@ -102,6 +122,16 @@
     {
       "action": "stepOut",
       "label": "跳出",
+      "disabled": true
+    },
+    {
+      "action": "evaluate",
+      "label": "计算表达式",
+      "disabled": true
+    },
+    {
+      "action": "clearBreakpoints",
+      "label": "清理全部断点",
       "disabled": true
     },
     {
@@ -142,6 +172,16 @@
       "disabled": true
     },
     {
+      "action": "evaluate",
+      "label": "计算表达式",
+      "disabled": true
+    },
+    {
+      "action": "clearBreakpoints",
+      "label": "清理全部断点",
+      "disabled": true
+    },
+    {
       "action": "attach",
       "label": "接入已有进程",
       "disabled": false
@@ -150,6 +190,7 @@
   "groups": [
     "运行控制",
     "单步控制",
+    "检查操作",
     "进程接入"
   ],
   "steppingIcons": {

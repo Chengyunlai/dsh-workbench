@@ -1,0 +1,10 @@
+{
+  "title": "计算表达式",
+  "frame": "frame8 · src/main.ts:1",
+  "expression": "state",
+  "result": "计算结果stateObject: {value: 42}valuenumber: 42",
+  "hint": [
+    "Enter 计算 · Shift Enter 换行",
+    "求值可能调用函数并改变程序状态。"
+  ]
+}

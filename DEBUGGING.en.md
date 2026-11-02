@@ -82,7 +82,15 @@ The paused view shows stack frames, variables, and output under separate section
 
 F5/F7/F8/Shift+F8/Alt+F5/Shift+F5 also work while the stack or variables have focus. Right-click a frame or press Shift+F10 for source navigation, resume, step, pause, and end actions. Output/status updates preserve frame selection and variable expansion; the next pause selects the execution frame again. Late variable responses after selection changes or resuming cannot overwrite the current selection. External frames can show variables without reading external source.
 
-Each workspace admits one active session. Expression evaluation, conditional breakpoints, test pickers, browser debugging, and automatic subprocess attachment are unsupported. Breakpoints remain in panel memory and reset after closing/reopening it.
+### Remove breakpoints and evaluate expressions
+
+The toolbar trash icon and source context menu offer Remove all breakpoints. Before launch, this clears every file’s panel breakpoints. During an active session, it also sends clearing requests to every connected adapter and removes markers after confirmation. A failure reports unverified adapter state and retains local markers for reapplication.
+
+While paused, select a stack frame and use the toolbar calculator, the Evaluate expression context action, or Alt+F8. Selected source text prefills the input; Enter or Evaluate expression submits, Shift+Enter adds a line, and Esc closes. Results show types and values, with expandable object children. Changing frames or entering another pause clears old results; continuing or ending the session closes evaluation.
+
+Evaluation uses adapter [DAP evaluate](https://microsoft.github.io/debug-adapter-protocol/specification#Requests_Evaluate) in the current paused frame. Available Python, Go, and JS/TS expressions depend on their adapters; TS uses runtime values. Typing and selecting never evaluate automatically; explicit submission may call functions, modify variables, or cause other side effects. Failure, timeout, or a changed pause cannot guarantee that the expression did not execute; the UI reports this and never retries automatically. Closing the dialog does not undo a submitted evaluation. Expressions are limited to 8192 characters; object children load at most 100 entries per request.
+
+Each workspace admits one active session. Conditional breakpoints, test pickers, browser debugging, and automatic subprocess attachment are unsupported. Breakpoints remain in panel memory and reset after closing/reopening it.
 
 Launch owns its created program: ending or unloading requests termination and awaits managed-process exit. Attach sends `terminateDebuggee: false` and preserves the existing program. Closing the pane or changing chats does not end debugging; returning to the workspace discovers its active session. End sessions explicitly before unloading. Adapter and OS behavior still governs disconnection/termination; failures appear in the debug view.
 

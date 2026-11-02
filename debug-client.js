@@ -3,9 +3,10 @@
  * Create stable client components sharing the host's React instance and authenticated API helper.
  * @param React - Host React exports.
  * @param api - JSON request helper accepting plain object bodies and abort signals.
+ * @param options - Host portal rendering and popup dismissal lifecycle.
  * @returns Workspace debugger state, client-local dock preferences, execution actions and a stack/variable/output view.
  */
-export function createDebugUI(React, api) {
+export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
   const h = React.createElement;
   const { useState, useEffect, useRef, useId } = React;
   const active = session => Boolean(session?.id && session.state !== 'ended');
@@ -25,11 +26,12 @@ export function createDebugUI(React, api) {
     };
     return { dock, change, error };
   }
-  function useDebugger(cwd, t, onLocation) {
+  function useDebugger(cwd, t, onLocation, readExpression) {
     const [session, setSession] = useState(null), [breakpoints, setBreakpoints] = useState({});
     const [error, setError] = useState(null), [choices, setChoices] = useState(null), [busy, setBusy] = useState(false), [attach, setAttach] = useState(null);
     const [selectedFrameId, setSelectedFrameId] = useState(null);
-    const refs = useRef({}); Object.assign(refs.current, { cwd, session, breakpoints, t, onLocation, selectedFrameId });
+    const [evaluation, setEvaluation] = useState(null), [variablesVersion, setVariablesVersion] = useState(0);
+    const refs = useRef({}); Object.assign(refs.current, { cwd, session, breakpoints, t, onLocation, selectedFrameId, readExpression });
     const selectFrame = (id, focusSource = false) => {
       const current = refs.current.session;
       const frame = current?.state === 'paused' && current.frames.find(frame => frame.id === id);
@@ -66,7 +68,7 @@ export function createDebugUI(React, api) {
             if (data.state === 'ended') { update(data); return data; }
           } catch (statusError) { if (refs.current.cwd === cwd) setError(t('debug.failed', { message: statusError.message })); return; }
         }
-        setError(t('debug.failed', { message: error.message }));
+        setError(t(error.code === 'DEBUG_BREAKPOINTS_FAILED' ? 'debug.breakpointsFailed' : 'debug.failed', { message: error.message }));
       }
       finally { if (refs.current.pendingAction === cwd) delete refs.current.pendingAction; if (refs.current.cwd === cwd) setBusy(false); }
     };
@@ -89,7 +91,8 @@ export function createDebugUI(React, api) {
       }
       return () => { cancelled = true; clearTimeout(timer); controller?.abort(); };
     }, [cwd, session?.id, session?.state]);
-    useEffect(() => { setSession(null); setSelectedFrameId(null); setBreakpoints({}); setChoices(null); setAttach(null); setError(null); }, [cwd]);
+    useEffect(() => { setSession(null); setSelectedFrameId(null); setBreakpoints({}); setEvaluation(null); setChoices(null); setAttach(null); setError(null); }, [cwd]);
+    useEffect(() => { if (session?.state !== 'paused') setEvaluation(null); }, [session?.state]);
     const start = async request => {
       if (refs.current.pendingStart === cwd || active(refs.current.session)) return;
       refs.current.pendingStart = cwd;
@@ -109,23 +112,34 @@ export function createDebugUI(React, api) {
       } catch (error) { if (refs.current.cwd === cwd) setError(t('debug.failed', { message: error.message })); }
       finally { if (refs.current.pendingStart === cwd) delete refs.current.pendingStart; if (refs.current.cwd === cwd) setBusy(false); }
     };
+    const changeBreakpoints = async next => {
+      if (refs.current.pendingAction === cwd) return;
+      if (active(refs.current.session)) {
+        const result = await action('breakpoints', { breakpoints: next });
+        if (!result || refs.current.cwd !== cwd) return;
+      }
+      setBreakpoints(next); refs.current.breakpoints = next;
+    };
     const toggle = line => {
       const path = refs.current.path;
       const old = refs.current.breakpoints[path] ?? [];
-      const next = { ...refs.current.breakpoints, [path]: old.includes(line) ? old.filter(n => n !== line) : [...old, line].sort((a, b) => a - b) };
-      setBreakpoints(next); refs.current.breakpoints = next;
-      if (refs.current.session?.id && refs.current.session.state !== 'ended') action('breakpoints', { breakpoints: next });
+      return changeBreakpoints({ ...refs.current.breakpoints, [path]: old.includes(line) ? old.filter(n => n !== line) : [...old, line].sort((a, b) => a - b) });
     };
-    return { session, selectedFrameId, selectFrame, breakpoints, error, choices, busy, attach, closeAttach: () => setAttach(null),
+    return { session, selectedFrameId, selectFrame, breakpoints, error, choices, busy, attach, evaluation, variablesVersion, refreshVariables: () => setVariablesVersion(value => value + 1),
+      openEvaluation: (expression = refs.current.readExpression?.() ?? '') => { if (refs.current.pendingAction !== cwd && refs.current.session?.state === 'paused' && refs.current.selectedFrameId != null) setEvaluation({ expression }); }, closeEvaluation: () => setEvaluation(null),
+      clearBreakpoints: () => changeBreakpoints({}), closeAttach: () => setAttach(null),
       submitAttach: input => { setAttach(null); return action('start', { attach: input, breakpoints: refs.current.breakpoints }); },
       setPath: path => { refs.current.path = path; }, toggle,
       choose: name => { setChoices(null); return action('start', { name, breakpoints }); }, closeChoices: () => setChoices(null),
       start, action, run: () => active(refs.current.session) ? action('continue') : start('launch') };
   }
   function controlItems(debug, t) {
-    return [['continue', 'F5'], ['next', 'F8'], ['stepIn', 'F7'], ['stepOut', 'Shift F8'], ['pause', 'Alt F5'], ['stop', 'Shift F5']].map(([name, shortcut]) => ({
+    return [...[['continue', 'F5'], ['next', 'F8'], ['stepIn', 'F7'], ['stepOut', 'Shift F8'], ['pause', 'Alt F5'], ['stop', 'Shift F5']].map(([name, shortcut]) => ({
       id: 'debug-' + name, label: t('debug.' + name), shortcut, disabled: debug.busy || !enabled(debug.session, name), run: () => debug.action(name),
-    }));
+    })),
+      { id: 'debug-evaluate', label: t('debug.evaluate'), shortcut: 'Alt F8', disabled: debug.busy || debug.session?.state !== 'paused' || debug.selectedFrameId == null, run: () => debug.openEvaluation() },
+      { id: 'debug-clearBreakpoints', label: t('debug.clearBreakpoints'), disabled: debug.busy || !(Object.values(debug.breakpoints).some(lines => lines.length) || (active(debug.session) && debug.session.breakpoints?.length)), run: debug.clearBreakpoints },
+    ];
   }
   // General controls use Lucide (ISC); stepping arrows follow the supplied IDE reference.
   const icons = {
@@ -136,6 +150,8 @@ export function createDebugUI(React, api) {
     next: [['path', { d: 'm4 13 7-7 8 8M12 14h7V7' }], ['path', { d: 'M4 20h16' }]],
     stepIn: [['path', { d: 'M12 17V3' }], ['path', { d: 'm6 11 6 6 6-6' }], ['path', { d: 'M19 21H5' }]],
     stepOut: [['path', { d: 'm18 9-6-6-6 6' }], ['path', { d: 'M12 3v14' }], ['path', { d: 'M5 21h14' }]],
+    evaluate: [['rect', { x: 4, y: 3, width: 16, height: 18, rx: 2 }], ['path', { d: 'M8 7h8M8 12h2m4 0h2M8 16h2m4 0h2' }]],
+    clearBreakpoints: [['path', { d: 'M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6M10 10v7M14 10v7' }]],
     attach: [['path', { d: 'M12 22v-5' }], ['path', { d: 'M15 8V2' }], ['path', { d: 'M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z' }], ['path', { d: 'M9 8V2' }]],
   };
   function DebugToolbar({ debug, t }) {
@@ -147,6 +163,7 @@ export function createDebugUI(React, api) {
         ...['debug-stop', 'debug-pause'].map(id => controls.find(item => item.id === id)),
       ] },
       { name: 'stepping', items: ['debug-next', 'debug-stepIn', 'debug-stepOut'].map(id => controls.find(item => item.id === id)) },
+      { name: 'inspection', items: ['debug-evaluate', 'debug-clearBreakpoints'].map(id => controls.find(item => item.id === id)) },
       { name: 'connection', items: [{ id: 'debug-attach', label: t('debug.attach'), disabled: debug.busy || debug.sourcePending || active(debug.session), run: () => debug.start('attach') }] },
     ];
     return h('div', { ref, className: 'jb-debug-toolbar', role: 'toolbar', 'aria-label': t('debug.title'), 'aria-busy': debug.busy,
@@ -183,17 +200,47 @@ export function createDebugUI(React, api) {
     const [items, setItems] = useState(null), [error, setError] = useState(null);
     useEffect(() => {
       let alive = true; const controller = new AbortController();
-      api('/api/git.debug.action', { method: 'POST', signal: controller.signal, headers: { 'content-type': 'application/json' }, body: { cwd: debug.cwd, id: debug.session.id, action: 'variables', reference } })
+      setItems(null); setError(null);
+      api('/api/git.debug.action', { method: 'POST', signal: controller.signal, headers: { 'content-type': 'application/json' }, body: { cwd: debug.cwd, id: debug.session.id, action: 'variables', reference, pauseId: debug.session.pauseId } })
         .then(data => { if (alive) setItems(data.variables ?? []); })
         .catch(error => { if (alive) setError(t('debug.failed', { message: error.message })); });
       return () => { alive = false; controller.abort(); };
-    }, [debug.cwd, debug.session.id, debug.session.pauseId, reference]);
+    }, [debug.cwd, debug.session.id, debug.session.pauseId, reference, debug.variablesVersion]);
     if (error) return h('div', { role: 'alert' }, error);
     if (items === null) return h('div', { className: 'jb-debug-placeholder', role: 'status' }, t('loading'));
     if (!items.length) return h('div', { className: 'jb-debug-placeholder' }, t('debug.noVariables'));
     return h('ul', { className: 'jb-variable-list' }, ...(items ?? []).map(item => h('li', { key: item.name + ':' + item.variablesReference }, item.variablesReference > 0
       ? h(VariableTree, { debug, reference: item.variablesReference, title: h(VariableValue, { item }), t })
       : h('div', { className: 'jb-variable-leaf' }, h(VariableValue, { item })))));
+  }
+  function EvaluationDialog({ debug, t, onClose }) {
+    const ref = useRef(null), input = useRef(null), pending = useRef(false), sequence = useRef(0);
+    const [expression, setExpression] = useState(debug.evaluation.expression), [result, setResult] = useState(null), [error, setError] = useState(null), [busy, setBusy] = useState(false);
+    const alive = useRef(true);
+    usePopupDismiss(ref, onClose);
+    useEffect(() => { alive.current = true; input.current?.focus(); input.current?.select(); return () => { alive.current = false; }; }, []);
+    const session = debug.session, frame = session.frames.find(frame => frame.id === debug.selectedFrameId);
+    const submit = async () => {
+      if (pending.current || !expression.trim()) return;
+      pending.current = true; setBusy(true); setResult(null); setError(null);
+      try {
+        const data = await api('/api/git.debug.action', { method: 'POST', body: { cwd: debug.cwd, id: session.id, action: 'evaluate', expression, frameId: frame.id, pauseId: session.pauseId } });
+        if (alive.current) setResult({ ...data, expression, sequence: ++sequence.current });
+      } catch (error) { if (alive.current) setError(t(error.code === 'DEBUG_EXPRESSION_INVALID' ? 'debug.invalidExpression' : 'debug.evaluateFailed', { message: error.message })); }
+      finally { pending.current = false; if (alive.current) { setBusy(false); debug.refreshVariables(); } }
+    };
+    return createPortal(h('section', { ref, role: 'dialog', 'aria-label': t('debug.evaluate'), className: 'jb-editor-popup jb-evaluate' },
+      h('div', { className: 'jb-evaluate-heading' }, h('span', null, t('debug.evaluate')), h('button', { type: 'button', onClick: onClose, 'aria-label': t('debug.closeEvaluation') }, '×')),
+      h('div', { className: 'jb-evaluate-frame', title: frame.path }, frame.name + ' · ' + (frame.path ?? t('debug.external')) + ':' + frame.line),
+      h('label', null, t('debug.expression'), h('textarea', { ref: input, value: expression, rows: 3, maxLength: 8192, spellCheck: false, 'aria-label': t('debug.expression'), disabled: busy,
+        onChange: event => setExpression(event.target.value), onKeyDownCapture: event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.stopPropagation(); submit(); } } })),
+      h('div', { className: 'jb-evaluate-submit' }, h('small', null, t('debug.evaluateHint')), h('button', { type: 'button', disabled: busy || !expression.trim(), onClick: submit }, t(busy ? 'loading' : 'debug.evaluate'))),
+      h('small', null, t('debug.evaluateEffects')),
+      error ? h('div', { role: 'alert' }, error) : null,
+      result ? h('div', { className: 'jb-evaluate-result', role: 'status', 'aria-label': t('debug.result') },
+        h('div', null, t('debug.result')), result.variablesReference > 0
+          ? h(VariableTree, { key: result.sequence, debug, reference: result.variablesReference, title: h(VariableValue, { item: { name: result.expression, value: result.result, type: result.type } }), t })
+          : h(VariableValue, { item: { name: result.expression, value: result.result, type: result.type } })) : null), document.body);
   }
   function FrameList({ debug, t, onMenu }) {
     const id = useId(), ref = useRef(null), session = debug.session;
@@ -248,6 +295,7 @@ export function createDebugUI(React, api) {
       : frameScopes?.sessionId === session?.id && frameScopes?.frameId === frameId && frameScopes.pauseId === session?.pauseId ? frameScopes : null;
     return h('section', { className: 'jb-debug-pane', 'aria-label': t('debug.title'), onKeyDown: event => {
       if (event.metaKey || event.ctrlKey || event.isComposing) return;
+      if (event.key === 'F8' && event.altKey && !event.shiftKey) { event.preventDefault(); event.stopPropagation(); debug.openEvaluation(); return; }
       const action = event.key === 'F5' ? event.shiftKey ? 'stop' : event.altKey ? 'pause' : 'continue'
         : event.key === 'F8' && !event.altKey ? event.shiftKey ? 'stepOut' : 'next' : event.key === 'F7' && !event.shiftKey && !event.altKey ? 'stepIn' : null;
       if (!action) return;
@@ -274,5 +322,5 @@ export function createDebugUI(React, api) {
             ...(selectedScopes?.scopes ?? []).map((scope, index) => h(VariableTree, { key: scope.variablesReference, debug, reference: scope.variablesReference, title: scope.name, defaultOpen: index === 0, t }))))) : null,
       session?.output ? h('details', { open: true, className: 'jb-debug-section jb-debug-output' }, h('summary', null, t('debug.output')), h('pre', null, session.output)) : null));
   }
-  return { useDebugger, useDebugDock, DebugPane, controlItems, isDebugVisible };
+  return { useDebugger, useDebugDock, DebugPane, EvaluationDialog, controlItems, isDebugVisible };
 }

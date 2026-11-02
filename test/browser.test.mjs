@@ -1015,3 +1015,120 @@ test('occurrence highlighting follows both themes and works in Go, Java, Python,
   assert.equal(ui.editor().state.doc.toString(),text);
  }
 });
+
+test('all breakpoints can be removed before launch and active removal waits for adapter confirmation', async context => {
+ const actions = []; let live = false, failClear = true;
+ let session = { id: 'clear', state: 'paused', revision: 1, pauseId: 1, name: 'Clear', frames: [{ id: 7, path: 'src/main.ts', name: 'main', line: 1, column: 1 }], scopes: [], breakpoints: [{ path: 'src/main.ts', line: 1, verified: true }] };
+ const ui = await panel(context, server((url, options) => {
+  if (url.pathname === '/api/git.debug.status') return Promise.resolve({ ok: true, json: async () => live ? session : { id: null, state: 'idle' } });
+  if (url.pathname === '/api/git.debug.configurations') return Promise.resolve({ ok: true, json: async () => ({ configurations: [{ name: 'Clear', request: 'launch' }] }) });
+  if (url.pathname === '/api/git.debug.action') {
+   const body = JSON.parse(options.body); actions.push(body);
+   if (body.action === 'start') live = true;
+   if (body.action === 'stop') session = { ...session, state: 'ended', revision: session.revision + 1, breakpoints: [{ path: 'src/main.ts', line: 1, verified: true }] };
+   if (body.action === 'breakpoints') {
+    if (failClear) return Promise.resolve({ ok: false, json: async () => ({ code: 'DEBUG_BREAKPOINTS_FAILED', error: 'adapter unavailable' }) });
+    session = { ...session, revision: session.revision + 1, breakpoints: [] };
+   }
+   return Promise.resolve({ ok: true, json: async () => session });
+  }
+ }));
+ await ui.click('src'); await ui.click('main.ts'); await ui.caret(0); await ui.key('F9');
+ const clear = () => ui.container.querySelector('[data-action=clearBreakpoints]');
+ assert.equal(clear().disabled, false);
+ await act(async () => clear().click());
+ assert.equal(actions.length, 0); assert.equal(ui.container.querySelectorAll('.jb-breakpoint-enabled').length, 0);
+ await ui.key('F9'); await ui.key('F5');
+ await act(async () => clear().click());
+ assert.deepEqual(actions.at(-1).breakpoints, {});
+ assert.equal(ui.container.querySelectorAll('.jb-breakpoint-enabled').length, 1, 'failed clearing retains the requested markers');
+ assert.match(ui.container.querySelector('.jb-debug-pane [role=alert]').textContent, /尚未确认/);
+ failClear = false;
+ await act(async () => clear().click());
+ assert.equal(ui.container.querySelectorAll('.jb-breakpoint-enabled').length, 0); assert.equal(clear().disabled, true);
+ await ui.key('F9');
+ await act(async () => ui.container.querySelector('[data-action=stop]').click());
+ const count = actions.length;
+ await act(async () => clear().click());
+ assert.equal(actions.length, count, 'ended sessions clear local markers without contacting a stopped adapter');
+ assert.equal(clear().disabled, true, 'historical adapter results do not keep the clear action enabled');
+});
+
+test('Alt F8 evaluates selected source explicitly in the selected frame and expands returned objects', async context => {
+ const calls = []; let evaluated = false;
+ const session = { id: 'eval', name: 'Evaluate', state: 'paused', revision: 1, pauseId: 3, frames: [7, 8].map(id => ({ id, path: 'src/main.ts', name: 'frame' + id, line: 1, column: 1 })), scopes: [], breakpoints: [] };
+ const ui = await panel(context, server((url, options) => {
+  if (url.pathname === '/api/git.debug.status') return Promise.resolve({ ok: true, json: async () => session });
+  if (url.pathname === '/api/git.debug.action') {
+   const body = JSON.parse(options.body); calls.push(body);
+   if (body.action === 'evaluate') evaluated = true;
+   const data = body.action === 'evaluate' ? { result: '{value: 42}', type: 'Object', variablesReference: 91 }
+    : body.action === 'variables' ? { variables: [{ name: 'value', value: body.reference === 90 && !evaluated ? '41' : '42', type: 'number', variablesReference: 0 }] } : { scopes: [{ name: 'Locals', variablesReference: 90 }] };
+   return Promise.resolve({ ok: true, json: async () => data });
+  }
+ }));
+ await act(async () => ui.container.querySelectorAll('[role=option]')[1].click());
+ assert.equal(ui.container.querySelector('.jb-debug-scopes .jb-variable-value').textContent, '41');
+ await act(async () => ui.editor().dispatch({ selection: { anchor: 0, head: 5 } }));
+ await ui.key('F8', { altKey: true });
+ const doc = ui.dom.window.document, dialog = () => doc.querySelector('.jb-evaluate');
+ assert.ok(dialog()); assert.equal(ui.container.contains(dialog()), false);
+ const input = dialog().querySelector('textarea'); assert.equal(input.value, 'const'); assert.equal(doc.activeElement, input);
+ assert.equal(calls.filter(call => call.action === 'evaluate').length, 0, 'opening never evaluates');
+ await act(async () => {
+  Object.getOwnPropertyDescriptor(ui.dom.window.HTMLTextAreaElement.prototype, 'value').set.call(input, 'state');
+  input.dispatchEvent(new ui.dom.window.Event('input', { bubbles: true }));
+ });
+ assert.equal(calls.filter(call => call.action === 'evaluate').length, 0, 'editing never evaluates');
+ await act(async () => input.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true })));
+ assert.equal(calls.filter(call => call.action === 'evaluate').length, 0);
+ await act(async () => input.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })));
+ const evaluate = calls.find(call => call.action === 'evaluate');
+ assert.equal(evaluate.expression, 'state'); assert.equal(evaluate.frameId, 8); assert.equal(evaluate.pauseId, 3);
+ assert.ok(dialog().textContent.includes('{value: 42}'));
+ assert.equal(ui.container.querySelector('.jb-debug-scopes .jb-variable-value').textContent, '42', 'variables refresh after evaluation');
+ const branch = dialog().querySelector('details');
+ await act(async () => { branch.open = true; branch.dispatchEvent(new ui.dom.window.Event('toggle')); });
+ assert.equal(dialog().querySelector('.jb-variable-leaf .jb-variable-value').textContent, '42');
+ assert.equal(calls.at(-1).reference, 91); assert.equal(calls.at(-1).pauseId, 3);
+ const snapshot = { title: dialog().getAttribute('aria-label'), frame: dialog().querySelector('.jb-evaluate-frame').textContent, expression: input.value,
+  result: dialog().querySelector('.jb-evaluate-result').textContent, hint: [...dialog().querySelectorAll('small')].map(node => node.textContent) };
+ assert.deepEqual(snapshot, JSON.parse(readFileSync(new URL('./fixtures/evaluation.expected.json', import.meta.url), 'utf8')));
+ await act(async () => doc.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+ assert.equal(dialog(), null);
+ await act(async () => ui.container.querySelector('[data-action=evaluate]').click());
+ assert.equal(dialog().querySelector('textarea').value, 'const', 'toolbar uses the source selection');
+ await act(async () => doc.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+ ui.editor().posAtCoords = () => 2;
+ await ui.menu(ui.container.querySelector('.cm-content'), 'debug.evaluate');
+ assert.equal(dialog().querySelector('textarea').value, 'const', 'context menu uses the source selection');
+});
+
+test('failed evaluation remains visible without retry and late results cannot replace a newer pause', async context => {
+ let resolveEvaluation, calls = 0;
+ let session = { id: 'late-eval', name: 'Evaluate', state: 'paused', revision: 1, pauseId: 1, frames: [{ id: 7, path: 'src/main.ts', name: 'main', line: 1, column: 1 }], scopes: [], breakpoints: [] };
+ const ui = await panel(context, server((url, options) => {
+  if (url.pathname === '/api/git.debug.status') return Promise.resolve({ ok: true, json: async () => session });
+  if (url.pathname === '/api/git.debug.action') {
+   const body = JSON.parse(options.body);
+   if (body.action === 'evaluate') {
+    calls++;
+    if (calls === 1) return Promise.resolve({ ok: false, json: async () => ({ code: 'DEBUG_EVALUATION_FAILED', error: 'name not found' }) });
+    return new Promise(resolve => { resolveEvaluation = resolve; });
+   }
+   if (body.action === 'next') session = { ...session, pauseId: 2, revision: 2 };
+   return Promise.resolve({ ok: true, json: async () => session });
+  }
+ }));
+ await ui.click('src'); await ui.click('main.ts');
+ await act(async () => ui.editor().dispatch({ selection: { anchor: 0, head: 5 } }));
+ await ui.key('F8', { altKey: true });
+ const doc = ui.dom.window.document, dialog = () => doc.querySelector('.jb-evaluate');
+ const enter = async () => act(async () => dialog().querySelector('textarea').dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })));
+ await enter(); assert.match(dialog().querySelector('[role=alert]').textContent, /可能已执行/); assert.equal(calls, 1);
+ await enter(); await enter(); assert.equal(calls, 2, 'pending evaluation is submitted only once');
+ await act(async () => ui.container.querySelector('[data-action=next]').click());
+ assert.equal(dialog().querySelector('.jb-evaluate-result'), null);
+ await act(async () => resolveEvaluation({ ok: true, json: async () => ({ result: 'STALE', variablesReference: 0 }) }));
+ assert.equal(dialog().querySelector('.jb-evaluate-result'), null); assert.equal(calls, 2);
+});

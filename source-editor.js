@@ -187,7 +187,7 @@ export function createSourceEditor(parent, options) {
     Prec.highest(keymap.of([
       { key: 'Mod-b', run: define, stopPropagation: true },
       { key: 'F9', run: view => { options.onToggleBreakpoint(positionAt(view).line + 1); return true; }, stopPropagation: true },
-      ...[['F5', 'run'], ['Shift-F5', 'stop'], ['F8', 'next'], ['F7', 'stepIn'], ['Shift-F8', 'stepOut'], ['Alt-F5', 'pause']].map(([key, action]) => ({ key, run: () => { options.onDebug(action); return true; }, stopPropagation: true })),
+      ...[['F5', 'run'], ['Shift-F5', 'stop'], ['F8', 'next'], ['F7', 'stepIn'], ['Shift-F8', 'stepOut'], ['Alt-F5', 'pause'], ['Alt-F8', 'evaluate']].map(([key, action]) => ({ key, run: () => { options.onDebug(action); return true; }, stopPropagation: true })),
       { key: 'F12', run: define, stopPropagation: true },
       { key: 'Shift-F10', run: contextMenu, stopPropagation: true },
       { key: 'Ctrl-g', mac: 'Meta-l', run: () => { options.onGoLine(); return true; }, stopPropagation: true },
@@ -213,7 +213,8 @@ export function createSourceEditor(parent, options) {
       contextmenu(event, view) {
         event.preventDefault();
         const position = view.posAtCoords({ x: event.clientX, y: event.clientY });
-        if (position !== null) view.dispatch({ selection: { anchor: position } });
+        const selected = view.state.selection.main;
+        if (position !== null && (selected.empty || position < selected.from || position > selected.to)) view.dispatch({ selection: { anchor: position } });
         options.onContextMenu({ x: event.clientX, y: event.clientY }, positionAt(view)); return true;
       },
       mousemove(event, view) {
@@ -272,6 +273,7 @@ export function createSourceEditor(parent, options) {
     setDebug: value => view.dispatch({ effects: debugEffect.of(value) }),
     setSource: (source, position) => { sourceVersion = source.version; view.setState(createState(source.text, source.path)); reveal(position, true); },
     snapshot: () => ({ ...positionAt(view), viewport: { version: sourceVersion, effect: view.scrollSnapshot() } }),
+    selectedText: () => view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to),
     focus: () => view.focus(), position: () => positionAt(view), reveal,
     measure: () => view.requestMeasure(),
     anchor: () => { const box = view.coordsAtPos(view.state.selection.main.head); return { x: box?.left ?? parent.getBoundingClientRect().left, y: box?.bottom ?? parent.getBoundingClientRect().top }; },

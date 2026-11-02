@@ -23,6 +23,12 @@ async function status(h, id, predicate) {
   }
   throw new Error('debug state deadline exceeded: ' + JSON.stringify(last));
 }
+async function evaluateAndClear(h, paused, expression) {
+  const result = await request(h, { action: 'evaluate', id: paused.id, pauseId: paused.pauseId, frameId: paused.frames[0].id, expression });
+  assert.equal(result.result, '42', JSON.stringify(result));
+  const cleared = await request(h, { action: 'breakpoints', id: paused.id, breakpoints: {} });
+  assert.deepEqual(cleared.breakpoints, []);
+}
 test('real debugpy launches, binds a breakpoint, reads variables, steps and stops', { timeout: 90000 }, async t => {
   const h = await fixture(t, null, { debugAdapters: { python: { command: python, args: ['-m', 'debugpy.adapter'] } } });
   await mkdir(join(h.root, '.dsh'));
@@ -34,6 +40,7 @@ test('real debugpy launches, binds a breakpoint, reads variables, steps and stop
   const scope = paused.scopes.find(scope => scope.name === 'Locals');
   const vars = await request(h, { action: 'variables', id: started.id, reference: scope.variablesReference });
   assert.ok(vars.variables.some(item => item.name === 'value' && item.value === '41'));
+  await evaluateAndClear(h, paused, 'value + 1');
   await request(h, { action: 'next', id: started.id });
   const stepped = await status(h, started.id, data => data.state === 'paused' && data.frames[0]?.line === 3);
   assert.equal(stepped.frames[0].line, 3);
@@ -85,6 +92,7 @@ test('real Delve launches Go, hits a breakpoint and reads a local variable', { t
   assert.equal(paused.frames[0].line, 5);
   const vars = await request(h, { action: 'variables', id: started.id, reference: paused.scopes[0].variablesReference });
   assert.ok(vars.variables.some(item => item.name === 'value' && item.value === '41'));
+  await evaluateAndClear(h, paused, 'value + 1');
   await request(h, { action: 'stop', id: started.id });
 });
 
@@ -114,6 +122,7 @@ test('real js-debug launches JavaScript, binds a breakpoint and reads local vari
   assert.equal(paused.frames[0].line, 2);
   const vars = await request(h, { action: 'variables', id: started.id, reference: paused.scopes[0].variablesReference });
   assert.ok(vars.variables.some(item => item.name === 'value' && item.value === '41'));
+  await evaluateAndClear(h, paused, 'value + 1');
   await request(h, { action: 'stop', id: started.id });
 });
 
@@ -135,6 +144,11 @@ test('TypeScript source maps bind original source lines and step through typed c
   const stepped = await status(h, started.id, data => data.state === 'paused' && data.frames[0]?.path === 'main.ts' && data.frames[0].line === 4);
   const vars = await request(h, { action: 'variables', id: started.id, reference: stepped.scopes[0].variablesReference });
   assert.ok(vars.variables.some(item => item.name === 'result' && item.value === '42'));
+  await evaluateAndClear(h, stepped, 'state.value + 1');
+  const object = await request(h, { action: 'evaluate', id: stepped.id, pauseId: stepped.pauseId, frameId: stepped.frames[0].id, expression: 'state' });
+  assert.ok(object.variablesReference > 0);
+  const children = await request(h, { action: 'variables', id: stepped.id, reference: object.variablesReference, pauseId: stepped.pauseId });
+  assert.ok(children.variables.some(item => item.name === 'value' && item.value === '41'));
   await request(h, { action: 'stop', id: started.id });
 });
 

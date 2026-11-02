@@ -29,7 +29,7 @@ Inspect projects, follow code, and debug programs beside DeepSeek Harness conver
 | Code reading | Read multiple tabs with syntax and occurrence highlighting, function/type definitions, and navigation history |
 | Documents | Switch Markdown between reading preview and source, follow document links, and read highlighted configuration files |
 | Git inspection | Inspect changes, unified diffs, commit graphs, and commit details alongside current source |
-| Debugging | Launch or attach, set breakpoints, resume, pause, step, and inspect frames, variables, and output |
+| Debugging | Launch or attach, set breakpoints, resume, pause, step, and inspect frames, variables, expression results, and output; remove all breakpoints |
 | Conversation handoff | Explicitly send file or commit references, or selected diff lines, with a review suggestion to a new project conversation |
 
 ```mermaid
@@ -79,7 +79,7 @@ See the [user guide](USAGE.en.md) for shortcuts, language setup, and reading beh
 - Works with registered Git projects in Harness. Source is read-only; Git has no staging, commits, resets, or branch switching.
 - A debugged program can write files or access external services; prepare its development environment before launching it. `.dsh/debug.json` is only needed for custom project arguments.
 - Breakpoints, source tabs, and reading history live in the current panel’s memory and are not restored as durable project state after closing it.
-- Java debugging, source editing, conditional breakpoints, expression evaluation, and automatic builds are unavailable. Markdown images currently display their descriptions.
+- Java debugging, source editing, conditional breakpoints and automatic builds are unavailable. Markdown images currently display their descriptions.
 
 ## Documentation and verification
 

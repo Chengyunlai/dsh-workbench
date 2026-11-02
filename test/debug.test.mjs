@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, writeFile, symlink } from 'node:fs/promises';
+import { mkdir, writeFile, symlink, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fixture } from './support/host.mjs';
@@ -113,4 +113,58 @@ test('current-file discovery preserves project venv paths and resolves explicit 
  assert.deepEqual(ts.arguments.outFiles, [join(h.root, 'dist/main.js')]);
  await writeFile(join(h.root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { rootDir: 'src', outDir: '../../outside' } }));
  await assert.rejects(currentFileTarget(h.ctx, h.root, 'src/main.ts'), { code: 'DEBUG_TS_BUILD' });
+});
+
+async function pausedFixture(t) {
+ const h = await fixture(t, null, { debugAdapters: { javascript: { ...adapter, args: [...adapter.args, '--paused'] } } });
+ const started = await action(h, { action: 'start', currentFile: 'new.js', breakpoints: { 'new.js': [2], 'src/main.ts': [1] } });
+ assert.equal(started.status, 200, JSON.stringify(started));
+ const deadline = Date.now() + 3000;
+ while (Date.now() < deadline) {
+  const paused = await h.call('debug.status', { id: started.id });
+  if (paused.frames?.length) return { h, paused };
+  await new Promise(resolve => setTimeout(resolve, 10));
+ }
+ throw new Error('fixture did not pause');
+}
+test('evaluation uses the requested frame and rejects invalid, expired or failed evaluations', async t => {
+ const { h, paused } = await pausedFixture(t);
+ const evaluate = expression => action(h, { action: 'evaluate', id: paused.id, pauseId: paused.pauseId, frameId: paused.frames[1].id, expression });
+ const result = await evaluate('$request');
+ assert.equal(result.status, 200);
+ assert.deepEqual(JSON.parse(result.result), { expression: '$request', frameId: paused.frames[1].id, context: 'repl' });
+ for (const expression of ['', '  ', 42, 'x'.repeat(8193)]) {
+  const invalid = await evaluate(expression);
+  assert.equal(invalid.status, 400); assert.equal(invalid.code, 'DEBUG_EXPRESSION_INVALID');
+ }
+ for (const extra of [{ pauseId: paused.pauseId + 1 }, { frameId: 999 }, { pauseId: undefined }]) {
+  const stale = await action(h, { action: 'evaluate', id: paused.id, expression: 'value', pauseId: paused.pauseId, frameId: paused.frames[0].id, ...extra });
+  assert.equal(stale.status, 409); assert.equal(stale.code, 'DEBUG_EVALUATION_STALE');
+ }
+ assert.equal((await evaluate('$invalid')).code, 'DEBUG_EVALUATION_FAILED');
+ const failure = await evaluate('missing'); assert.equal(failure.code, 'DEBUG_EVALUATION_FAILED');
+ const resumed = await evaluate('resume'); assert.equal(resumed.code, 'DEBUG_EVALUATION_STALE');
+ assert.equal((await evaluate('42')).code, 'DEBUG_EVALUATION_STALE');
+ await action(h, { action: 'stop', id: paused.id });
+});
+test('removing all breakpoints clears every adapter source, including a file deleted after binding', async t => {
+ const { h, paused } = await pausedFixture(t);
+ await unlink(join(h.root, 'src/main.ts'));
+ const cleared = await action(h, { action: 'breakpoints', id: paused.id, breakpoints: {} });
+ assert.equal(cleared.status, 200, JSON.stringify(cleared)); assert.deepEqual(cleared.breakpoints, []);
+ const evaluated = await action(h, { action: 'evaluate', id: paused.id, expression: '$points', frameId: paused.frames[0].id, pauseId: paused.pauseId });
+ const points = JSON.parse(evaluated.result);
+ assert.equal(Object.keys(points).length, 2); assert.ok(Object.values(points).every(lines => lines.length === 0));
+ await action(h, { action: 'stop', id: paused.id });
+});
+
+test('partial adapter breakpoint failures report unverified state rather than successful removal', async t => {
+ const h = await fixture(t, null, { debugAdapters: { javascript: { ...adapter, args: [...adapter.args, '--fail-clear'] } } });
+ const started = await action(h, { action: 'start', currentFile: 'new.js', breakpoints: { 'new.js': [2] } });
+ assert.equal(started.status, 200);
+ const failed = await action(h, { action: 'breakpoints', id: started.id, breakpoints: {} });
+ assert.equal(failed.status, 409); assert.equal(failed.code, 'DEBUG_BREAKPOINTS_FAILED');
+ const status = await h.call('debug.status', { id: started.id });
+ assert.equal(status.breakpoints[0].verified, false);
+ await action(h, { action: 'stop', id: started.id });
 });
