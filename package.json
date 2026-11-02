@@ -11,7 +11,7 @@
     "setup:debuggers": "node scripts/configure-debuggers.mjs",
     "test:debug": "node --test test/debug.e2e.mjs"
   },
-  "description": "Development workbench for DeepSeek Harness: code and document reading, definitions, Git inspection, and launch/attach debugging.",
+  "description": "Development workbench for DeepSeek Harness: files, code navigation, document previews, Git diffs and history, and breakpoint debugging with expression evaluation.",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

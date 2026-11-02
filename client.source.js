@@ -116,7 +116,7 @@ window.__ModuleLoader__.load({
       'layout.unsaved': 'Size changed for this panel. Browser storage is unavailable, so it cannot be saved.',
 
       panel: 'Development workbench',
-      'guide.description': 'Read code and documents, inspect Git changes, and debug programs',
+      'guide.description': 'Browse projects, navigate code, inspect Git changes, and debug',
       'log.message': 'Message', 'log.author': 'Author', 'log.date': 'Date', 'log.hash': 'Hash',
       title: 'Development workbench',
       'tabs.files': 'Files',
@@ -243,7 +243,7 @@ window.__ModuleLoader__.load({
       'layout.unsaved': '尺寸已调整，但浏览器存储不可用，仅对本次面板生效',
 
       panel: '开发工作台',
-      'guide.description': '阅读代码与文档、查看 Git 变更并调试程序',
+      'guide.description': '浏览项目、跳转代码、查看 Git 变更并调试程序',
       'log.message': '提交说明', 'log.author': '作者', 'log.date': '日期', 'log.hash': '提交号',
       title: '开发工作台',
       'tabs.files': '文件',
@@ -1750,14 +1750,13 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     // ------------------------------------------------------------- icon
-    // Lucide "panels-top-left" (ISC License) represents the project workbench.
-    function WorkbenchIcon({ size = 18 }) {
-      return h('svg', {
-        viewBox: '0 0 24 24', width: size, height: size, 'aria-hidden': true,
-        fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
-      },
-        h('rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }),
-        h('path', { d: 'M3 9h18M9 9v12' }));
+    /** Fixed-palette artwork matching the official guide canvas and blue palette. */
+    function WorkbenchIcon({ size = 36, className }) {
+      return h('svg', { viewBox: '0 0 36 36', width: size, height: size, className, 'aria-hidden': true, fill: 'none', xmlns: 'http://www.w3.org/2000/svg' },
+        h('path', { d: 'M8 13H13V27H10C8.89543 27 8 26.1046 8 25V13Z', fill: '#7FB7FC', fillOpacity: 0.55 }),
+        h('rect', { x: 7, y: 8, width: 22, height: 20, rx: 2, stroke: '#679EFE', strokeWidth: 2 }),
+        h('path', { d: 'M7 13H29M13 13V28', stroke: '#679EFE', strokeWidth: 2 }),
+        h('path', { d: 'M18 18L15.5 20.5L18 23M23 18L25.5 20.5L23 23', stroke: '#679EFE', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }));
     }
 
     // ------------------------------------------------------------- apply

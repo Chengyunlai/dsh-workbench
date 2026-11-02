@@ -1,5 +1,5 @@
 ---
-description: "A development workbench beside DeepSeek Harness conversations for code, documents, Git inspection, and debugging."
+description: "A development workbench beside DeepSeek Harness conversations for project browsing, code navigation, document previews, Git inspection, and debugging."
 kind: package-bundle
 ---
 

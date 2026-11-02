@@ -1,5 +1,5 @@
 ---
-description: "DeepSeek Harness 对话旁的开发工作台，整合代码阅读、文档、Git 检查与断点调试。"
+description: "DeepSeek Harness 对话旁的开发工作台，整合项目浏览、代码跳转、文档预览、Git 检查与断点调试。"
 kind: package-bundle
 ---
 
