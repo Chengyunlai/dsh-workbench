@@ -69,7 +69,7 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "3.18.5",
     "pyright": "1.1.414",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vscode-jsonrpc": "10.0.0"
   },
   "devDependencies": {
