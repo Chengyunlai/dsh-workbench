@@ -30,7 +30,7 @@ let worker;
 try {
   const file = join(project, 'main.ts'), text = ['export function answer() { return 42; }', 'answer();', ''].join(String.fromCharCode(10));
   await writeFile(file, text);
-  worker = new Worker(pathToFileURL(join(process.cwd(), 'typescript-worker.js')), { workerData: { root: project, file, text, line: 1, character: 1 } });
+  worker = new Worker(pathToFileURL(join(process.cwd(), 'typescript-worker.js')), { execArgv: [], workerData: { root: project, file, text, line: 1, character: 1 } });
   const exited = new Promise(resolve => worker.once('exit', resolve));
   const [result] = await once(worker, 'message');
   assert.equal(result.error, undefined, JSON.stringify(result));
