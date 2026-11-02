@@ -23,6 +23,7 @@ try {
   const read = name => resolve(name) === file ? text : ts.sys.readFile(name);
   service = ts.createLanguageService({
     ...ts.sys,
+    useCaseSensitiveFileNames: () => ts.sys.useCaseSensitiveFileNames,
     getCompilationSettings: () => options,
     getCurrentDirectory: () => root,
     getScriptFileNames: () => files,

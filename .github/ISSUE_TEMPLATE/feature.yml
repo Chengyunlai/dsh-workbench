@@ -1,0 +1,27 @@
+name: Feature request / 功能建议
+description: Explain a workflow you want to improve / 描述希望改善的使用场景
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User scenario and obstacle / 使用场景与阻碍
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired interaction and outcome / 期望交互与结果
+      description: 'Describe what a user does and what should happen. Explain any compatibility expectations.'
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and references / 替代方案与参考
+  - type: checkboxes
+    id: implementation
+    attributes:
+      label: Contribution / 参与方式
+      options:
+        - label: 'I can help implement or test this / 我可以参与实现或验证'

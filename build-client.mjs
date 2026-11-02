@@ -5,6 +5,7 @@ await build({
   entryPoints: [fileURLToPath(new URL('./client.source.js', import.meta.url))],
   outfile: fileURLToPath(new URL('./client.js', import.meta.url)),
   bundle: true, format: 'iife', target: 'es2022',
+  tsconfigRaw: { compilerOptions: { alwaysStrict: true } },
   minifyWhitespace: true, minifySyntax: true, keepNames: true,
   // Escaped literal newlines keep dependency snippets compatible with whitespace gates.
   supported: { 'template-literal': false },

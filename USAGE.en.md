@@ -81,7 +81,7 @@ Top-level `navigationTimeoutMs` defaults to 120000 and covers cold startup and q
 - The client refuses server-requested workspace edits and executes no server-supplied commands. Built-in navigation requires a local filesystem; remote filesystems need a Harness LSP provider in the same execution environment.
 - Queries use current workspace source. Historical diffs, old revisions and deleted files cannot be queried as current source. Outside-workspace definitions are counted and reported, never read automatically; dependency declarations inside the workspace can be opened.
 - Source must be regular UTF-8 text of at most 512 KiB. Positions are zero-based UTF-16. Changes before or during a query invalidate the old position; reopen the file before navigating again.
-- JS/TS uses a separate compiler thread per query, with awaited termination on completion, failure or cancellation. Missing servers, protocol failures and timeouts are reported while source remains readable. Unconfigured project dependencies and virtual environments can prevent some import resolution.
+- JS/TS follows the host filesystem’s case rules and uses a separate compiler thread per query, with awaited termination on completion, failure or cancellation. Missing servers, protocol failures and timeouts are reported while source remains readable. Unconfigured project dependencies and virtual environments can prevent some import resolution.
 
 ## Breakpoint debugging
 

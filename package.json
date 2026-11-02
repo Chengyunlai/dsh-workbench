@@ -9,7 +9,12 @@
     "test:languages": "node --test test/languages.e2e.mjs",
     "setup:languages": "node scripts/configure-languages.mjs",
     "setup:debuggers": "node scripts/configure-debuggers.mjs",
-    "test:debug": "node --test test/debug.e2e.mjs"
+    "test:debug": "node --test test/debug.e2e.mjs",
+    "check": "node scripts/repository-checks.mjs",
+    "check:generated": "git ls-files --error-unmatch client.js && git diff --exit-code -- client.js",
+    "test:package": "node scripts/package-smoke.mjs",
+    "verify": "npm test && npm run check && npm run check:generated",
+    "setup:ci-tools": "node scripts/setup-ci-tools.mjs"
   },
   "description": "Development workbench for DeepSeek Harness: files, code navigation, document previews, Git diffs and history, and breakpoint debugging with expression evaluation.",
   "exports": {
@@ -38,7 +43,13 @@
     "DEBUGGING.md",
     "DEBUGGING.en.md",
     "USAGE.md",
-    "USAGE.en.md"
+    "USAGE.en.md",
+    "CONTRIBUTING.md",
+    "CONTRIBUTING.en.md",
+    "SECURITY.md",
+    "SECURITY.en.md",
+    "AUTOMATION.md",
+    "AUTOMATION.en.md"
   ],
   "dsh": {
     "bundle": {
@@ -79,11 +90,13 @@
     "codemirror-lang-makefile": "0.1.1",
     "dompurify": "3.4.17",
     "esbuild": "0.28.2",
+    "fflate": "0.8.3",
     "github-slugger": "2.0.0",
     "jsdom": "27.0.1",
     "marked": "18.1.2",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "yaml": "2.9.1"
   },
   "repository": {
     "type": "git",
