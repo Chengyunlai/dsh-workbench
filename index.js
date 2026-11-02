@@ -1,11 +1,18 @@
+import { navigationHandlers } from './navigation.js';
+import { Config, installedServers, installedDebugAdapters, serverSpecifications } from './language-config.js';
+import { createLanguageServers } from './language-servers.js';
+import { createDebugService } from './debug-service.js';
+export { Config } from './language-config.js';
+
 /**
- * Git Control — Host half (read-only git + one chat bridge).
+ * DSH Workbench — Host routes for project reading, Git inspection and debugging.
  *
  * Runs git in a registered Harness workspace and serves the results to the
  * browser panel through authenticated `/api/git.*` fetch routes (inside
  * Connection's browser-trust fence). Git is pure read-only: status, per-file
  * diffs, history, and one-commit details. No git write operations are exposed
- * at all. The single chat bridge route (`/api/git.review`) posts a review
+ * at all. Debug routes own explicit launch/attach sessions separately.
+ * The chat bridge route (`/api/git.review`) posts a review
  * suggestion into a fresh workspace conversation through the same
  * `sessionController.prompt` RPC the chat input itself uses — it never touches
  * git and returns the newly created session id.
@@ -74,6 +81,7 @@ function requireRelativePath(value) {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
     throw Object.assign(new Error('invalid file path'), { status: 400 });
   }
+  if (/[\u0000-\u001f\u007f]/.test(value)) throw Object.assign(new Error('file path must not contain control characters'), { status: 400 });
   if (value.startsWith('-')) throw Object.assign(new Error('file path must not start with "-"'), { status: 400 });
   if (value.includes('\\') || value.includes(':')) {
     throw Object.assign(new Error('file path must use forward slashes'), { status: 400 });
@@ -424,23 +432,29 @@ async function handleReview(ctx, request, signal) {
 }
 
 /** Register the read-only git routes plus the chat bridge inside Connection's authentication fence. */
-function registerRoutes(ctx) {
+function registerRoutes(ctx, config, languageServers) {
+  const debug = createDebugService(ctx, config, requireWorkspacePath, json);
+  ctx.effect(() => () => debug.dispose(), 'git-control: debug sessions');
   const lifetime = new AbortController();
-  ctx.effect(() => () => lifetime.abort(), 'git-control: query lifetime');
+  const pending = new Set();
+  ctx.effect(() => async () => { lifetime.abort(); await Promise.allSettled([...pending]); }, 'git-control: query lifetime');
   const run = (ctx, request, handler) => {
     const timeout = new AbortController();
-    const timer = setTimeout(() => timeout.abort(), QUERY_TIMEOUT_MS);
+    const timer = setTimeout(() => timeout.abort(), new URL(request.url).pathname === '/api/git.definition' ? config.navigationTimeoutMs : QUERY_TIMEOUT_MS);
     const signal = AbortSignal.any([request.signal, lifetime.signal, timeout.signal]);
-    return Promise.resolve()
-      .then(() => handler(ctx, request, signal))
+    const task = Promise.resolve()
+      .then(() => { signal.throwIfAborted(); return handler(ctx, request, signal); })
       .catch((error) => {
+        if (timeout.signal.aborted) return json({ ok: false, code: new URL(request.url).pathname === '/api/git.definition' ? 'LANGUAGE_SERVER_TIMEOUT' : 'QUERY_TIMEOUT', error: 'query timed out' }, 408);
         if (request.signal.aborted || lifetime.signal.aborted || timeout.signal.aborted) {
           return json({ ok: false, error: 'query cancelled' }, 408);
         }
         const status = typeof error?.status === 'number' ? error.status : 500;
-        return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, status);
+        return json({ ok: false, code: error?.code, error: error instanceof Error ? error.message : String(error) }, status);
       })
-      .finally(() => clearTimeout(timer));
+      .finally(() => { clearTimeout(timer); pending.delete(task); });
+    pending.add(task);
+    return task;
   };
   const route = (path, methods, handler) => {
     ctx.connection.fetch.register({
@@ -454,9 +468,20 @@ function registerRoutes(ctx) {
   route('/api/git.diff', ['GET'], handleDiff);
   route('/api/git.log', ['GET'], handleLog);
   route('/api/git.commit', ['GET'], handleCommit);
+  const navigation = navigationHandlers({ runGit, requireWorkspacePath, requireRelativePath, json, languageServers });
+  route('/api/git.tree', ['GET'], navigation.tree);
+  route('/api/git.source', ['GET'], navigation.source);
+  route('/api/git.definition', ['GET'], navigation.definition);
   route('/api/git.review', ['POST'], handleReview);
+  route('/api/git.debug.configurations', ['GET'], (ctx, request) => debug.configurations(request));
+  route('/api/git.debug.status', ['GET'], (ctx, request) => debug.status(request));
+  route('/api/git.debug.action', ['POST'], (ctx, request) => debug.action(request));
 }
 
-export function apply(ctx) {
-  registerRoutes(ctx);
+export function apply(ctx, options = {}) {
+  const config = Config(options);
+  config.debugAdapters = { ...(config.useInstalledDebugAdapters ? installedDebugAdapters() : {}), ...config.debugAdapters };
+  const servers = createLanguageServers(ctx, serverSpecifications({ ...(config.useInstalledServers ? installedServers() : {}), ...config.languageServers }), config);
+  ctx.effect(() => () => servers.dispose(), 'git-control: language servers');
+  registerRoutes(ctx, config, servers);
 }

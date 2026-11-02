@@ -1,0 +1,171 @@
+{
+  "idle": [
+    {
+      "action": "run",
+      "label": "启动调试",
+      "disabled": false
+    },
+    {
+      "action": "stop",
+      "label": "结束调试",
+      "disabled": true
+    },
+    {
+      "action": "pause",
+      "label": "暂停",
+      "disabled": true
+    },
+    {
+      "action": "next",
+      "label": "单步跳过",
+      "disabled": true
+    },
+    {
+      "action": "stepIn",
+      "label": "单步进入",
+      "disabled": true
+    },
+    {
+      "action": "stepOut",
+      "label": "跳出",
+      "disabled": true
+    },
+    {
+      "action": "attach",
+      "label": "接入已有进程",
+      "disabled": false
+    }
+  ],
+  "paused": [
+    {
+      "action": "run",
+      "label": "继续运行",
+      "disabled": false
+    },
+    {
+      "action": "stop",
+      "label": "结束调试",
+      "disabled": false
+    },
+    {
+      "action": "pause",
+      "label": "暂停",
+      "disabled": true
+    },
+    {
+      "action": "next",
+      "label": "单步跳过",
+      "disabled": false
+    },
+    {
+      "action": "stepIn",
+      "label": "单步进入",
+      "disabled": false
+    },
+    {
+      "action": "stepOut",
+      "label": "跳出",
+      "disabled": false
+    },
+    {
+      "action": "attach",
+      "label": "接入已有进程",
+      "disabled": true
+    }
+  ],
+  "running": [
+    {
+      "action": "run",
+      "label": "继续运行",
+      "disabled": true
+    },
+    {
+      "action": "stop",
+      "label": "结束调试",
+      "disabled": false
+    },
+    {
+      "action": "pause",
+      "label": "暂停",
+      "disabled": false
+    },
+    {
+      "action": "next",
+      "label": "单步跳过",
+      "disabled": true
+    },
+    {
+      "action": "stepIn",
+      "label": "单步进入",
+      "disabled": true
+    },
+    {
+      "action": "stepOut",
+      "label": "跳出",
+      "disabled": true
+    },
+    {
+      "action": "attach",
+      "label": "接入已有进程",
+      "disabled": true
+    }
+  ],
+  "ended": [
+    {
+      "action": "run",
+      "label": "启动调试",
+      "disabled": false
+    },
+    {
+      "action": "stop",
+      "label": "结束调试",
+      "disabled": true
+    },
+    {
+      "action": "pause",
+      "label": "暂停",
+      "disabled": true
+    },
+    {
+      "action": "next",
+      "label": "单步跳过",
+      "disabled": true
+    },
+    {
+      "action": "stepIn",
+      "label": "单步进入",
+      "disabled": true
+    },
+    {
+      "action": "stepOut",
+      "label": "跳出",
+      "disabled": true
+    },
+    {
+      "action": "attach",
+      "label": "接入已有进程",
+      "disabled": false
+    }
+  ],
+  "groups": [
+    "运行控制",
+    "单步控制",
+    "进程接入"
+  ],
+  "steppingIcons": {
+    "next": [
+      "m4 13 7-7 8 8M12 14h7V7",
+      "M4 20h16"
+    ],
+    "stepIn": [
+      "M12 17V3",
+      "m6 11 6 6 6-6",
+      "M19 21H5"
+    ],
+    "stepOut": [
+      "m18 9-6-6-6 6",
+      "M12 3v14",
+      "M5 21h14"
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Git Control",
-    "description": "Read-only JetBrains-style Git panel for the Harness workspace: repository status, file diffs, commit history, and per-commit details."
+    "title": "Development workbench",
+    "description": "Read code and documents, inspect Git changes, and launch or attach debuggers beside DeepSeek Harness conversations."
   }
 }

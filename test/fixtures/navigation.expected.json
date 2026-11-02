@@ -1,0 +1,12 @@
+{
+  "path": "src/lib.ts",
+  "source": "export function render() {}",
+  "status": "行 1，列 17只读 · UTF-8",
+  "readOnly": "true",
+  "navigationButtons": 0,
+  "highlighting": [
+    { "text": "export", "color": "var(--shiki-token-keyword)" },
+    { "text": "function", "color": "var(--shiki-token-keyword)" },
+    { "text": "render", "color": "var(--shiki-token-function)" }
+  ]
+}

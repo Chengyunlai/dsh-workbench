@@ -1,0 +1,7 @@
+{
+  "word": "decide",
+  "occurrences": 5,
+  "selectedText": "",
+  "background": "var(--dsw-alias-bg-document-selection)",
+  "activeOutline": "1px solid var(--dsw-alias-state-business-primary)"
+}

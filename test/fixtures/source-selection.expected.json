@@ -1,0 +1,10 @@
+{
+  "dark": {
+    "focused": "var(--dsw-alias-bg-document-selection)",
+    "unfocused": "var(--dsw-alias-bg-document-selection)"
+  },
+  "light": {
+    "focused": "var(--dsw-alias-bg-document-selection)",
+    "unfocused": "var(--dsw-alias-bg-document-selection)"
+  }
+}

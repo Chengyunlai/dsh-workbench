@@ -1,0 +1,108 @@
+# 开发工作台使用指南
+
+[项目介绍](README.md) | [English](USAGE.en.md)
+
+## 使用
+
+展开对话右侧工具区，在“开始”或“更多工具”里选择 **开发工作台**。标签默认跟随所属对话的项目，可用仓库下拉框查看其他已注册工作区。
+
+| 标签 | 操作与结果 |
+| --- | --- |
+| 文件 | 目录树包含已跟踪和未跟踪文件，排除 Git 忽略的文件；文件旁显示 Git 状态。展开目录或按路径过滤，点击文件阅读当前工作区源码。 |
+| 代码阅读 | 只读编辑器支持连续滚动、语法高亮、行号、光标和文字选择，不使用分页或导航工具栏。 |
+| Git 差异 | 在文件树或源码中右键选择“差异”；双击 diff 行或按 F4 阅读对应的当前源码。 |
+| 变更 | 按已暂存、工作区变更、未跟踪文件分组；显示行数统计和统一 diff。双击 diff 行或按 F4 打开当前源码。 |
+| 历史 | 提交图、作者、时间与哈希；打开提交后显示文件统计和完整 diff。 |
+
+文件树与阅读区、阅读区与调试面板之间的分隔线可拖动调整尺寸，代码区使用剩余空间。右侧停靠调节宽度，底部或窄栏上下布局调节高度；两种方向分别记住尺寸。分隔线获得焦点后用方向键微调，Shift 加大步长，Home／End 到允许的最小／最大值；双击或 Enter 恢复该方向默认尺寸。拖动取消或按 Esc 会还原，重新打开面板会恢复已完成的调整。
+
+普通点击放置光标或选择文字，不触发定义查询。光标位于名称上时，当前词与可见区域内的同名完整词自动高亮，区分大小写并保留语法配色；当前词另加边框。选择完整词也会高亮其它匹配，部分词选择或移到空白行会清除高亮。匹配按文本进行，包含字符串和注释中的同名词；滚动或切换文件后重新计算。定义跳转会定位并高亮目标行，多个目标显示浮动选择菜单。切换文件／变更／历史标签保留阅读状态，返回时恢复调用处光标。右栏较窄时，文件树与阅读区上下排列。
+
+源码顶部保留已打开的文件标签：文件树、定义跳转与调用栈都会打开或选中对应文件，同一路径不重复创建标签。点击标签切换，恢复各文件的光标与滚动位置；文件内容变化时只恢复仍有效的光标位置。标签可通过关闭图标、中键或 Delete 关闭，左右键及 Home／End 切换；窄栏下横向滚动标签，同名文件显示路径以区分。标签与阅读位置保存在当前面板内存中，不缓存文件正文；关闭标签不结束调试，前进／后退仍可重新打开历史文件。
+
+Markdown（`.md`／`.markdown`／`.mdown`）默认显示阅读预览，包含标题层级、强调、列表、任务项、引用、表格、行内代码和按语言高亮的围栏代码块；文档视图可切回保留行号与原始标记的源码。切换视图复用编辑器，文件标签与前进／后退保留阅读位置。相对链接在工作区内打开对应文件，支持章节锚点和 `#L行号`；HTTP(S) 链接在新窗口打开。原始 HTML 不渲染，图片仅显示说明文字，不自动请求资源。
+
+JSON、YAML、TOML、INI／properties／`.env`、Shell 与 Makefile 提供基础语法高亮；Markdown 源码区分标题、强调、链接与代码标记。预览与源码沿用宿主明暗主题，宽代码块与表格在各自区域内横向滚动。
+
+同文件的定义跳转、栈帧切换和调试单步复用当前源码与编辑器，不重复读取文件；目标仍可见时保持滚动位置，超出可见区域时只滚动必要距离。跨文件跳转复用编辑器，加载或失败时保留旧源码及其标题，并提示目标路径；读取完成前暂停旧源码上的操作，结束调试仍可使用。重新选择文件或刷新仓库会重新读取内容，定义查询仍检查磁盘版本；加载与查询提示不挤动代码。
+
+| 操作 | 手势或快捷键（焦点位于源码区时） |
+| --- | --- |
+| 跳到定义 | ⌘／Ctrl＋点击符号，或 F12 |
+| 前进／后退 | ⌘[／⌘]；Windows／Linux 使用 Ctrl＋Alt＋←／→；也支持鼠标后退／前进侧键 |
+| 定位行／列 | macOS：⌘L；Windows／Linux：Ctrl＋G。输入 `行号[:列号]`，Enter 确认 |
+| 更多操作 | 右键菜单；键盘使用 Shift＋F10 |
+| 关闭菜单或定位框 | Escape；点击外部也可关闭 |
+
+⌘B／Ctrl＋B 在宿主转发按键时也支持跳转。Harness 桌面版默认把这组键分配给全局侧栏，并优先于编辑器处理；插件不改动全局快捷键设置，默认使用 F12 和修饰键点击。
+
+工具栏、变更 diff 与提交详情里的“向 AI 提建议”会创建项目新对话。默认仅附路径或提交号；只有手动选择的 diff 行才附代码。投递结果不明确时保留已创建的对话，请先检查消息后再决定是否重发。
+
+## 五种语言的支持与配置
+
+五种语言均支持语法高亮、只读阅读、函数／类型的项目内跨文件定义跳转，以及相同的快捷键和右键操作。已配置的 Harness `ctx.lsp` 优先处理匹配语言；没有对应提供方时，插件使用下表中的本机服务。
+
+插件跟随 Harness 的浅色／深色主题及主题颜色变量，文件树、源码、diff、选中态和弹出菜单同步更新；切换主题保留当前文件和光标。文本选区使用宿主文档选区色，获得或失去焦点均不回退到编辑器的默认浅色配色。语法高亮复用宿主代码块配色，区分关键字、函数／方法、类型声明与注解、属性、装饰器、字符串、数字和注释。高亮由语言语法树决定；字符串与注释中的名称保持原类别，Python f-string 和 JS 模板字符串中的表达式单独着色。高亮不使用 LSP 语义令牌，未显式标注类型的普通变量不会据名称猜测类别。
+
+| 语言 | 导航引擎 | 本机条件 |
+| --- | --- | --- |
+| JavaScript／TypeScript | TypeScript 编译器语言服务 | 随 npm 依赖安装；支持 `.js`、`.jsx`、`.mjs`、`.cjs`、`.ts`、`.tsx`、`.mts`、`.cts`，读取最近的 `tsconfig.json`／`jsconfig.json` |
+| Python | Pyright | 随 npm 依赖安装；支持 `.py`／`.pyi`，读取项目的 Python／Pyright 配置 |
+| Go | gopls | 安装 gopls 和兼容的 Go 工具链，项目的 `go.mod`／`go.work` 与依赖需可解析 |
+| Java | Eclipse JDT LS | 安装 JDT LS 及其要求的 JDK；本文验证版本为 JDT LS 1.50.0 和 Java 21 |
+
+Go 的安装命令与版本要求见 [gopls 官方文档](https://go.dev/gopls/)。Java 的发行包与运行要求见 [JDT LS 官方文档](https://github.com/eclipse-jdtls/eclipse.jdt.ls)。安装后，可在插件目录记录机器上的绝对路径：
+
+```sh
+npm run setup:languages -- \
+  --gopls /absolute/path/to/gopls \
+  --jdtls-home /absolute/path/to/jdt-language-server \
+  --java-home /absolute/path/to/jdk-21
+```
+
+这个命令不下载软件，也不修改全局 PATH、JAVA_HOME 或 IDE 设置；它将验证后的启动命令保存到 Git 忽略的 `.tools/servers.json`，然后需在 Harness 中重载 工作台插件。可仅传 `--gopls` 配置 Go；Java 的两个目录参数需一起传入。Python、JS、TS 无需运行此命令。`.tools` 下的机器路径、Java 服务文件均不包含在插件包中。
+
+也可在 工作台插件设置中配置 `languageServers.go`、`languageServers.java`、`languageServers.python`；显式配置优先于本机设置文件。每项的字段如下：
+
+| 字段 | 含义 |
+| --- | --- |
+| `command` | 必填，语言服务的绝对路径或 PATH 命令；不通过 shell 执行 |
+| `args`／`env` | 命令参数与额外环境变量，默认空数组／空对象 |
+| `settings` | 通过 LSP 配置发送的对象；Python 虚拟环境可用 `python.pythonPath` 等 Pyright 支持的配置指定 |
+| `initializationOptions` | 服务初始化选项，默认空对象 |
+| `waitForJavaReady` | 默认继承语言预设；JDT LS 等待 `ServiceReady` 后才查询，其他服务默认不等待 |
+
+顶层 `navigationTimeoutMs` 默认 120000，覆盖冷启动与排队；`serverKillGraceMs` 默认 1500。`useInstalledServers` 默认 true，设为 false 可仅使用显式配置和内置预设。gopls 和 JDT LS 的预设命令分别为 `gopls`、`jdtls`；默认 Python 通过受管 Node 运行随包 Pyright。
+
+## 导航行为与限制
+
+- stdio 服务按工作区和语言延迟启动并保持运行；同一服务的查询串行执行，源文件按每次请求打开／关闭。取消当前查询会终止对应服务，下次请求重新启动；仅取消排队中的请求不会终止前面的查询。卸载插件会拒绝新请求、取消查询、等待进程退出，并清理临时 Java 索引目录。
+- Java 的工作区索引使用独立临时目录，禁用自动构建和源目录中的 Eclipse 元数据；启动脚本同时设置对应 JVM 属性。服务本身仍有项目导入和依赖解析行为；Maven 导入可能创建空的 `target/classes`、`target/test-classes` 输出目录，具体取决于项目和语言服务版本。
+- 客户端拒绝语言服务请求的工作区编辑，不执行服务端下发的命令。内置导航只用于本机文件系统；远程文件系统需配置同一执行环境的 Harness LSP 提供方。
+- 导航针对当前工作区源码。历史 diff、旧版本和已删除文件不能作为当前源码查询。工作区外的定义会计数提示，不自动读取；工作区内的依赖声明文件可以打开。
+- 源码必须是 UTF-8 常规文件，最多 512 KiB。位置采用零起点 UTF-16；文件在查询前后发生变化时拒绝旧位置，重新打开后再跳转。
+- JS／TS 每次使用独立编译器线程，完成、失败或取消后等待线程退出。语言服务未安装、协议错误和超时会明确报错，源码仍可阅读；项目依赖和虚拟环境未配置时，部分导入可能无法解析。
+
+## 断点调试
+
+安装调试适配器后，可按 F5 调试当前 Python、Go、JS 入口文件；TS 需已有 JS 和 source map。右键“接入已有进程”通过端口或 Go 进程 ID 接入。调试面板默认在右侧，可通过标题栏“停靠”切换到底部并记住位置。`.dsh/debug.json` 仅用于自定义项目参数；详细配置、快捷键和进程归属见[调试配置](DEBUGGING.md)。程序只在显式选择启动或接入后执行。
+
+## 实现与验证
+
+`index.js` 在 Connection 认证保护内注册 `/api/git.status`、`.diff`、`.log`、`.commit`、`.tree`、`.source`、`.definition` 七条只读 GET 路由，以及 `.review` 对话 POST 路由。调试另通过 `.debug.configurations`、`.debug.status` GET 路由与 `.debug.action` POST 路由提供显式程序执行。所有请求只接受已注册工作区；新增源码路由和跳转目标均检查解析后的路径是否仍在工作区内。`navigation.js` 负责路径、文件大小、版本检查和服务选择，`typescript-worker.js` 调用编译器语言服务；`language-config.js` 验证启动配置，`language-servers.js` 使用受管子进程和 vscode-jsonrpc 运行 Go／Java／Python 服务；`client.source.js` 通过 `sidebarRightTabs` 注册右侧标签，保留旧 `main` 注册以兼容已有视图；`source-editor.js` 负责 CodeMirror 只读编辑器，组件卸载时销毁实例。`build-client.mjs` 把客户端模块及编辑器依赖打包为 `client.js`，沿用宿主的 React／React DOM，不产生网络依赖。修改客户端源码后需重新构建。
+
+```sh
+npm ci
+node --check index.js
+node --check navigation.js
+node --check typescript-worker.js
+node --check client.source.js
+node --check source-editor.js
+npm test
+npm run test:languages  # 需先配置真实 gopls 和 JDT LS
+npm pack --dry-run
+```
+
+测试覆盖真实 Git 文件枚举、真实编译器及 Pyright 跨文件／类型／同名符号／UTF-16／JavaScript 跳转、路径与文件限制、LSP 结果、过期源码、协议错误、拒绝服务端编辑、取消与卸载等待，以及 DOM 中的光标／只读选择／修饰键点击／菜单／行列定位／源码与 diff／返回联动；中文输出快照位于 `test/fixtures/navigation.expected.json`。桌面端验证包括右侧文件树、真实源码阅读、F12 跨文件定义跳转和 ⌘[ 返回调用处。窄栏布局使用容器查询，尚未完成实际宽度验收。
+
+编辑器使用 [CodeMirror](https://codemirror.net/)（MIT）；控件使用 Lucide 图标（ISC），文件类型图标源自 vscode-icons（MIT）。

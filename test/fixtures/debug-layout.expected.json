@@ -1,0 +1,11 @@
+{
+  "defaultDock": "right",
+  "name": "main.py",
+  "location": "lib.ts:1",
+  "sections": ["调用栈2", "变量", "程序输出"],
+  "variables": [
+    { "name": "enabled", "type": "bool", "value": "True", "kind": "constant" },
+    { "name": "count", "type": "int", "value": "3", "kind": "number" },
+    { "name": "message", "type": "str", "value": "'ready'", "kind": "string" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "heading": "项目说明",
+  "strong": "重点",
+  "emphasis": "说明",
+  "inlineCode": "value",
+  "quote": "注意配置",
+  "tasks": ["☑", "☐"],
+  "table": ["文件", "用途", "main.ts", "入口"],
+  "code": { "keyword": "def", "color": "var(--shiki-token-keyword)" },
+  "status": "Markdown · 只读"
+}

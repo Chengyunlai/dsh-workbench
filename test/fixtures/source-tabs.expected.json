@@ -1,0 +1,7 @@
+{
+  "tabs": [
+    { "path": "src/main.ts", "selected": "false" },
+    { "path": "src/lib.ts", "selected": "true" }
+  ],
+  "close": ["关闭 src/main.ts", "关闭 src/lib.ts"]
+}

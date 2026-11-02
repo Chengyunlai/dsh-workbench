@@ -1,0 +1,8 @@
+{
+  "panel": { "background": "var(--dsw-alias-bg-base)", "foreground": "var(--dsw-alias-label-primary)" },
+  "editor": { "background": "var(--dsw-alias-bg-base)", "foreground": "var(--shiki-foreground)" },
+  "gutter": { "background": "var(--dsw-alias-markdown-code-block-banner)", "foreground": "var(--dsw-alias-label-secondary)" },
+  "menu": { "background": "var(--dsw-alias-bg-layer-2)", "foreground": "var(--dsw-alias-label-primary)" },
+  "added": { "background": "var(--dsw-alias-file-diff-added-bg)", "foreground": "var(--dsw-alias-label-primary)" },
+  "deleted": { "background": "var(--dsw-alias-file-diff-deleted-bg)", "foreground": "var(--dsw-alias-label-primary)" }
+}

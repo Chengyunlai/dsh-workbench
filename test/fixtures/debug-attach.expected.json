@@ -1,0 +1,6 @@
+{
+  "title": "接入已有进程",
+  "labels": ["语言", "本机调试端口"],
+  "help": ["填写 Node inspector（--inspect）的监听端口", "Enter 接入 · Esc 取消"],
+  "buttons": 0
+}

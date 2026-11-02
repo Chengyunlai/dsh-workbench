@@ -1,89 +1,106 @@
-# dsh-git-control · Read-only Git panel for DeepSeek Harness
+---
+description: "A development workbench beside DeepSeek Harness conversations for code, documents, Git inspection, and debugging."
+kind: package-bundle
+---
 
-> Look at Git the way you would in IntelliJ IDEA, right inside [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — **pure read-only, zero risk of accidental writes**.
+# dsh-workbench · Development workbench
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Icons: Lucide](https://img.shields.io/badge/icons-Lucide-ISC-blue)](https://lucide.dev)
-[![Icons: vscode-icons](https://img.shields.io/badge/icons-vscode--icons-MIT-orange)](https://github.com/vscode-icons/vscode-icons)
-[![DSH: 0.2.1-rc.3+](https://img.shields.io/badge/DSH-0.2.1--rc.3%2B-4B6EAF)](https://github.com/deepseek-ai/deepseek-harness)
+English | [中文](README.md)
 
-A Harness plugin styled after the **IntelliJ IDEA Git tool window** (Darcula palette): repository status, file diffs, commit history, and per-commit details — **look, don't touch**.
+## Summary
 
-## Why "pure read-only"?
+Inspect projects, follow code, and debug programs beside DeepSeek Harness conversations. dsh-workbench combines a file tree, source and document reading, Git inspection, and breakpoint debugging in one right-side workbench while keeping the conversation visible. Source reading and Git inspection are read-only; launching a debugger executes a real program.
 
-- No staging, no commits, no rollback, no branch switching — **no write operations anywhere in the UI**
-- The Host exposes only **4 read-only GET routes** (status / diff / log / commit); there is no write API at all
-- When you actually need to change something, use the git CLI or your IDE. The panel's only job is to make the repository state crystal clear.
+## Contents
 
-## ✨ Features
+- [Capabilities](#capabilities)
+- [Language support](#language-support)
+- [Install](#install)
+- [Use](#use)
+- [Scope](#scope)
+- [Documentation and verification](#documentation-and-verification)
+- [Development and compatibility](#development-and-compatibility)
 
-| | |
-|---|---|
-| 🎯 **Auto-follows your project** | Open the panel and it shows the project you are working on; switch projects and the panel follows |
-| 🎨 **JetBrains look & feel** | Darcula palette, Changes / Log tabs, directory-grouped change tree, blue selection, branch badge |
-| 🗂 **File-type icons** | 40+ extensions (TS / JS / Python / Go / Rust / JSON / Markdown / Docker…); untracked files render gray |
-| 🔢 **Per-file line stats** | `+n −m` right in the tree; files changed in both the index and the worktree show a **combined two-section diff** |
-| 📄 **Numbered unified diff** | JetBrains Darcula diff colors (green add / red delete / gray hunk), old and new line numbers side by side |
-| 🌿 **Commit graph + details** | Multi-color lanes, smooth Bézier merge lines, branch labels; click any commit for author / date / parents / file list / full diff |
-| 🐘 **Large-repo friendly** | Change list truncates at 500 entries with a total hint, plus a file filter box |
-| 🌐 **Bilingual** | UI copy follows the Harness language (Chinese / English) |
-| 💬 **One-click "suggest to AI"** | While reviewing, type a suggestion right in the panel and send it to a new project conversation — no window switching; the agent picks it up immediately |
+## Capabilities
 
-## 📸 Screenshots
+| Capability | What you can do |
+| --- | --- |
+| Project browsing | Browse a file tree, filter paths, see Git status markers, and resize panes |
+| Code reading | Read multiple tabs with syntax and occurrence highlighting, function/type definitions, and navigation history |
+| Documents | Switch Markdown between reading preview and source, follow document links, and read highlighted configuration files |
+| Git inspection | Inspect changes, unified diffs, commit graphs, and commit details alongside current source |
+| Debugging | Launch or attach, set breakpoints, resume, pause, step, and inspect frames, variables, and output |
+| Conversation handoff | Explicitly send file or commit references, or selected diff lines, with a review suggestion to a new project conversation |
 
-**Changes view** — directory-grouped change tree (file-type icons, line stats) with a numbered unified diff on the right:
-
-![Changes](screenshots/changes.png)
-
-**Suggest to AI** — write a review suggestion in the panel and send it to a new project conversation (path only by default; selected diff lines are optional):
-
-![Review](screenshots/review.png)
-
-**Log view** — multi-color commit graph and branch labels; click any commit to expand the details pane below (author, date, changed files, full diff):
-
-![Log](screenshots/log.png)
-
-## 🚀 Install
-
-This is a Harness plugin bundle (plain JavaScript, no build step). Install this repository directory through the Harness plugin manager:
-
-```bash
-# Option 1: install the directory via the plugin manager (install_bundle)
-# Option 2: command line
-dsh --profile <profile-name> plugin install /path/to/dsh-git-control
+```mermaid
+flowchart LR
+  Chat["DeepSeek Harness conversation"] --- Workbench["Development workbench"]
+  Workbench --> Files["Files and documents"]
+  Workbench --> Code["Code reading and navigation"]
+  Workbench --> Git["Git changes and history"]
+  Workbench --> Debug["Breakpoint debugging"]
 ```
 
-> The package name `@local/dsh-git-control` follows the local-scope convention: this plugin is installed from a directory and is not published to npm.
+## Language support
 
-## 📖 Usage
+| Language | Reading and definitions | Launch / attach |
+| --- | --- | --- |
+| Python | Pyright | debugpy |
+| Go | gopls | Delve |
+| Java | Eclipse JDT LS | Unavailable |
+| JavaScript | TypeScript language service | vscode-js-debug (Node.js) |
+| TypeScript | TypeScript language service | vscode-js-debug (requires JS and source maps) |
 
-1. Click the **Git** icon in the left sidebar to open the panel
-2. The panel **auto-binds to the current project**; use the toolbar repository dropdown to inspect other registered workspaces
-3. **Changes tab**: the filter box at the top filters by path; click any file to view its diff on the right
-4. **Log tab**: click any commit row to expand its details below (file list + full diff)
-5. **Suggest to AI**: use the toolbar without opening a file or an existing chat, or open the composer from a diff or commit. Only your suggestion and relative path (or commit hash) are included by default. Click diff lines to attach selected code. Every send creates and opens a new project conversation.
+JS/TS and Python navigation dependencies ship with the installation; Go and Java need local language servers. Debugging requires separately configured local adapters. See the [user guide](USAGE.en.md#five-language-support-and-configuration) and [debug configuration](DEBUGGING.en.md).
 
-## 🏗 Architecture
+## Install
 
-- **Host** (`index.js`): runs git through `ctx.subprocess` (clears inherited `GIT_*` environment variables, `GIT_TERMINAL_PROMPT=0`) and registers 4 **read-only GET routes** plus 1 **chat-bridge POST route** inside the Harness Connection authentication fence:
-  - `/api/git.status` — repository status + per-file numstat line statistics
-  - `/api/git.diff` — single-file diff (staged / worktree / combined / untracked)
-  - `/api/git.log` — commit history (with parents, for the commit graph)
-  - `/api/git.commit` — per-commit metadata + file stats + full diff
-  - `/api/git.review` — creates a workspace conversation and delivers the review suggestion (the same `ctx.sessionController.prompt` the chat input uses, `mode: 'queue'`; never touches git)
-  - Safety: `cwd` must be a registered workspace path; file paths reject absolute paths / `..` / leading `-`; commit hashes accept hex only; session ids and message length are bounded
-- **Client** (`client.js`): plain JavaScript, no build step, registered through the `sidebar.panellist` + `main` keyed slots; Darcula palette (`#2B2D30` / `#3C3F41` / `#1B5A33` / `#6A2A24`…); copy goes through the Harness locale service (zh / en)
+Clone the repository and install runtime dependencies. The repository ships a built client, so using it does not require a build.
 
-## ✅ Verified
+```sh
+git clone https://github.com/Chengyunlai/dsh-workbench.git
+cd dsh-workbench
+npm ci --omit=dev
+```
 
-- Tested in the **DeepSeek Harness desktop app (0.2.1-rc.3)** Web GUI: panel registration, auto-follow of the current project, the three change groups, diffs, commit graph and commit details all work
-- Read-only check: `POST /api/git.ops` returns 404 — the Host exposes no git write routes
-- `node --test test/*.test.mjs`: distinct workspace sessions, input validation, recovery after rejected admission, and opening a new chat without selecting a file.
-- When admission is uncertain, inspect the created conversation before retrying.
-- Screenshots are real captures of the rendered panel (demo content)
+Install this local directory through the DeepSeek Harness plugin manager, then enable Development workbench. Existing installations show the new display name after updating; their installation path can stay the same.
 
-## 🎁 Icons & License
+## Use
 
-- Control icons: [Lucide](https://lucide.dev) (ISC License)
-- File-type icons: [vscode-icons](https://github.com/vscode-icons/vscode-icons) (MIT License)
-- Plugin code: [MIT License](LICENSE)
+1. Expand a project conversation’s right sidebar and open **Development workbench** from Start or More tools.
+2. Open source or documents under Files. Use file tabs, modifier-click, and F12 to follow definitions; inspect Git under Changes and Log.
+3. After configuring an adapter, set a breakpoint in a Python, Go, or Node.js entry and press F5, or choose Attach to process from the source context menu.
+4. When paused, select frames and expand variables. Dock the debugger on the right or bottom; drag pane dividers to resize, with sizes retained.
+
+See the [user guide](USAGE.en.md) for shortcuts, language setup, and reading behavior; see [debug configuration](DEBUGGING.en.md) for launch arguments, attach, and process ownership.
+
+## Scope
+
+- Works with registered Git projects in Harness. Source is read-only; Git has no staging, commits, resets, or branch switching.
+- A debugged program can write files or access external services; prepare its development environment before launching it. `.dsh/debug.json` is only needed for custom project arguments.
+- Breakpoints, source tabs, and reading history live in the current panel’s memory and are not restored as durable project state after closing it.
+- Java debugging, source editing, conditional breakpoints, expression evaluation, and automatic builds are unavailable. Markdown images currently display their descriptions.
+
+## Documentation and verification
+
+- [User guide](USAGE.en.md): reading, navigation, layout, Git, and language services.
+- [Debug configuration](DEBUGGING.en.md): adapters, current-file debugging, launch, and attach.
+- Default tests use temporary Git projects, simulated language servers and DAP adapters, and the real client DOM. They require no model API key.
+- macOS desktop checks cover code/documents, definitions, occurrence highlighting, light/dark themes, and side/bottom pane sizing. Real language servers and debuggers have separate environment tests; Windows/Linux desktop interaction is not verified.
+
+## Development and compatibility
+
+<details>
+<summary>Build, test, and existing installation identifiers</summary>
+
+```sh
+npm ci
+npm test
+npm pack --dry-run
+```
+
+`build-client.mjs` bundles the client sources into `client.js` using host React. The installation package remains `@local/dsh-git-control`; Cordis configuration, dock tabs, preference keys, and `/api/git.*` routes keep their identifiers so renaming the repository does not create duplicate installations or lose settings. The project and UI use dsh-workbench / Development workbench.
+
+</details>
+
+Project code is [MIT](LICENSE). The editor uses CodeMirror (MIT); UI icons use Lucide (ISC), and file-type icons come from vscode-icons (MIT). Bundled dependency license notices remain in the client artifact.
