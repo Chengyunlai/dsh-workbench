@@ -2,7 +2,7 @@
 
 [中文](AUTOMATION.md) | English
 
-Workflows live in `.github/workflows/`. External Actions use full commit SHAs. Dependabot proposes weekly npm and Actions updates for maintainer review through the same PR checks.
+Workflows live in `.github/workflows/`. External Actions use full commit SHAs. Dependabot proposes weekly npm and Actions updates for maintainer review through the same PR checks. React and React DOM update together to prevent mismatched versions.
 
 ## Every PR and main
 
