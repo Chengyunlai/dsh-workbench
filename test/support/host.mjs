@@ -41,8 +41,23 @@ export async function fixture(t, lsp, options = {}) {
         let stdout = '', stderr = '';
         if (spec.stdio.stdout !== 'pipe') child.stdout.on('data', chunk => { stdout += chunk; });
         child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-65536); });
-        const done = new Promise((resolve, reject) => { child.once('error', reject); child.once('close', exitCode => resolve({ exitCode })); });
-        return { done, stdin: child.stdin, stdout: child.stdout, collected: { stdout: { readFrom: () => ({ text: stdout, lossy: false }) }, stderr: { readFrom: () => ({ text: stderr, lossy: false }) } }, terminate: () => { if (child.exitCode !== null || child.signalCode !== null) return; try { if (process.platform === 'win32') child.kill(); else if (child.pid) process.kill(-child.pid, 'SIGTERM'); } catch (error) { if (error.code !== 'ESRCH') throw error; } }, waitForExit: () => done.catch(() => {}) };
+        let closed = false, killing = false, killTimer;
+        const signalGroup = signal => {
+          try { if (process.platform === 'win32') child.kill(signal); else if (child.pid) process.kill(-child.pid, signal); }
+          catch (error) { if (error.code !== 'ESRCH') throw error; }
+        };
+        const done = new Promise((resolve, reject) => {
+          child.once('error', reject);
+          child.once('close', exitCode => { closed = true; clearTimeout(killTimer); resolve({ exitCode }); });
+        });
+        const terminate = () => {
+          if (closed || killing) return;
+          killing = true;
+          signalGroup('SIGTERM');
+          killTimer = setTimeout(() => signalGroup('SIGKILL'), spec.graceMs);
+        };
+        t.after(async () => { terminate(); await done.catch(() => {}); });
+        return { done, stdin: child.stdin, stdout: child.stdout, collected: { stdout: { readFrom: () => ({ text: stdout, lossy: false }) }, stderr: { readFrom: () => ({ text: stderr, lossy: false }) } }, terminate, waitForExit: () => done.catch(() => {}) };
       },
     },
     connection: { fetch: { register: route => routes.set(route.path, route.fetch) } },
