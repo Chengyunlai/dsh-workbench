@@ -20,6 +20,7 @@ Inspect projects, follow code, and debug programs beside DeepSeek Harness conver
 - [Use](#use)
 - [Scope](#scope)
 - [Documentation and verification](#documentation-and-verification)
+- [Contributing](#contributing)
 - [Development and compatibility](#development-and-compatibility)
 
 ## Capabilities
@@ -121,6 +122,10 @@ See the [user guide](USAGE.en.md) for shortcuts, language setup, and reading beh
 - [Debug configuration](DEBUGGING.en.md): adapters, current-file debugging, launch, and attach.
 - Default tests use temporary Git projects, simulated language servers and DAP adapters, and the real client DOM. They require no model API key.
 - macOS desktop checks cover code/documents, definitions, occurrence highlighting, light/dark themes, and side/bottom pane sizing. Real language servers and debuggers have separate environment tests; Windows/Linux desktop interaction is not verified.
+
+## Contributing
+
+Read the [contribution guide](CONTRIBUTING.en.md) before opening an issue or PR; use [private security reporting](SECURITY.en.md) for vulnerabilities. See [automation](AUTOMATION.en.md) for core CI, real integration tests, and release steps.
 
 ## Development and compatibility
 

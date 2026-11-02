@@ -1,0 +1,58 @@
+name: Bug report / 问题反馈
+description: Report a reproducible workbench problem / 提交可复现的问题
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: 'Use a minimal sample project. Remove API keys, tokens, private paths and business data from logs and screenshots. 请使用最小示例，并对日志、截图脱敏。'
+  - type: input
+    id: harness-version
+    attributes:
+      label: Harness version / Harness 版本
+      placeholder: 'For example: 0.2.1-rc.5, desktop or Web'
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Workbench version or commit / 插件版本或提交
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Operating system / 操作系统
+      options: [macOS, Linux, Windows]
+    validations:
+      required: true
+  - type: input
+    id: tools
+    attributes:
+      label: Language and tools / 语言与工具
+      description: 'Include runtime, language server and debugger versions when relevant; for debugging, say launch or attach. 调试问题请注明启动或接入。'
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction / 复现步骤
+      description: 'Provide a minimal project or code sample and the exact actions.'
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior / 预期与实际表现
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized logs, screenshots or GIF / 脱敏证据
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting / 提交前确认
+      options:
+        - label: 'I searched existing issues / 已搜索现有问题'
+          required: true
+        - label: 'I removed credentials and private data / 已移除凭据与私人数据'
+          required: true

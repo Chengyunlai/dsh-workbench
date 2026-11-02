@@ -1,0 +1,54 @@
+/** Build an installable release ZIP and verify npm and ZIP installs outside the checkout. */
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, writeFile, mkdir, rm, cp, readdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createHash } from 'node:crypto';
+import { zipSync } from 'fflate';
+import { checkPackageFiles } from './repository-checks.mjs';
+const exec = promisify(execFile), root = fileURLToPath(new URL('../', import.meta.url));
+const scratch = await mkdtemp(join(tmpdir(), 'dsh-package-smoke-'));
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const run = (command, args, cwd) => exec(command, args, { cwd, timeout: 180000, maxBuffer: 4 * 1024 * 1024 });
+const probe = `import assert from 'node:assert/strict';
+import { readFile, access } from 'node:fs/promises';
+import vm from 'node:vm';
+const host = await import('./index.js'); assert.equal(typeof host.apply, 'function'); assert.ok(host.Config);
+for (const file of ['icon.svg','cordis.patch.yml','typescript-worker.js','locale/en.json','locale/zh.json']) await access(file);
+let definition; vm.runInNewContext(await readFile('client.js','utf8'),{window:{__ModuleLoader__:{load:value=>{definition=value;}}}});
+assert.equal(typeof definition.factory,'function'); assert.ok(definition.id);
+console.log('Installed Host exports, client module and runtime resources passed.');`;
+try {
+  const { stdout } = await run(npm, ['pack', '--json', '--pack-destination', scratch], root);
+  const [packed] = JSON.parse(stdout); checkPackageFiles(packed.files.map(file => file.path));
+  const install = join(scratch, 'consumer'); await mkdir(install);
+  await writeFile(join(install, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
+  await run(npm, ['install', '--omit=dev', '--no-audit', '--no-fund', join(scratch, packed.filename)], install);
+  const installed = join(install, 'node_modules', '@local', 'dsh-git-control');
+  await run(process.execPath, ['--input-type=module', '--eval', probe], installed);
+  const unpacked = join(scratch, 'unpacked'); await mkdir(unpacked);
+  await run('tar', ['-xzf', join(scratch, packed.filename), '-C', unpacked], scratch);
+  const payload = join(unpacked, 'package');
+  await cp(join(root, 'package-lock.json'), join(payload, 'package-lock.json'));
+  const pkg = JSON.parse(await readFile(join(payload, 'package.json'), 'utf8'));
+  assert.match(pkg.version, /^\d+\.\d+\.\d+(?:-[\w.-]+)?$/);
+  const archiveFiles = {};
+  for (const file of [...packed.files.map(file => file.path), 'package-lock.json']) archiveFiles[`dsh-workbench-${pkg.version}/${file}`] = new Uint8Array(await readFile(join(payload, file)));
+  await writeFile(join(payload, 'INSTALL.txt'), 'Run npm ci --omit=dev in this directory, then install the directory using the Harness plugin manager. See README.md / README.en.md.\n');
+  archiveFiles[`dsh-workbench-${pkg.version}/INSTALL.txt`] = new Uint8Array(await readFile(join(payload, 'INSTALL.txt')));
+  // The release directory follows the same lockfile installation documented for end users.
+  await run(npm, ['ci', '--omit=dev', '--no-audit', '--no-fund'], payload);
+  await run(process.execPath, ['--input-type=module', '--eval', probe], payload);
+  assert.ok(!(await readdir(join(payload, 'node_modules'))).includes('fflate'), 'development dependencies leaked into runtime installation');
+  const dist = resolve(root, 'dist'); await mkdir(dist, { recursive: true });
+  const zipName = `dsh-workbench-${pkg.version}.zip`, tgzName = `dsh-workbench-${pkg.version}.tgz`;
+  await writeFile(join(dist, zipName), zipSync(archiveFiles, { level: 9 }));
+  await cp(join(scratch, packed.filename), join(dist, tgzName));
+  const sums = await Promise.all([zipName, tgzName].map(async file => createHash('sha256').update(await readFile(join(dist, file))).digest('hex') + '  ' + file));
+  await writeFile(join(dist, 'SHA256SUMS'), sums.join('\n') + '\n');
+  console.log('Package smoke passed: npm install, release npm ci, client registration and runtime resources.');
+  console.log('Release assets: ' + [zipName, tgzName, 'SHA256SUMS'].join(', '));
+} finally { await rm(scratch, { recursive: true, force: true }); }
