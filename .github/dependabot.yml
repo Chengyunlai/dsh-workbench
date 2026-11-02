@@ -6,6 +6,8 @@ updates:
       interval: weekly
     open-pull-requests-limit: 3
     groups:
+      react:
+        patterns: [react, react-dom]
       codemirror:
         patterns: ['@codemirror/*', '@lezer/*']
   - package-ecosystem: github-actions

@@ -2,7 +2,7 @@
 
 中文 | [English](AUTOMATION.en.md)
 
-工作流由 `.github/workflows/` 管理。所有外部 Actions 固定完整提交 SHA；Dependabot 每周提出 npm 与 Actions 更新，维护者按同样的 PR 检查审核。
+工作流由 `.github/workflows/` 管理。所有外部 Actions 固定完整提交 SHA；Dependabot 每周提出 npm 与 Actions 更新，维护者按同样的 PR 检查审核。React 与 React DOM 配套更新，防止版本不一致。
 
 ## 每个 PR 与 main
 
