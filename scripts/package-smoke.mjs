@@ -2,12 +2,12 @@
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, mkdir, rm, cp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
-import { zipSync } from 'fflate';
+import { zipSync, unzipSync } from 'fflate';
 import { checkPackageFiles } from './repository-checks.mjs';
 const exec = promisify(execFile), root = fileURLToPath(new URL('../', import.meta.url));
 const scratch = await mkdtemp(join(tmpdir(), 'dsh-package-smoke-'));
@@ -56,13 +56,19 @@ try {
   for (const file of [...packed.files.map(file => file.path), 'package-lock.json']) archiveFiles[`dsh-workbench-${pkg.version}/${file}`] = new Uint8Array(await readFile(join(payload, file)));
   await writeFile(join(payload, 'INSTALL.txt'), 'Run npm ci --omit=dev in this directory, then install the directory using the Harness plugin manager. See README.md / README.en.md.\n');
   archiveFiles[`dsh-workbench-${pkg.version}/INSTALL.txt`] = new Uint8Array(await readFile(join(payload, 'INSTALL.txt')));
-  // The release directory follows the same lockfile installation documented for end users.
-  await run(npm, ['ci', '--omit=dev', '--no-audit', '--no-fund'], payload);
-  await run(process.execPath, ['--input-type=module', '--eval', probe], payload);
-  assert.ok(!(await readdir(join(payload, 'node_modules'))).includes('fflate'), 'development dependencies leaked into runtime installation');
+  const zipBytes = zipSync(archiveFiles, { level: 9 });
+  const extracted = join(scratch, 'zip');
+  for (const [file, bytes] of Object.entries(unzipSync(zipBytes))) {
+    const target = join(extracted, file); await mkdir(dirname(target), { recursive: true }); await writeFile(target, bytes);
+  }
+  const releaseDirectory = join(extracted, 'dsh-workbench-' + pkg.version);
+  // Install the extracted release archive, including its shipped lockfile.
+  await run(npm, ['ci', '--omit=dev', '--no-audit', '--no-fund'], releaseDirectory);
+  await run(process.execPath, ['--input-type=module', '--eval', probe], releaseDirectory);
+  assert.ok(!(await readdir(join(releaseDirectory, 'node_modules'))).includes('fflate'), 'development dependencies leaked into runtime installation');
   const dist = resolve(root, 'dist'); await mkdir(dist, { recursive: true });
   const zipName = `dsh-workbench-${pkg.version}.zip`, tgzName = `dsh-workbench-${pkg.version}.tgz`;
-  await writeFile(join(dist, zipName), zipSync(archiveFiles, { level: 9 }));
+  await writeFile(join(dist, zipName), zipBytes);
   await cp(join(scratch, packed.filename), join(dist, tgzName));
   const sums = await Promise.all([zipName, tgzName].map(async file => createHash('sha256').update(await readFile(join(dist, file))).digest('hex') + '  ' + file));
   await writeFile(join(dist, 'SHA256SUMS'), sums.join('\n') + '\n');
