@@ -14,13 +14,30 @@ const scratch = await mkdtemp(join(tmpdir(), 'dsh-package-smoke-'));
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const run = (command, args, cwd) => exec(command, args, { cwd, timeout: 180000, maxBuffer: 4 * 1024 * 1024 });
 const probe = `import assert from 'node:assert/strict';
-import { readFile, access } from 'node:fs/promises';
+import { readFile, access, mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { Worker } from 'node:worker_threads';
+import { once } from 'node:events';
 import vm from 'node:vm';
 const host = await import('./index.js'); assert.equal(typeof host.apply, 'function'); assert.ok(host.Config);
 for (const file of ['icon.svg','cordis.patch.yml','typescript-worker.js','locale/en.json','locale/zh.json']) await access(file);
 let definition; vm.runInNewContext(await readFile('client.js','utf8'),{window:{__ModuleLoader__:{load:value=>{definition=value;}}}});
 assert.equal(typeof definition.factory,'function'); assert.ok(definition.id);
-console.log('Installed Host exports, client module and runtime resources passed.');`;
+const project = await mkdtemp(join(tmpdir(), 'dsh-installed-navigation-'));
+let worker;
+try {
+  const file = join(project, 'main.ts'), text = ['export function answer() { return 42; }', 'answer();', ''].join(String.fromCharCode(10));
+  await writeFile(file, text);
+  worker = new Worker(pathToFileURL(join(process.cwd(), 'typescript-worker.js')), { workerData: { root: project, file, text, line: 1, character: 1 } });
+  const exited = new Promise(resolve => worker.once('exit', resolve));
+  const [result] = await once(worker, 'message');
+  assert.equal(result.error, undefined, JSON.stringify(result));
+  assert.ok(result.locations.some(item => item.range.start.line === 0));
+  assert.equal(await exited, 0);
+} finally { if (worker) await worker.terminate(); await rm(project, { recursive: true, force: true }); }
+console.log('Installed Host exports, client module, runtime resources and compiler worker passed.');`;
 try {
   const { stdout } = await run(npm, ['pack', '--json', '--pack-destination', scratch], root);
   const [packed] = JSON.parse(stdout); checkPackageFiles(packed.files.map(file => file.path));

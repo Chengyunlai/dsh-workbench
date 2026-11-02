@@ -8,7 +8,7 @@ Workflows live in `.github/workflows/`. External Actions use full commit SHAs. D
 
 `CI` runs `npm ci` and `npm run verify` on Ubuntu 24.04 and macOS 15 with Node.js 24. Linux also runs pinned actionlint for workflow semantics. A separate package job builds and runs `npm run test:package`, producing a ZIP, npm tarball, and SHA256SUMS retained as Actions artifacts for seven days.
 
-Default tests cover real Git, bundled JS/TS and Python navigation, simulated DAP, and client DOM. Repository checks validate translation keys and placeholders, local document links, aligned bilingual paragraphs, and uncommitted drift in rebuilt `client.js`. Package checks verify Host imports, client registration, and required resources in isolated directories; the ZIP also includes the lockfile and is checked with `npm ci --omit=dev`.
+Default tests cover real Git, bundled JS/TS and Python navigation, simulated DAP, and client DOM. Repository checks validate translation keys and placeholders, local document links, aligned bilingual paragraphs, and uncommitted drift in rebuilt `client.js`. Package checks verify Host imports, client registration, required resources, and installed compiler navigation in isolated directories; the ZIP also includes the lockfile and is checked with `npm ci --omit=dev`.
 
 Main requires the aggregate `CI` check, which succeeds only when every core and package job succeeds. Document-only changes do not skip this required check. Windows is not yet a verified platform, and passing JSDOM tests does not establish native desktop behavior.
 

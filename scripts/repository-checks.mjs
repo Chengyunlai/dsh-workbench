@@ -19,7 +19,7 @@ export function checkLocales(dictionaries) {
   for (const key of Object.keys(dictionaries.en)) {
     const values = ['en', 'zh'].map(language => dictionaries[language][key]);
     assert.ok(values.every(value => typeof value === 'string' && value.trim()), 'empty locale value: ' + key);
-    assert.deepEqual(...values.map(value => [...value.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort()), 'locale parameters differ: ' + key);
+    assert.deepEqual(...values.map(value => [...new Set([...value.matchAll(/\{(\w+)\}/g)].map(match => match[1]))].sort()), 'locale parameters differ: ' + key);
   }
 }
 
@@ -40,6 +40,7 @@ export function checkPackageFiles(files) {
  */
 export function checkReleaseTag(tag, version) {
   assert.match(version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/);
+  assert.equal(version.trim(), version, 'release version must not contain surrounding whitespace');
   assert.equal(tag, 'v' + version, 'release tag must match package.json');
 }
 

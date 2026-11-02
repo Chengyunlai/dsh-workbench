@@ -4,6 +4,8 @@ import * as fs from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fixture } from './support/host.mjs';
+import { Worker } from 'node:worker_threads';
+import { once } from 'node:events';
 
 test('tree includes tracked unchanged and new files, excludes ignored files, scopes subdirectory workspaces', async t => {
   const h = await fixture(t);
@@ -89,4 +91,22 @@ test('plugin disposal cancels navigation and awaits the provider before completi
   release();
   await disposal;
   assert.equal((await query).status, 408);
+});
+
+
+test('compiler navigation supports both case-sensitive and case-insensitive filesystem hosts', { timeout: 15000 }, async t => {
+  const h = await fixture(t);
+  const source = await h.call('source', { path: 'src/main.ts' });
+  for (const testCaseSensitive of [true, false]) {
+    const worker = new Worker(new URL('../typescript-worker.js', import.meta.url), {
+      execArgv: ['--import', new URL('./support/typescript-system.mjs', import.meta.url).href],
+      workerData: { root: h.root, file: join(h.root, 'src/main.ts'), text: source.text, line: 2, character: source.text.split('\n')[2].indexOf('draw'), testCaseSensitive },
+    });
+    t.after(async () => { await worker.terminate(); });
+    const exited = new Promise(resolve => worker.once('exit', resolve));
+    const [result] = await once(worker, 'message');
+    assert.equal(result.error, undefined, JSON.stringify(result));
+    assert.ok(result.locations.some(item => item.uri.endsWith('/src/shapes.ts')));
+    assert.equal(await exited, 0);
+  }
 });

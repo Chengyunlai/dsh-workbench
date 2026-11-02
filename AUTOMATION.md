@@ -8,7 +8,7 @@
 
 `CI` 在 Ubuntu 24.04 和 macOS 15、Node.js 24 上执行 `npm ci` 与 `npm run verify`。Linux 同时运行固定版本 actionlint 检查工作流语义。独立的安装包任务执行构建与 `npm run test:package`，生成 ZIP、npm tarball 和 SHA256SUMS，供 Actions 下载并保留七天。
 
-默认测试覆盖真实 Git、捆绑的 JS／TS 与 Python 导航、模拟 DAP 和客户端 DOM。仓库检查验证翻译键与占位符、文档本地链接、中英文段落对齐，以及构建后的 `client.js` 未发生未提交漂移。安装包在隔离目录中验证 Host 导入、客户端注册和必需资源；ZIP 额外包含锁文件并执行 `npm ci --omit=dev` 验收。
+默认测试覆盖真实 Git、捆绑的 JS／TS 与 Python 导航、模拟 DAP 和客户端 DOM。仓库检查验证翻译键与占位符、文档本地链接、中英文段落对齐，以及构建后的 `client.js` 未发生未提交漂移。安装包在隔离目录中验证 Host 导入、客户端注册、必需资源与安装后的编译器跳转；ZIP 额外包含锁文件并执行 `npm ci --omit=dev` 验收。
 
 main 要求汇总检查 `CI` 成功；它只有在全部基础与安装包任务通过时才成功。工作流不按文档路径跳过这一必需检查。Windows 尚未列为已验证平台；JSDOM 测试通过不代表桌面原生行为已验收。
 

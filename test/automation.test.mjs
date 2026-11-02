@@ -24,4 +24,5 @@ test('release checks require a matching version tag, including prerelease suffix
   checkReleaseTag('v1.0.0', '1.0.0'); checkReleaseTag('v1.1.0-beta.1', '1.1.0-beta.1');
   for (const tag of ['1.0.0', 'v2.0.0', 'v1.0.0\n']) assert.throws(() => checkReleaseTag(tag, '1.0.0'));
   assert.throws(() => checkReleaseTag('vbad', 'bad'));
+  assert.throws(() => checkReleaseTag('v1.0.0\n', '1.0.0\n'));
 });

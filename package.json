@@ -11,7 +11,7 @@
     "setup:debuggers": "node scripts/configure-debuggers.mjs",
     "test:debug": "node --test test/debug.e2e.mjs",
     "check": "node scripts/repository-checks.mjs",
-    "check:generated": "git diff --exit-code -- client.js",
+    "check:generated": "git ls-files --error-unmatch client.js && git diff --exit-code -- client.js",
     "test:package": "node scripts/package-smoke.mjs",
     "verify": "npm test && npm run check && npm run check:generated",
     "setup:ci-tools": "node scripts/setup-ci-tools.mjs"
