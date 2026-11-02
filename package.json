@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node build-client.mjs",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "test": "npm run build && node --test --test-timeout=300000 test/*.test.mjs",
     "test:languages": "node --test test/languages.e2e.mjs",
     "setup:languages": "node scripts/configure-languages.mjs",
     "setup:debuggers": "node scripts/configure-debuggers.mjs",

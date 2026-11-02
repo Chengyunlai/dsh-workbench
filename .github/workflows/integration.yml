@@ -5,6 +5,7 @@ on:
       - '.github/workflows/integration.yml'
       - 'scripts/setup-ci-tools.mjs'
       - 'test/*.e2e.mjs'
+      - 'test/support/**'
       - 'debug*.js'
       - 'language*.js'
   schedule:
