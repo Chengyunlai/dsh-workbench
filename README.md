@@ -1,96 +1,63 @@
----
-description: "DeepSeek Harness 对话旁的开发工作台，整合项目浏览、代码跳转、文档预览、Git 检查与断点调试。"
-kind: package-bundle
----
+<p align="center"><img src="icon.svg" width="52" height="52" alt="dsh-workbench" /></p>
 
-# dsh-workbench · 开发工作台
+<h1 align="center">dsh-workbench</h1>
 
-[English](README.en.md) | 中文
+<p align="center"><strong>对话留在中间，代码就在手边。</strong><br />DeepSeek Harness 对话旁的开发工作台。</p>
+
+<p align="center"><a href="https://github.com/Chengyunlai/dsh-workbench/actions/workflows/ci.yml"><img src="https://github.com/Chengyunlai/dsh-workbench/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a> <a href="LICENSE"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/badge-license.svg" alt="MIT license" /></a> <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/badge-harness.svg" alt="DeepSeek Harness community plugin" /></a> <a href="#语言支持"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/badge-languages.svg" alt="Navigation for five languages" /></a></p>
+
+<p align="center">中文 · <a href="README.en.md">English</a>　|　<a href="#能力演示">看演示</a> · <a href="#安装">开始使用</a> · <a href="USAGE.md">使用指南</a> · <a href="https://github.com/Chengyunlai/dsh-workbench/issues">反馈问题</a></p>
+
+![对话与开发工作台的概念主视觉](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/cover.png)
 
 ## 简介
 
-在 DeepSeek Harness 对话旁查看项目、追踪代码并调试程序。dsh-workbench 将文件树、源码与文档阅读、Git 差异和断点调试放进同一个右侧工作台，保留中间的对话上下文。代码阅读与 Git 检查只读；启动调试会执行真实程序。
+AI 给出改动后，你可以就在对话旁打开文件、沿着定义跳转、逐行检查 diff，再用断点确认程序如何执行。文件树、代码、文档、Git 和调试共用一个工作台，保留当前对话上下文。
 
-## 目录
-
-- [能力](#能力)
-- [能力演示](#能力演示)
-- [语言支持](#语言支持)
-- [安装](#安装)
-- [使用](#使用)
-- [适用范围](#适用范围)
-- [文档与验证](#文档与验证)
-- [参与贡献](#参与贡献)
-- [开发与兼容](#开发与兼容)
+交互参考 JetBrains：多文件标签、代码折叠、修饰键点击跳转、前进／后退，以及联动源码的调用栈。阅读区、文件树和调试区可拖动调整，调试面板可放右侧或底部，并跟随宿主明暗主题。
 
 ## 能力
 
-| 能力 | 在工作台中完成 |
-| --- | --- |
-| 项目浏览 | 文件树、路径过滤、Git 状态标记，以及可拖动调整的区域 |
-| 代码阅读 | 多文件标签、代码折叠、语法高亮、同名词高亮、函数与类型定义跳转、阅读历史 |
-| 文档阅读 | Markdown 排版预览与源码切换，文档内链接，以及常用配置文件高亮 |
-| Git 检查 | 工作区变更、统一 diff、提交图与提交详情，联动当前源码 |
-| 断点调试 | 启动或接入进程、断点、继续、暂停、单步、调用栈、变量、表达式求值、清理全部断点和程序输出 |
-| 与对话协作 | 手动将文件、提交或选中的 diff 片段连同评审建议发到项目新对话 |
+![对话旁的代码阅读、Git 检查和断点调试](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/workflow.zh.svg)
 
-```mermaid
-flowchart LR
-  Chat["DeepSeek Harness 对话"] --- Workbench["开发工作台"]
-  Workbench --> Files["文件与文档"]
-  Workbench --> Code["代码阅读与导航"]
-  Workbench --> Git["Git 变更与历史"]
-  Workbench --> Debug["断点调试"]
-```
+| 读懂代码 | 看清改动 | 检查真实执行 |
+| --- | --- | --- |
+| 文件树、多标签、语法高亮、同名词高亮、定义跳转、代码折叠和阅读历史。Markdown 默认排版预览，可切回源码。 | 查看工作区变更、逐行 diff、提交图和提交详情；从差异跳回源码，手动把选中的 diff 交给项目新对话讨论。 | 启动或接入已有进程，设置断点、单步、切换调用栈、展开变量、计算表达式，并清理全部断点。 |
 
 ## 能力演示
 
-场景使用虚构的 Sample Shop 项目，代码、提交作者和业务数据均为演示内容。
+以下是真实 Harness 界面，使用虚构的 Sample Shop 项目。点击截图可查看对应 GIF。
 
-**文档与代码导航**：预览 Markdown、切回源码，再通过定义跳转跨文件阅读。
-
-![文档预览、源码切换与跨文件定义跳转](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif)
+<table><tr><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/read-code.png" alt="代码与文档阅读" /></a><br /><strong>代码与文档阅读</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/review-changes.png" alt="Git 差异与历史" /></a><br /><strong>Git 差异与历史</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/debug-program.png" alt="断点与表达式求值" /></a><br /><strong>断点与表达式求值</strong></td></tr></table>
 
 <details>
-<summary>Git 差异与提交历史</summary>
+<summary><strong>播放：断点、变量与 Evaluate Expression</strong></summary>
 
-查看工作区变更、逐行差异、提交图和单次提交详情。
+命中 Python 断点，进入函数、查看变量，计算并展开对象结果，最后清理断点、继续运行。
 
-![Git 工作区差异与提交历史](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif)
+![Python 断点、单步与表达式求值](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif)
 
 </details>
 
 <details>
-<summary>断点、单步、变量与表达式求值</summary>
+<summary><strong>播放：代码折叠与文件切换恢复</strong></summary>
 
-命中 Python 断点、进入函数、查看变量、计算并展开对象结果，最后清理断点并继续运行。
+折叠函数及外层类，切到文档再返回；展开外层时保留内层折叠，点击省略号展开代码。跳转和调试定位进入隐藏代码时会自动展开目标区域。
 
-![Python 断点、单步、表达式求值与清理断点](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif)
+![嵌套折叠、切换文件恢复与展开](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-03-beecb54/code-folding.gif)
 
 </details>
 
 <details>
 <summary>录制与脱敏说明</summary>
 
-录制于 macOS 上独立的 Harness Web 0.2.1-rc.5 实例，使用[此版本的工作台](https://github.com/Chengyunlai/dsh-workbench/tree/c0f7910947fba167619a6526c84b343348ebfcea)。Git、Pyright 和 debugpy 均为真实服务，未调用模型。画面排除了账号与绝对路径区域，未录入现有会话或真实项目。GIF 由连续操作中验证过的截图按步骤组成，停留时长为便于阅读而编辑，不代表响应耗时。
+主视觉为概念插画，功能截图与 GIF 来自 macOS 上独立的 Harness Web 0.2.1-rc.5 实例。代码、提交作者和业务数据均为虚构；画面排除了账号与绝对路径区域。GIF 由已验证的操作截图按步骤组成，停留时长经过编辑，不代表响应耗时。代码导航、Git 与调试演示使用真实 Git、Pyright 和 debugpy，未调用模型；折叠演示中的模型请求返回 AUTH，未完成模型回复，折叠操作本身不调用模型。
 
 </details>
 
-## 语言支持
-
-| 语言 | 阅读与定义跳转 | 启动／接入调试 |
-| --- | --- | --- |
-| Python | Pyright | debugpy |
-| Go | gopls | Delve |
-| Java | Eclipse JDT LS | 暂无 |
-| JavaScript | TypeScript 语言服务 | vscode-js-debug（Node.js） |
-| TypeScript | TypeScript 语言服务 | vscode-js-debug（需 JS 与 source map） |
-
-JS／TS 与 Python 导航依赖随安装提供；Go、Java 需要本机语言服务。调试需要另行配置本机适配器。环境与配置步骤分别见[使用指南](USAGE.md#五种语言的支持与配置)和[调试配置](DEBUGGING.md)。
-
 ## 安装
 
-克隆项目并安装运行依赖；仓库包含已构建的客户端，使用时无需构建。
+**1. 克隆项目，安装运行依赖。** 仓库已包含构建后的客户端，使用时无需构建。
 
 ```sh
 git clone https://github.com/Chengyunlai/dsh-workbench.git
@@ -98,48 +65,48 @@ cd dsh-workbench
 npm ci --omit=dev
 ```
 
-在 DeepSeek Harness 的插件管理器中安装此本地目录，然后启用“开发工作台”。已有安装升级后会显示新名称；安装目录可沿用原路径。
+**2. 在 Harness 插件管理器中安装这个本地目录，启用“开发工作台”。** 在项目对话中展开右侧工具区，从“开始”或“更多工具”打开它。
 
-## 使用
+先打开一个文件开始阅读。配好调试适配器后，点击行号旁设置断点，按 F5 启动；需要接入已有进程时使用源码右键菜单。快捷键与语言配置见[使用指南](USAGE.md)，启动和接入参数见[调试配置](DEBUGGING.md)。
 
-1. 在项目对话中展开右侧工具区，从“开始”或“更多工具”打开 **开发工作台**。
-2. 在“文件”中打开代码或文档；用文件标签、修饰键点击和 F12 追踪定义，在“变更”和“历史”检查 Git。
-3. 配好适配器后，在 Python、Go 或 Node.js 入口设置断点，按 F5 启动；也可右键选择“接入已有进程”。
-4. 暂停后切换栈帧并展开变量。调试面板可停靠右侧或底部，区域分隔线可拖动，尺寸自动保存。
+## 语言支持
 
-完整快捷键、语言服务配置和阅读交互见[使用指南](USAGE.md)；启动参数、进程接入与调试进程归属见[调试配置](DEBUGGING.md)。
+五种语言均支持源码阅读与语法折叠；定义跳转和调试使用下表中的服务。
+
+| 语言 | 定义跳转 | 启动 / 接入调试 |
+| --- | --- | --- |
+| Python | Pyright | debugpy |
+| Go | gopls | Delve |
+| Java | Eclipse JDT LS | 暂无 |
+| JavaScript | TypeScript 语言服务 | vscode-js-debug（Node.js） |
+| TypeScript | TypeScript 语言服务 | vscode-js-debug（需 JS 与 source map） |
+
+JS／TS 与 Python 导航依赖随安装提供；Go、Java 需要本机语言服务。调试需要另行配置本机适配器，TypeScript 需先生成 JS 与 source map。详见[语言服务配置](USAGE.md#五种语言的支持与配置)和[调试适配器配置](DEBUGGING.md#安装调试器)。
 
 ## 适用范围
 
-- 面向 Harness 已注册的 Git 项目；源码不支持编辑，Git 不提供暂存、提交、回滚或分支切换。
-- 调试启动的程序可能修改文件或访问外部服务，使用前应准备好开发环境。`.dsh/debug.json` 只在需要自定义项目参数时使用。
-- 断点、源码标签和阅读历史保存在当前面板内存中；关闭面板后不作为持久项目状态恢复。
-- Java 调试、源码编辑、条件断点和自动构建不在当前能力内。Markdown 图片当前显示说明文字。
+- 面向 Harness 已注册的 Git 项目。源码和 Git 检查只读，不提供源码编辑、暂存、提交、回滚或分支切换。
+- 启动调试会执行真实程序，可能写文件或访问外部服务。`.dsh/debug.json` 仅用于自定义项目参数。
+- 文件标签、阅读历史、折叠和断点保存在当前面板内存中；关闭面板后不作为持久项目状态恢复。
+- 当前不支持 Java 调试、条件断点和自动构建。Markdown 图片显示说明文字。
 
-## 文档与验证
+## 文档与贡献
 
-- [使用指南](USAGE.md)：阅读、导航、布局、Git 与语言服务。
-- [调试配置](DEBUGGING.md)：适配器、当前文件调试、启动与接入配置。
-- 默认测试使用临时 Git 项目、模拟语言服务和 DAP 适配器，以及实际客户端 DOM；不需要模型 API 密钥。
-- macOS 桌面端已验证代码与文档阅读、定义跳转、同名高亮、明暗主题，以及侧栏与底部的尺寸调整。真实语言服务和调试器有独立的手动环境测试；Windows／Linux 尚无桌面交互验收。
+| 你想做什么 | 从这里开始 |
+| --- | --- |
+| 阅读代码、配置语言服务、调整布局 | [使用指南](USAGE.md) |
+| 配置调试器、启动或接入进程 | [调试配置](DEBUGGING.md) |
+| 报告问题或提交 PR | [贡献指南](CONTRIBUTING.md) · [Issues](https://github.com/Chengyunlai/dsh-workbench/issues) |
+| 了解 CI 和发布流程 | [自动化与发布](AUTOMATION.md) |
+| 私密报告安全问题 | [安全报告](SECURITY.md) |
 
-## 参与贡献
-
-问题反馈与 PR 请先阅读[贡献指南](CONTRIBUTING.md)；漏洞请使用[私密安全报告](SECURITY.md)。基础 CI、真实集成测试和版本发布步骤见[自动化说明](AUTOMATION.md)。
-
-## 开发与兼容
+macOS 桌面端已实测阅读、导航、折叠、明暗主题与布局。CI 在 Linux／macOS 运行基础测试，并在 Linux 验收安装包；真实语言服务与调试器另有集成测试。Windows／Linux 桌面交互尚未验收。欢迎用脱敏的最小示例反馈问题。
 
 <details>
-<summary>构建、测试与既有安装标识</summary>
+<summary>开发与已有安装兼容</summary>
 
-```sh
-npm ci
-npm test
-npm pack --dry-run
-```
-
-客户端源码由 `build-client.mjs` 打包到 `client.js`，复用宿主 React。安装包名继续使用 `@local/dsh-git-control`；已有 Cordis 配置、右侧标签、偏好键和 `/api/git.*` 路由保持原标识，避免仓库更名导致重复安装或丢失设置。项目名称与用户界面统一为 dsh-workbench／开发工作台。
+开发测试使用 Node.js 24.15.0 或更新的 24.x，运行 `npm ci`、`npm run verify` 与 `npm run test:package`。安装包保持 `@local/dsh-git-control`，既有 Cordis 配置、右侧标签、偏好键和 `/api/git.*` 路由继续使用原标识；更新后界面名称为“开发工作台”。
 
 </details>
 
-项目代码采用 [MIT](LICENSE)。编辑器使用 CodeMirror（MIT）；界面图标使用 Lucide（ISC），文件类型图标来自 vscode-icons（MIT）。打包依赖的许可声明保留在客户端产物中。
+代码采用 [MIT](LICENSE) 许可。编辑器使用 CodeMirror（MIT），界面图标使用 Lucide（ISC），文件图标来自 vscode-icons（MIT）；客户端保留打包依赖的许可声明。
