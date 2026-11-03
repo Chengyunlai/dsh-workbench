@@ -3,7 +3,7 @@ import { EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
 import { EditorView, Decoration, gutter, GutterMarker, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from '@codemirror/view';
 import { defaultKeymap } from '@codemirror/commands';
 import { highlightSelectionMatches } from '@codemirror/search';
-import { LanguageSupport, StreamLanguage, syntaxHighlighting, bracketMatching } from '@codemirror/language';
+import { LanguageSupport, StreamLanguage, syntaxHighlighting, bracketMatching, foldGutter, foldKeymap, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language';
 import { javascript } from '@codemirror/lang-javascript';
 import { go } from '@codemirror/lang-go';
 import { java } from '@codemirror/lang-java';
@@ -154,7 +154,7 @@ function wordAt(state, position) {
  * Mount a source reader; callers own its returned disposer.
  * @param parent - Empty editor container.
  * @param options - Source, initial position, localized name, and callbacks scoped to this reader.
- * @returns Focus, caret/viewport snapshots, reveal, host-source replacement and disposal actions; user edits remain disabled.
+ * @returns Focus, caret/viewport/fold snapshots, reveal, host-source replacement and disposal actions; user edits remain disabled.
  */
 export function createSourceEditor(parent, options) {
   let sourceVersion = options.version;
@@ -177,10 +177,11 @@ export function createSourceEditor(parent, options) {
   };
   const createState = (text, path) => EditorState.create({ doc: text, extensions: [
     EditorState.readOnly.of(true), EditorState.tabSize.of(2), EditorView.editable.of(false),
+    EditorState.phrases.of(options.foldPhrases),
     EditorView.contentAttributes.of({ tabindex: '0', 'aria-label': options.label, 'aria-readonly': 'true' }),
     debugField, executionLine,
     gutter({ class: 'jb-breakpoints', lineMarker: (view, line) => { const number = view.state.doc.lineAt(line.from).number, value = view.state.field(debugField); const point = value.breakpoints.find(item => item.line === number); return new BreakpointMarker(Boolean(point), point?.verified === true, value.currentLine === number, options.breakpointLabel); }, lineMarkerChange: update => update.transactions.some(transaction => transaction.effects.some(effect => effect.is(debugEffect))), domEventHandlers: { mousedown: (view, line, event) => { event.preventDefault(); options.onToggleBreakpoint(view.state.doc.lineAt(line.from).number); return true; } } }),
-    lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(), bracketMatching(),
+    lineNumbers(), foldGutter(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(), bracketMatching(),
     highlightSelectionMatches({ highlightWordAroundCursor: true, wholeWords: true }),
     syntaxHighlighting(sourceHighlighting), sourceLanguage(path),
     linkField,
@@ -196,6 +197,7 @@ export function createSourceEditor(parent, options) {
       { key: 'Ctrl-Alt-ArrowLeft', mac: 'Meta-Alt-ArrowLeft', run: view => { options.onBack(positionAt(view)); return true; }, stopPropagation: true },
       { key: 'Ctrl-Alt-ArrowRight', mac: 'Meta-Alt-ArrowRight', run: view => { options.onForward(positionAt(view)); return true; }, stopPropagation: true },
     ])),
+    keymap.of(foldKeymap.map(binding => ({ ...binding, stopPropagation: true }))),
     keymap.of(defaultKeymap),
     EditorView.updateListener.of(update => { if (update.selectionSet) options.onPosition(positionAt(update.view)); }),
     EditorView.domEventHandlers({
@@ -233,6 +235,11 @@ export function createSourceEditor(parent, options) {
       '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace', lineHeight: '22px' },
       '.cm-content': { caretColor: options.colors.text, padding: '6px 0' },
       '.cm-gutters': { backgroundColor: options.colors.gutter, color: options.colors.textDim, borderRight: '1px solid ' + options.colors.border },
+      '.cm-foldGutter .cm-gutterElement': { padding: '0 2px', minWidth: '14px', textAlign: 'center' },
+      '.cm-foldGutter span': { color: options.colors.textDim, fontSize: '16px', lineHeight: '22px' },
+      '.cm-foldGutter span:hover': { color: options.colors.accent },
+      '.cm-foldPlaceholder': { backgroundColor: options.colors.panel, color: options.colors.text, borderWidth: '1px', borderStyle: 'solid', borderColor: options.colors.border, borderRadius: '3px', padding: '0 4px' },
+      '.cm-foldPlaceholder:hover': { backgroundColor: options.colors.hover, borderColor: options.colors.accent },
       '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: options.colors.hover },
       // Match the focused base-theme selector so its light palette cannot override host colors.
       '.cm-selectionLayer .cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': { backgroundColor: options.colors.textSelection },
@@ -267,12 +274,29 @@ export function createSourceEditor(parent, options) {
     const scroll = position.viewport && position.viewport.version === sourceVersion ? position.viewport.effect : EditorView.scrollIntoView(anchor, { y: center ? 'center' : 'nearest' });
     view.dispatch({ selection: { anchor }, effects: scroll });
   };
+  const restoreFolds = position => {
+    if (position.folding?.version === sourceVersion) view.dispatch({ effects: position.folding.ranges.map(range => foldEffect.of(range)) });
+  };
+  restoreFolds(options.position);
   reveal(options.position, true);
   if (options.takeFocus) view.focus();
   return {
-    setDebug: value => view.dispatch({ effects: debugEffect.of(value) }),
-    setSource: (source, position) => { sourceVersion = source.version; view.setState(createState(source.text, source.path)); reveal(position, true); },
-    snapshot: () => ({ ...positionAt(view), viewport: { version: sourceVersion, effect: view.scrollSnapshot() } }),
+    setDebug: value => {
+      const previous = view.state.field(debugField), effects = [debugEffect.of(value)];
+      for (const key of ['currentLine', 'selectedLine']) {
+        const line = value[key];
+        if (!line || line === previous[key] || line > view.state.doc.lines) continue;
+        const position = view.state.doc.line(line).from;
+        foldedRanges(view.state).between(position, position, (from, to) => { if (from < position && position < to) effects.push(unfoldEffect.of({ from, to })); });
+      }
+      view.dispatch({ effects });
+    },
+    setSource: (source, position) => { sourceVersion = source.version; view.setState(createState(source.text, source.path)); restoreFolds(position); reveal(position, true); },
+    snapshot: () => {
+      const ranges = [];
+      foldedRanges(view.state).between(0, view.state.doc.length, (from, to) => ranges.push({ from, to }));
+      return { ...positionAt(view), viewport: { version: sourceVersion, effect: view.scrollSnapshot() }, folding: { version: sourceVersion, ranges } };
+    },
     selectedText: () => view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to),
     focus: () => view.focus(), position: () => positionAt(view), reveal,
     measure: () => view.requestMeasure(),

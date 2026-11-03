@@ -28,7 +28,7 @@ Inspect projects, follow code, and debug programs beside DeepSeek Harness conver
 | Capability | What you can do |
 | --- | --- |
 | Project browsing | Browse a file tree, filter paths, see Git status markers, and resize panes |
-| Code reading | Read multiple tabs with syntax and occurrence highlighting, function/type definitions, and navigation history |
+| Code reading | Read multiple tabs with code folding, syntax and occurrence highlighting, function/type definitions, and navigation history |
 | Documents | Switch Markdown between reading preview and source, follow document links, and read highlighted configuration files |
 | Git inspection | Inspect changes, unified diffs, commit graphs, and commit details alongside current source |
 | Debugging | Launch or attach, set breakpoints, resume, pause, step, and inspect frames, variables, expression results, and output; remove all breakpoints |

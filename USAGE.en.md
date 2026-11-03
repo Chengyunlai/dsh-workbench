@@ -20,6 +20,8 @@ Plain clicks place the caret or select text without querying definitions. A care
 
 Source keeps open-file tabs. The tree, definitions, and stack frames open or select their file, reusing the tab for the same path. Selecting a tab restores its caret and scroll position; changed files restore only the valid caret position. Close using the close icon, middle-click, or Delete; switch with Left/Right and Home/End. Tabs scroll horizontally in narrow panes; duplicate basenames show their paths. Tabs and positions stay in panel memory without caching source text. Closing a tab does not end debugging, and Back/Forward can reopen a file from navigation history.
 
+Use arrows beside line numbers to fold or unfold syntax-recognized code blocks; clicking the ellipsis also unfolds them. Python, Go, Java, JavaScript and TypeScript fold functions, classes and nested blocks according to their grammars, without guessing indentation for unknown files. Switching files retains folds for the same content version; changed content clears old folds. Definition jumps, line navigation and debugging expand blocks containing a hidden destination. Folds remain in the current panel’s memory only.
+
 Markdown (`.md`/`.markdown`/`.mdown`) opens in a reading preview with heading hierarchy, emphasis, lists, tasks, quotes, tables, inline code, and language-highlighted fenced blocks. The document view can switch to source with line numbers and original markup. View changes reuse the editor; file tabs and Back/Forward retain reading positions. Relative links open workspace files, including heading anchors and `#Lline` destinations; HTTP(S) links open a new window. Raw HTML is omitted, and images show their descriptions without automatic resource requests.
 
 JSON, YAML, TOML, INI/properties/`.env`, shell, and Makefile receive basic syntax highlighting. Markdown source distinguishes headings, emphasis, links, and code markers. Preview and source follow the host light/dark theme; wide code blocks and tables scroll within their own regions.
@@ -31,6 +33,8 @@ Same-file definition jumps, frame selection, and stepping reuse the current sour
 | Definition | ⌘/Ctrl+click a symbol, or F12 |
 | Back / Forward | ⌘[ / ⌘]; Ctrl+Alt+Left / Right on Windows/Linux; mouse back/forward buttons also work |
 | Go to line/column | ⌘L on macOS, Ctrl+G on Windows/Linux. Enter `line[:column]` and press Enter |
+| Fold / Unfold current block | ⌘⌥[ / ⌘⌥] on macOS; Ctrl+Shift+[ / ] on Windows/Linux |
+| Fold / Unfold all | Ctrl+Alt+[ / ]; Control+Option+[ / ] on macOS |
 | More actions | Right-click, or Shift+F10 |
 | Dismiss menus and line prompts | Escape or an outside click |
 
