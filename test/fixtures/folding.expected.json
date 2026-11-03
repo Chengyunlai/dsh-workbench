@@ -1,0 +1,37 @@
+[
+  {
+    "path": "src/fold.py",
+    "fold": "折叠代码",
+    "placeholder": "…",
+    "label": "已折叠的代码",
+    "unfold": "展开代码"
+  },
+  {
+    "path": "src/fold.go",
+    "fold": "折叠代码",
+    "placeholder": "…",
+    "label": "已折叠的代码",
+    "unfold": "展开代码"
+  },
+  {
+    "path": "src/fold.java",
+    "fold": "折叠代码",
+    "placeholder": "…",
+    "label": "已折叠的代码",
+    "unfold": "展开代码"
+  },
+  {
+    "path": "src/fold.js",
+    "fold": "折叠代码",
+    "placeholder": "…",
+    "label": "已折叠的代码",
+    "unfold": "展开代码"
+  },
+  {
+    "path": "src/fold.ts",
+    "fold": "折叠代码",
+    "placeholder": "…",
+    "label": "已折叠的代码",
+    "unfold": "展开代码"
+  }
+]

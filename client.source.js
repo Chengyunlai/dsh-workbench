@@ -126,6 +126,8 @@ window.__ModuleLoader__.load({
       'files.hint': '⌘/Ctrl+click or F12: definition · Right-click: more actions',
       'files.definition': 'Go to definition',
       'files.goLine': 'Go to line/column',
+      'files.fold': 'Fold code', 'files.unfold': 'Unfold code', 'files.foldedCode': 'Folded code',
+      'files.foldedLines': 'Folded lines', 'files.unfoldedLines': 'Unfolded lines', 'files.rangeTo': 'to',
       'files.opening': 'Opening {path}…', 'files.openFailed': 'Could not open {path}: {message}',
       'files.openTabs': 'Open files', 'files.closeTab': 'Close {path}',
       'files.linePrompt': 'Line[:column] · Enter to go · Esc to cancel',
@@ -253,6 +255,8 @@ window.__ModuleLoader__.load({
       'files.hint': '⌘/Ctrl＋点击或 F12 跳到定义；右键查看更多操作',
       'files.definition': '跳转到定义',
       'files.goLine': '跳转到行／列',
+      'files.fold': '折叠代码', 'files.unfold': '展开代码', 'files.foldedCode': '已折叠的代码',
+      'files.foldedLines': '已折叠行', 'files.unfoldedLines': '已展开行', 'files.rangeTo': '至',
       'files.opening': '正在打开 {path}…', 'files.openFailed': '无法打开 {path}：{message}',
       'files.openTabs': '已打开文件', 'files.closeTab': '关闭 {path}',
       'files.linePrompt': '行号[:列号] · Enter 跳转 · Esc 取消',
@@ -1147,6 +1151,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       useLayoutEffect(() => {
         const instance = createSourceEditor(parent.current, {
           text: source.text, path: source.path, version: source.version, position: target, label: t('files.source'), colors: C,
+          foldPhrases: { 'Fold line': t('files.fold'), 'Unfold line': t('files.unfold'), 'folded code': t('files.foldedCode'), unfold: t('files.unfold'), 'Folded lines': t('files.foldedLines'), 'Unfolded lines': t('files.unfoldedLines'), to: t('files.rangeTo') },
           takeFocus: document.activeElement === document.body || (parent.current.closest('.jb-changes')?.contains(document.activeElement) && document.activeElement.closest('.jb-filebutton') !== null),
           onDefinition: at => { if (!callbacks.current.busy && !callbacks.current.blocked) callbacks.current.onDefinition(at.line, at.character); },
           onBack: at => callbacks.current.onNavigate(-1, at), onForward: at => callbacks.current.onNavigate(1, at),
@@ -1265,6 +1270,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }, [view, content]);
       const visit = (destination, origin, mode = 'source') => {
         const remembered = remember(); retain(destination.path);
+        destination = { folding: positions.current.get(destination.path)?.folding, ...destination };
         navigationRef.current?.abort();
         if (error && destination.path === target?.path) setReadRevision(value => value + 1);
         setView(mode);

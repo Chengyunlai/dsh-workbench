@@ -9,10 +9,11 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const source = { 'src/main.ts': "const emoji = '😀'; render();", 'src/lib.ts': 'export function render() {}' };
 
-async function panel(testContext, fetch, { dock, paneSizes } = {}) {
+async function panel(testContext, fetch, { dock, paneSizes, platform } = {}) {
   let dictionary = {};
   const t = (key, vars = {}) => Object.entries(vars).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), dictionary[key] ?? key);
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true, url: 'https://harness.test/' });
+  if (platform !== undefined) Object.defineProperty(dom.window.navigator, 'platform', { value: platform });
   if (dock !== undefined) dom.window.localStorage.setItem('dsh.git-control.debugDock', dock);
   if (paneSizes !== undefined) dom.window.localStorage.setItem('dsh.git-control.paneSizes', typeof paneSizes === 'string' ? paneSizes : JSON.stringify(paneSizes));
   globalThis.window = dom.window;
@@ -1135,4 +1136,126 @@ test('failed evaluation remains visible without retry and late results cannot re
  assert.equal(dialog().querySelector('.jb-evaluate-result'), null);
  await act(async () => resolveEvaluation({ ok: true, json: async () => ({ result: 'STALE', variablesReference: 0 }) }));
  assert.equal(dialog().querySelector('.jb-evaluate-result'), null); assert.equal(calls, 2);
+});
+
+test('Python, Go, Java, JavaScript and TypeScript expose independent folding without editing source or toggling breakpoints', async context => {
+ const files = {
+  'src/fold.py': 'class Basket:\n    def total(self):\n        return 42\n\nBasket()\n',
+  'src/fold.go': 'package main\nfunc total() int {\n  if true {\n    return 42\n  }\n  return 0\n}\n',
+  'src/fold.java': 'class Basket {\n  int total() {\n    return 42;\n  }\n}\n',
+  'src/fold.js': 'class Basket {\n  total() {\n    return 42;\n  }\n}\n',
+  'src/fold.ts': 'class Basket {\n  total(): number {\n    return 42;\n  }\n}\n',
+ };
+ const ui = await panel(context, server(url => {
+  if (url.pathname === '/api/git.tree') return Promise.resolve({ ok: true, json: async () => ({ files: Object.keys(files) }) });
+  if (url.pathname === '/api/git.source') return Promise.resolve({ ok: true, json: async () => ({ path: url.searchParams.get('path'), text: files[url.searchParams.get('path')], version: 'fold-v1' }) });
+ }));
+ await ui.click('src');
+ const snapshot = [];
+ for (const [path, text] of Object.entries(files)) {
+  await ui.click(path.slice(4));
+  const view = ui.editor();
+  const marker = ui.container.querySelector('.cm-foldGutter span[title="折叠代码"]');
+  assert.ok(marker, path);
+  const line = path.endsWith('.go') ? 2 : 1;
+  const block = view.lineBlockAt(view.state.doc.line(line).from);
+  marker.parentElement.getBoundingClientRect = () => ({ top: view.documentTop + block.top, bottom: view.documentTop + block.bottom });
+  // JSDOM has no gutter geometry; bind this click to the indicated source line.
+  const lineAtHeight = view.lineBlockAtHeight;
+  view.lineBlockAtHeight = () => block;
+  try { await act(async () => marker.click()); } finally { view.lineBlockAtHeight = lineAtHeight; }
+  const placeholder = ui.container.querySelector('.cm-foldPlaceholder');
+  assert.ok(placeholder, path);
+  snapshot.push({ path, fold: marker.title, placeholder: placeholder.textContent, label: placeholder.getAttribute('aria-label'), unfold: placeholder.title });
+  assert.equal(placeholder.getAttribute('aria-label'), ui.t('files.foldedCode'));
+  assert.equal(ui.container.querySelector('.cm-content').getAttribute('aria-readonly'), 'true');
+  assert.equal(ui.container.querySelectorAll('.jb-breakpoint-enabled').length, 0);
+  assert.equal(view.state.doc.toString(), text);
+  await act(async () => placeholder.click());
+  assert.equal(ui.container.querySelector('.cm-foldPlaceholder'), null);
+  assert.equal(ui.editor(), view);
+ }
+ assert.deepEqual(snapshot, JSON.parse(readFileSync(new URL('./fixtures/folding.expected.json', import.meta.url), 'utf8')));
+});
+
+test('folding survives file tabs, reveals hidden definition targets and discards stale folds after a source change', async context => {
+ let changed = false;
+ const text = 'class Basket {\n  total() {\n    return 42;\n  }\n}\n\nfunction extra() {\n  return 7;\n}\n';
+ const ui = await panel(context, server(url => {
+  if (url.pathname === '/api/git.source' && url.searchParams.get('path') === 'src/main.ts') return Promise.resolve({ ok: true, json: async () => ({ path: 'src/main.ts', text: changed ? 'const replacement = 1;' : text, version: changed ? 'fold-v2' : 'fold-v1' }) });
+  if (url.pathname === '/api/git.definition') return Promise.resolve({ ok: true, json: async () => ({ targets: [{ path: 'src/main.ts', line: 2, character: 4 }], external: 0 }) });
+ }));
+ await ui.click('src'); await ui.click('main.ts');
+ const view = ui.editor();
+ await ui.caret(0); await ui.key('{', { ctrlKey: true, shiftKey: true, keyCode: 219, code: 'BracketLeft' });
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 1);
+ await ui.click('lib.ts');
+ await act(async () => ui.container.querySelector('[role=tab][title="src/main.ts"]').click());
+ assert.equal(ui.editor(), view);
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 1);
+ await ui.key('}', { ctrlKey: true, shiftKey: true, keyCode: 221, code: 'BracketRight' });
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 0);
+ await ui.caret(text.indexOf('total'));
+ await ui.key('{', { ctrlKey: true, shiftKey: true, keyCode: 219, code: 'BracketLeft' });
+ await ui.caret(0);
+ await ui.key('{', { ctrlKey: true, shiftKey: true, keyCode: 219, code: 'BracketLeft' });
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 1);
+ await ui.key('}', { ctrlKey: true, shiftKey: true, keyCode: 221, code: 'BracketRight' });
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 1, 'unfolding the class retains the nested method fold');
+ await ui.key(']', { ctrlKey: true, altKey: true });
+ await ui.key('[', { ctrlKey: true, altKey: true });
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 2);
+ await ui.key(']', { ctrlKey: true, altKey: true });
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 0);
+ await ui.key('[', { ctrlKey: true, altKey: true });
+ await ui.click('lib.ts'); await ui.caret(source['src/lib.ts'].indexOf('render')); await ui.key('F12');
+ assert.equal(ui.editor().state.doc.lineAt(ui.editor().state.selection.main.head).number, 3);
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 1, 'definition opens the containing class and retains the unrelated function fold');
+ await ui.click('lib.ts'); changed = true;
+ await act(async () => ui.container.querySelector('[role=tab][title="src/main.ts"]').click());
+ assert.equal(ui.editor().state.doc.toString(), 'const replacement = 1;');
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 0);
+});
+
+test('a newly paused debugger expands its hidden execution line and fold placeholders use host colors', async context => {
+ const text = 'def total():\n    value = 42\n    return value\n\ndef other():\n    return 7\n';
+ let session = { id: null, state: 'idle' };
+ const ui = await panel(context, server((url, options) => {
+  if (url.pathname === '/api/git.tree') return Promise.resolve({ ok: true, json: async () => ({ files: ['src/main.py'] }) });
+  if (url.pathname === '/api/git.source') return Promise.resolve({ ok: true, json: async () => ({ path: 'src/main.py', text, version: 'fold-py-v1' }) });
+  if (url.pathname === '/api/git.debug.status') return Promise.resolve({ ok: true, json: async () => session });
+  if (url.pathname === '/api/git.debug.configurations') return Promise.resolve({ ok: true, json: async () => ({ configurations: [{ name: 'Folded', request: 'launch' }] }) });
+  if (url.pathname === '/api/git.debug.action') {
+   const body = JSON.parse(options.body);
+   if (body.action === 'start') session = { id: 'fold-debug', name: 'Folded', state: 'paused', revision: 1, pauseId: 1, frames: [{ id: 7, path: 'src/main.py', name: 'total', line: 2, column: 1 }], scopes: [], breakpoints: [] };
+   return Promise.resolve({ ok: true, json: async () => session });
+  }
+ }));
+ await ui.click('src'); await ui.click('main.py');
+ await ui.key('[', { ctrlKey: true, altKey: true });
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 2);
+ for (const dark of [true, false]) {
+  ui.dom.window.document.body.toggleAttribute('data-ds-dark-theme', dark);
+  const style = ui.dom.window.getComputedStyle(ui.container.querySelector('.cm-foldPlaceholder'));
+  assert.equal(style.backgroundColor, 'var(--dsw-alias-bg-layer-1)');
+  assert.equal(style.color, 'var(--dsw-alias-label-primary)');
+ }
+ await ui.key('F5');
+ assert.ok(ui.container.querySelector('.jb-debug-line'));
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 1);
+ assert.ok(ui.container.querySelector('.cm-content').textContent.includes('value = 42'));
+ assert.equal(ui.editor().state.doc.toString(), text);
+});
+
+test('macOS folding shortcuts remain distinct from navigation history', async context => {
+ const ui = await panel(context, server(url => {
+  if (url.pathname === '/api/git.source') return Promise.resolve({ ok: true, json: async () => ({ path: url.searchParams.get('path'), text: 'function total() {\n  return 42;\n}\n', version: 'fold-mac-v1' }) });
+ }), { platform: 'MacIntel' });
+ await ui.click('src'); await ui.click('main.ts');
+ const back = ui.container.querySelector('.cm-content').textContent;
+ await ui.key('[', { metaKey: true, altKey: true, keyCode: 219 });
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 1);
+ await ui.key(']', { metaKey: true, altKey: true, keyCode: 221 });
+ assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 0);
+ assert.equal(ui.container.querySelector('.cm-content').textContent, back);
 });
