@@ -468,7 +468,7 @@ function registerRoutes(ctx, config, languageServers) {
   route('/api/git.diff', ['GET'], handleDiff);
   route('/api/git.log', ['GET'], handleLog);
   route('/api/git.commit', ['GET'], handleCommit);
-  const navigation = navigationHandlers({ runGit, requireWorkspacePath, requireRelativePath, json, languageServers });
+  const navigation = navigationHandlers({ runGit, requireWorkspacePath, requireRelativePath, json, languageServers, imagePreviewMaxBytes: config.imagePreviewMaxBytes });
   route('/api/git.tree', ['GET'], navigation.tree);
   route('/api/git.source', ['GET'], navigation.source);
   route('/api/git.definition', ['GET'], navigation.definition);

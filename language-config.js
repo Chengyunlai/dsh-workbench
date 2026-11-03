@@ -14,6 +14,7 @@ export const ServerConfig = Schema.object({
 
 /** Language-server overrides are trusted deployment configuration, never supplied by a browser request. */
 export const Config = Schema.object({
+  imagePreviewMaxBytes: Schema.number().step(1).min(1024).max(32 * 1024 * 1024).default(8 * 1024 * 1024),
   debugAdapters: Schema.dict(Schema.object({
     command: Schema.string().required(), args: Schema.array(Schema.string()).default([]),
     env: Schema.dict(Schema.string()).default({}), transport: Schema.union(['stdio', 'tcp']).default('stdio'),

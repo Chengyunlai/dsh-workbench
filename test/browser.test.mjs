@@ -1259,3 +1259,59 @@ test('macOS folding shortcuts remain distinct from navigation history', async co
  assert.equal(ui.container.querySelectorAll('.cm-foldPlaceholder').length, 0);
  assert.equal(ui.container.querySelector('.cm-content').textContent, back);
 });
+
+test('image preview supports fit, actual size, zoom, SVG source and source tabs without creating an editor for binary data', async context => {
+  const requests = [];
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>window.bad = true</script><path d="M0 0"/></svg>';
+  const files = ['icon.png', 'logo.svg', ...Object.keys(source)];
+  const ui = await panel(context, server(url => {
+    const path = url.searchParams.get('path');
+    if (url.pathname === '/api/git.tree') return { ok: true, json: async () => ({ files }) };
+    if (url.pathname === '/api/git.source' && ['icon.png', 'logo.svg'].includes(path)) return { ok: true, json: async () => ({ kind: 'image', path, mime: path.endsWith('svg') ? 'image/svg+xml' : 'image/png', version: path, size: 1024,
+      dataUrl: 'data:image/' + (path.endsWith('svg') ? 'svg+xml' : 'png') + ';base64,AA==', ...(path.endsWith('svg') ? { text: svg } : {}) }) };
+  }, requests));
+  await ui.click('icon.png');
+  assert.equal(ui.container.querySelector('.cm-content'), null);
+  const image = ui.container.querySelector('.jb-image-stage img');
+  assert.match(image.src, /^data:image\/png;base64,/);
+  Object.defineProperties(image, { naturalWidth: { value: 200 }, naturalHeight: { value: 100 } });
+  await act(async () => image.dispatchEvent(new ui.dom.window.Event('load')));
+  const dimensions = ui.container.querySelector('.jb-editor-status span').textContent;
+  assert.ok(dimensions.includes('200 × 100'));
+  await ui.click('image.actual'); assert.equal(image.style.width, '200px');
+  await ui.click('image.zoomIn'); assert.equal(image.style.width, '250px');
+  await ui.click('image.zoomOut'); assert.equal(image.style.width, '200px');
+  await ui.click('image.fit'); assert.equal(ui.container.querySelector('.jb-image-stage').dataset.fit, 'true');
+  assert.equal(image.style.width, '');
+  await ui.click('logo.svg');
+  assert.equal(ui.container.querySelector('.jb-image-reader script'), null);
+  await ui.click('document.source'); assert.equal(ui.editor().state.doc.toString(), svg);
+  await ui.click('image.preview'); assert.equal(ui.container.querySelector('.cm-content'), null);
+  assert.equal(ui.dom.window.bad, undefined);
+  await ui.click('src'); await ui.click('main.ts');
+  assert.equal(ui.editor().state.doc.toString(), source['src/main.ts']);
+  await ui.key('[', { ctrlKey: true });
+  assert.equal(ui.container.querySelector('.jb-image-stage img').alt, 'logo.svg');
+  await act(async () => ui.container.querySelector('.jb-image-stage').dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: '[', ctrlKey: true, bubbles: true, cancelable: true })));
+  assert.equal(ui.container.querySelector('.jb-image-stage img').alt, 'icon.png');
+  const output = { dimensions, actions: [...ui.container.querySelectorAll('.jb-image-reader button')].map(node => node.textContent), status: ui.container.querySelector('.jb-editor-status').textContent };
+  assert.deepEqual(output, JSON.parse(readFileSync(new URL('./fixtures/image-preview.expected.json', import.meta.url), 'utf8')));
+  assert.equal(requests.filter(request => request.name === '/api/git.definition').length, 0);
+});
+
+test('decode failures are visible, a new file clears them, and untracked image diffs retain the binary message', async context => {
+  const ui = await panel(context, server(url => {
+    const path = url.searchParams.get('path');
+    if (url.pathname === '/api/git.status') return { ok: true, json: async () => ({ isRepo: true, branch: 'main', changes: [{ path: 'broken.png', displayPath: 'broken.png', letter: '?', untracked: true }], shown: 1, total: 1 }) };
+    if (url.pathname === '/api/git.tree') return { ok: true, json: async () => ({ files: ['broken.png', 'other.png'] }) };
+    if (url.pathname === '/api/git.source') return { ok: true, json: async () => ({ kind: 'image', path, mime: 'image/png', version: path, size: 5, dataUrl: 'data:image/png;base64,AA==' }) };
+  }));
+  await ui.click('broken.png');
+  await act(async () => ui.container.querySelector('.jb-image-stage img').dispatchEvent(new ui.dom.window.Event('error')));
+  assert.equal(ui.container.querySelector('[role=alert]').textContent, ui.t('image.failed'));
+  await ui.click('other.png');
+  assert.equal(ui.container.querySelector('[role=alert]'), null);
+  assert.ok(ui.container.querySelector('.jb-image-stage img'));
+  await ui.menu([...ui.container.querySelectorAll('.jb-filebutton')].find(node => node.textContent.includes('broken.png')), 'files.diff');
+  assert.ok(ui.container.querySelector('.jb-diffempty').textContent.includes(ui.t('diff.binary')));
+});
