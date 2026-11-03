@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { realpath } from 'node:fs/promises';
 import { Worker } from 'node:worker_threads';
+import { imageMime, readImagePreview } from './image-preview.js';
 import { serverLanguage } from './language-servers.js';
 
 const MAX_SOURCE_BYTES = 512 * 1024;
@@ -60,9 +61,9 @@ export async function typescriptDefinitions(data, signal) {
 /**
  * Create authenticated route handlers using the plugin's workspace and Git validation.
  * @param dependencies - Shared Git runner, registered-workspace/path validators, and JSON response writer.
- * @returns Tree, source, and definition handlers with bounded source reads.
+ * @returns Tree, source/image preview, and definition handlers with bounded workspace reads.
  */
-export function navigationHandlers({ runGit, requireWorkspacePath, requireRelativePath, json, languageServers }) {
+export function navigationHandlers({ runGit, requireWorkspacePath, requireRelativePath, json, languageServers, imagePreviewMaxBytes }) {
   const readQuery = async (ctx, request, signal) => {
     const query = new URL(request.url).searchParams;
     const cwd = query.get('cwd') ?? '';
@@ -80,6 +81,7 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
     source: async (ctx, request, signal) => {
       const { query, cwd } = await readQuery(ctx, request, signal);
       const path = requireRelativePath(query.get('path'));
+      if (imageMime(path)) return json(await readImagePreview(ctx, cwd, path, signal, imagePreviewMaxBytes));
       const source = await readWorkspaceSource(ctx, cwd, path, signal);
       return json({ path, text: source.text, version: source.version });
     },

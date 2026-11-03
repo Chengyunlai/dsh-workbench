@@ -148,6 +148,13 @@ window.__ModuleLoader__.load({
       'files.read': 'Read source',
       'files.tooLarge': 'Source is larger than 512 KiB.',
       'files.binary': 'This is a binary file; source preview is unavailable.',
+      'image.preview': 'Image preview', 'image.fit': 'Fit', 'image.actual': 'Actual size',
+      'image.zoomIn': 'Zoom in', 'image.zoomOut': 'Zoom out', 'image.dimensions': '{width} × {height} px',
+      'image.failed': 'Could not decode this image. Check its format and file contents.',
+      'image.tooLarge': 'This image exceeds the preview limit. Adjust imagePreviewMaxBytes in plugin settings.',
+      'image.invalid': 'This icon file is damaged or incomplete.',
+      'image.icnsUnsupported': 'This ICNS has no embedded PNG. Legacy and JPEG 2000 icon encodings are not supported.',
+
       'files.notFile': 'This file is missing or is not a regular file. Deleted files can be inspected in Diff.',
       'files.encoding': 'Source preview requires UTF-8 text.',
       'files.outside': 'This file resolves outside the workspace and cannot be opened.',
@@ -277,6 +284,13 @@ window.__ModuleLoader__.load({
       'files.read': '阅读源码',
       'files.tooLarge': '源码超过 512 KiB，无法在此预览。',
       'files.binary': '这是二进制文件，无法预览源码。',
+      'image.preview': '图片预览', 'image.fit': '适应窗口', 'image.actual': '原始大小',
+      'image.zoomIn': '放大', 'image.zoomOut': '缩小', 'image.dimensions': '{width} × {height} 像素',
+      'image.failed': '无法解码图片，请检查文件格式和内容',
+      'image.tooLarge': '图片超过预览上限，可在插件设置中调整 imagePreviewMaxBytes',
+      'image.invalid': '图标文件损坏或不完整',
+      'image.icnsUnsupported': '这个 ICNS 没有内嵌 PNG，暂不支持旧式或 JPEG 2000 图标编码',
+
       'files.notFile': '文件不存在或不是普通文件；已删除文件可切到“差异”查看。',
       'files.encoding': '源码预览只支持 UTF-8 文本。',
       'files.outside': '这个文件的实际位置在工作区外，无法打开。',
@@ -421,6 +435,15 @@ window.__ModuleLoader__.load({
 @media(hover:hover){.jb-stack-frame:hover:not([aria-selected=true]){background:${C.hover}}}
 .jb-sourcebody{flex:1;min-height:0;overflow:hidden}
 .jb-sourcebody[hidden]{display:none}
+.jb-image-reader{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}
+.jb-image-reader>.jb-document-toolbar{flex-wrap:wrap}
+.jb-image-stage{flex:1;min-height:0;min-width:0;overflow:auto;outline:none;background:${C.bg}}
+.jb-image-stage:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
+.jb-image-canvas{display:flex;min-width:100%;min-height:100%;width:max-content;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+.jb-image-stage[data-fit=true] .jb-image-canvas{width:100%;height:100%}
+.jb-image-stage img{display:block;flex:none;background-color:${C.bg};background-image:conic-gradient(${C.hover} 25%,transparent 0 50%,${C.hover} 0 75%,transparent 0);background-size:16px 16px;box-shadow:0 0 0 1px ${C.border};object-fit:contain}
+.jb-image-stage[data-fit=true] img{max-width:100%;max-height:100%}
+.jb-image-meta{margin-left:auto;color:${C.textDim};white-space:nowrap}
 .jb-document-toolbar{display:flex;flex:none;align-items:center;gap:4px;padding:4px 10px;border-bottom:1px solid ${C.border};background:${C.panel}}
 .jb-document-toolbar button{border:0;border-radius:4px;background:transparent;color:${C.textDim};padding:3px 8px;font:inherit;cursor:default;min-height:28px}
 .jb-document-toolbar button[aria-pressed=true]{background:${C.selection};color:${C.text}}
@@ -1200,6 +1223,31 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         goLine && editor.current ? h(GoToLine, { editor: editor.current, t, onClose: closeGo }) : null);
     }
 
+    /** Images remain isolated img documents; SVG markup never enters the application DOM. */
+    function ImageReader(props) {
+      const { source, t, blocked, onNavigate } = props;
+      const [zoom, setZoom] = useState(null), [dimensions, setDimensions] = useState(null), [failed, setFailed] = useState(false), [mode, setMode] = useState('preview');
+      const stage = useRef(null);
+      const scale = factor => setZoom(value => Math.max(.1, Math.min(8, (value ?? 1) * factor)));
+      useLayoutEffect(() => { if (props.target.focusSource && !blocked && mode === 'preview') stage.current?.focus({ preventScroll: true }); }, [blocked, mode]);
+      return h('div', { className: 'jb-image-reader' },
+        h('div', { className: 'jb-document-toolbar', role: 'group', 'aria-label': t('image.preview') },
+          ...(source.text !== undefined ? ['preview', 'source'].map(value => h('button', { key: value, type: 'button', 'aria-pressed': mode === value, disabled: blocked, onClick: () => setMode(value) }, t(value === 'preview' ? 'image.preview' : 'document.source'))) : []),
+          ...['fit', 'actual', 'zoomOut', 'zoomIn'].map(action => h('button', { key: action, type: 'button', disabled: blocked || mode !== 'preview',
+            'aria-pressed': action === 'fit' ? zoom === null : action === 'actual' ? zoom === 1 : undefined,
+            onClick: () => action === 'fit' ? setZoom(null) : action === 'actual' ? setZoom(1) : scale(action === 'zoomIn' ? 1.25 : .8) }, t('image.' + action))),
+          h('span', { className: 'jb-image-meta' }, zoom === null ? '' : Math.round(zoom * 100) + '%')),
+        mode === 'source' ? h(SourceEditor, props) : h(React.Fragment, null,
+          failed ? h('div', { className: 'jb-diffempty', role: 'alert' }, t('image.failed')) : h('div', { ref: stage, tabIndex: 0, className: 'jb-image-stage', 'data-fit': zoom === null, 'aria-label': t('image.preview'), inert: blocked || undefined,
+            onKeyDown: event => { if ((event.metaKey || event.ctrlKey) && ['[', ']'].includes(event.key)) { event.preventDefault(); event.stopPropagation(); onNavigate(event.key === '[' ? -1 : 1); } } },
+          h('div', { className: 'jb-image-canvas' }, h('img', { src: source.dataUrl, alt: source.path, draggable: false,
+            style: zoom !== null && dimensions ? { width: dimensions.width * zoom, height: dimensions.height * zoom } : undefined,
+            onLoad: event => setDimensions({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }), onError: () => setFailed(true) }))),
+          h('div', { className: 'jb-editor-status', role: 'status' },
+            h('span', null, dimensions && !failed ? t('image.dimensions', { width: String(dimensions.width), height: String(dimensions.height) }) : ''),
+            h('span', null, source.mime + ' · ' + new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(source.size / 1024) + ' KiB'))));
+    }
+
     /** Persistent file tabs with keyboard activation and explicit close controls. */
     function SourceTabs({ paths, activePath, panelId, t, onSelect, onClose, onEmpty }) {
       const ref = useRef(null), closing = useRef(false);
@@ -1347,10 +1395,10 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         else if (view === 'diff' && entry?.staged) params.set('staged', '1');
         const untrackedDiff = view === 'diff' && entry?.untracked;
         api(`/api/git.${view === 'source' || untrackedDiff ? 'source' : 'diff'}?${params}`, { signal: controller.signal })
-          .then(data => { if (!controller.signal.aborted) setLoaded({ path: target.path, view, target, content: untrackedDiff ? { ...data, untracked: true } : data }); })
+          .then(data => { if (!controller.signal.aborted) setLoaded({ path: target.path, view, target, content: untrackedDiff ? { ...data, untracked: true, ...(data.kind === 'image' ? { binary: true } : {}) } : data }); })
           .catch(error => {
             if (controller.signal.aborted) return;
-            const key = { SOURCE_TOO_LARGE: 'files.tooLarge', SOURCE_BINARY: 'files.binary', SOURCE_NOT_FILE: 'files.notFile', SOURCE_ENCODING: 'files.encoding', SOURCE_OUTSIDE_WORKSPACE: 'files.outside' }[error.code];
+            const key = { IMAGE_TOO_LARGE: 'image.tooLarge', IMAGE_INVALID: 'image.invalid', IMAGE_ICNS_UNSUPPORTED: 'image.icnsUnsupported', SOURCE_TOO_LARGE: 'files.tooLarge', SOURCE_BINARY: 'files.binary', SOURCE_NOT_FILE: 'files.notFile', SOURCE_ENCODING: 'files.encoding', SOURCE_OUTSIDE_WORKSPACE: 'files.outside' }[error.code];
             setError(key ? t(key) : t('error.load', { message: error.message }));
           })
           .finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -1405,7 +1453,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             : navigation.busy || navigation.message ? h('div', { className: 'jb-source-notice', role: 'status' }, navigation.busy ? t('loading') : navigation.message) : null,
           h('div', { className: 'jb-source-panel', role: 'tabpanel', id: panelId, 'aria-labelledby': target ? `${panelId}-tab-${openPaths.indexOf(target.path)}` : undefined },
           !content ? h('div', { className: 'jb-diffempty', role: error ? 'alert' : undefined }, error ?? t(loading ? 'loading' : 'files.pick'))
-                : shownView === 'source' ? h(SourceEditor, { source: content, target: shownTarget, onDefinition: define, t, debug, busy: navigation.busy, blocked: loading || !contentMatches,
+                : shownView === 'source' ? h(content.kind === 'image' ? ImageReader : SourceEditor, { ...(content.kind === 'image' ? { key: content.path + ':' + content.version } : {}), source: content, target: shownTarget, onDefinition: define, t, debug, busy: navigation.busy, blocked: loading || !contentMatches,
                   onReader: instance => { reader.current = instance; }, canBack: history.index > 0, canForward: history.index + 1 < history.items.length, onNavigate: navigate, onShowDiff: () => { remember(); setView('diff'); },
                   onOpenDocument: destination => visit(destination),
                   definitions: navigation.targets, onChooseDefinition: item => visit({ ...item, focusSource: true }, navigation.origin) })

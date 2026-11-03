@@ -22,7 +22,7 @@ Interactions take cues from JetBrains: file tabs, code folding, modifier-click d
 
 | Read the code | Review the changes | Inspect execution |
 | --- | --- | --- |
-| File trees, tabs, syntax and occurrence highlighting, definitions, code folding, and reading history. Markdown opens as a reading preview with a source view. | Inspect working-tree changes, line diffs, commit graphs, and commit details. Follow a diff back to source and explicitly send selected lines to a new project conversation. | Launch or attach, set breakpoints, step, select stack frames, expand variables, evaluate expressions, and remove all breakpoints. |
+| File trees, tabs, syntax and occurrence highlighting, definitions, code folding, and reading history. Markdown opens as a reading preview with a source view; images and ICNS icons preview directly. | Inspect working-tree changes, line diffs, commit graphs, and commit details. Follow a diff back to source and explicitly send selected lines to a new project conversation. | Launch or attach, set breakpoints, step, select stack frames, expand variables, evaluate expressions, and remove all breakpoints. |
 
 ## Demos
 

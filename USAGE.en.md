@@ -42,6 +42,10 @@ Same-file definition jumps, frame selection, and stepping reuse the current sour
 
 Suggest to AI in the toolbar, change diff or commit detail creates a new project conversation. Only a path or commit hash is attached by default; code is included only for manually selected diff lines. If admission is uncertain, the created conversation is retained: check its messages before sending again.
 
+## Image and icon previews
+
+Click PNG/APNG, JPEG, GIF, WebP, BMP, AVIF, ICO, SVG, or ICNS files to preview them in file tabs. Images fit the pane by default, with actual-size and zoom controls; the status bar shows pixel dimensions and file size. A theme-aware checkerboard shows transparency. SVG offers read-only source up to 512 KiB and renders only as an isolated image, never as markup inserted into the workbench page. ICNS selects its largest embedded PNG; legacy bitmap and JPEG 2000 encodings are unsupported. Images must be regular files inside the workspace. Set `imagePreviewMaxBytes` in plugin settings to 1024–33554432 bytes; the default is 8388608 (8 MiB). Decode failures, damaged containers, and oversized files show a message. Other binary files have no preview, and Git diffs keep their binary-file message. Inline Markdown images retain their description-only behavior.
+
 ## Five-language support and configuration
 
 All five languages support syntax highlighting, read-only source, project-local cross-file function/type definitions, and the same shortcuts and context menus. Configured Harness `ctx.lsp` providers take priority; otherwise the plugin uses the following local services.
