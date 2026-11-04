@@ -6,7 +6,7 @@
 
 Expand a conversation's right sidebar and choose **Development workbench** from Start or More tools. The tab follows its own conversation's project; the repository selector can inspect other registered workspaces. Previously opened Git tabs also show the workbench name in the current language without clearing the layout.
 
-| View | Actions and results |
+| Area or tool | Actions and results |
 | --- | --- |
 | Files | The directory tree includes tracked and untracked files, excludes Git-ignored files, and annotates Git status. Expand directories or filter paths; select a file to read its current workspace source. |
 | Source reader | The read-only editor has continuous scrolling, syntax highlighting, line numbers, a caret and text selection, without paging or a navigation toolbar. |
@@ -14,7 +14,7 @@ Expand a conversation's right sidebar and choose **Development workbench** from 
 | Changes | Groups staged, worktree and untracked files, with line statistics and unified diffs. Double-click a diff line or press F4 to open current source. |
 | Log | Shows the commit graph, author, date and hash. Select a commit for file statistics and its full diff. |
 
-Drag the dividers between the file tree, reader, and debugger to resize their panes; the reader uses the remaining space. Right docking adjusts width; bottom docking and narrow stacked layouts adjust height, with independent stored sizes. Focus a divider and use arrow keys for fine changes, Shift for larger steps, and Home/End for its allowed minimum/maximum. Double-click or Enter resets that direction to its default. Cancelled drags or Esc restore the previous size; reopening restores committed adjustments.
+Four persistent bottom icons open Changes, History, Debugger, and Terminal; hovering reveals their names. Switch tools in the same window, or click the selected icon or header minus to collapse it. Code stays visible, and switching retains the caret, Git selection, stack frame, expanded variables, and terminal output. Drag the top edge to adjust the shared tool height; the file-tree divider independently adjusts width or height in narrow layouts. Arrow keys resize a focused divider, Shift uses larger steps, and Home/End select its limits. Double-click or Enter resets the size. Cancelling or Escape restores the previous size; committed sizes are saved.
 
 Plain clicks place the caret or select text without querying definitions. A caret on a name highlights that word and matching case-sensitive whole words in the visible source, preserving syntax colors and outlining the current word. Selecting a whole word highlights its other matches; partial words or a caret on a blank line clear the marks. Matches use text, including the same words in strings and comments, and update when scrolling or changing files. Definition navigation locates and highlights the destination line; multiple destinations appear in a floating chooser. Switching Files/Changes/Log retains reading state, and Back restores the call-site caret. Narrow sidebars stack the tree above the reader.
 
@@ -46,7 +46,7 @@ Suggest to AI in the toolbar, change diff or commit detail creates a new project
 
 ## Bottom terminal
 
-Click Terminal at the bottom of the workbench to start a shell in the current session workspace. The screen loads on demand and supports interactive input, shell completion, Ctrl+C, ANSI colors, and scrollback through the official Harness terminal controller. Drag its top edge to resize, use arrow keys on the divider, or double-click to reset. Collapse Terminal to keep its process running. Closing the terminal, closing the workbench, or switching sessions requests process termination. New terminals are available only for the current session workspace, not an overridden repository. Commands run as the execution-environment user independently of Agent file-access modes; output is not automatically sent to the model. Enable the official terminal controller and use a Harness version supporting lazy client chunks. Retry failed connections; close an exited shell before starting another.
+Click Terminal at the bottom of the workbench to start a shell in the current session workspace. The screen loads on demand and supports interactive input, shell completion, Ctrl+C, ANSI colors, and scrollback through the official Harness terminal controller. The terminal uses the shared tool-window height. Switching tools or collapsing the window keeps its process running. Closing the terminal, closing its owning workbench, or unloading the plugin requests process termination; switching to another session never creates a shell automatically. New terminals are available only for the current session workspace, not an overridden repository. Commands run as the execution-environment user independently of Agent file-access modes; output is not automatically sent to the model. Enable the official terminal controller and use a Harness version supporting lazy client chunks. Retry failed connections; close an exited shell before starting another.
 
 ## Image and icon previews
 
@@ -99,7 +99,7 @@ Top-level `navigationTimeoutMs` defaults to 120000 and covers cold startup and q
 
 ## Breakpoint debugging
 
-After installing adapters, press F5 to debug the current Python, Go, or JS entry file; TS requires generated JS and source maps. Attach from the context menu using a local debugger port or Go process ID. The debugger defaults to the right; its Dock selector moves it to the bottom and remembers the choice. `.dsh/debug.json` is optional for custom project arguments. See [Debug configuration](DEBUGGING.en.md) for details, shortcuts, and process ownership. Programs execute only after an explicit launch or attach action.
+After installing adapters, press F5 to debug the current Python, Go, or JS entry file; TS requires generated JS and source maps. Attach from the context menu using a local debugger port or Go process ID. Debugging shares the bottom tool window with Changes, History, and Terminal. Starting debugging or reaching a new breakpoint stop selects it automatically; switching tools does not end debugging. `.dsh/debug.json` is optional for custom project arguments. See [Debug configuration](DEBUGGING.en.md) for details, shortcuts, and process ownership. Programs execute only after an explicit launch or attach action.
 
 ## Implementation and verification
 

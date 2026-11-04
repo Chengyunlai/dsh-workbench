@@ -4,28 +4,13 @@
  * @param React - Host React exports.
  * @param api - JSON request helper accepting plain object bodies and abort signals.
  * @param options - Host portal rendering and popup dismissal lifecycle.
- * @returns Workspace debugger state, client-local dock preferences, execution actions and a stack/variable/output view.
+ * @returns Workspace debugger state, execution actions and a stack/variable/output view.
  */
 export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
   const h = React.createElement;
   const { useState, useEffect, useRef, useId } = React;
   const active = session => Boolean(session?.id && session.state !== 'ended');
-  const isDebugVisible = debug => Boolean(debug.session || debug.error || /\.(?:py|go|[cm]?[jt]s|[jt]sx)$/i.test(debug.path ?? ''));
   const enabled = (session, name) => name === 'stop' ? active(session) : name === 'pause' ? session?.state === 'running' : session?.state === 'paused';
-  function useDebugDock(t) {
-    const [dock, setDock] = useState(() => {
-      try { return window.localStorage.getItem('dsh.git-control.debugDock') === 'bottom' ? 'bottom' : 'right'; }
-      catch (error) { return 'right'; } // Browser storage can be unavailable; the panel remains usable.
-    });
-    const [error, setError] = useState(null);
-    const change = value => {
-      if (!['right', 'bottom'].includes(value)) return;
-      setDock(value);
-      try { window.localStorage.setItem('dsh.git-control.debugDock', value); setError(null); }
-      catch (error) { setError(t('debug.dockUnsaved')); }
-    };
-    return { dock, change, error };
-  }
   function useDebugger(cwd, t, onLocation, readExpression) {
     const [session, setSession] = useState(null), [breakpoints, setBreakpoints] = useState({});
     const [error, setError] = useState(null), [choices, setChoices] = useState(null), [busy, setBusy] = useState(false), [attach, setAttach] = useState(null);
@@ -277,7 +262,7 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
         h('span', { className: 'jb-stack-location-file' }, selected.path ? selected.path.split(/[\\/]/).at(-1) + ':' + selected.line : t('debug.external')),
         selected.path ? h('details', { className: 'jb-stack-path' }, h('summary', null, t('debug.fullPath')), h('div', null, selected.path)) : null) : null);
   }
-  function DebugPane({ debug, t, onMenu, layout }) {
+  function DebugPane({ debug, t, onMenu }) {
     const session = debug.session;
     const [frameScopes, setFrameScopes] = useState(null);
     const frameId = debug.selectedFrameId;
@@ -290,7 +275,6 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
         .catch(error => { if (!controller.signal.aborted) setFrameScopes({ sessionId: session.id, frameId, pauseId: session.pauseId, error: t('debug.failed', { message: error.message }) }); });
       return () => controller.abort();
     }, [debug.cwd, session?.id, session?.state, session?.pauseId, frameId]);
-    if (!isDebugVisible(debug)) return null;
     const selectedScopes = frameId === session?.frames?.[0]?.id ? { scopes: session.scopes }
       : frameScopes?.sessionId === session?.id && frameScopes?.frameId === frameId && frameScopes.pauseId === session?.pauseId ? frameScopes : null;
     return h('section', { className: 'jb-debug-pane', 'aria-label': t('debug.title'), onKeyDown: event => {
@@ -307,9 +291,7 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
       debug.error || session?.error ? h('div', { role: 'alert' }, debug.error ?? session.error) : null,
       h('div', { className: 'jb-debug-topbar' },
         h('div', { className: 'jb-debug-heading' }, h('span', { className: 'jb-debug-name', title: session?.name ?? debug.path }, session?.name?.split(/[\\/]/).at(-1) ?? t('debug.title')), h('span', { className: 'jb-debug-state', 'data-state': session?.state ?? 'ready' }, t('debug.' + (session?.state ?? 'ready')))),
-        h('label', { className: 'jb-debug-dock' }, h('span', null, t('debug.dock')), h('select', { value: layout.dock, onChange: event => layout.change(event.target.value) },
-          h('option', { value: 'right' }, t('debug.dockRight')), h('option', { value: 'bottom' }, t('debug.dockBottom'))))),
-      layout.error ? h('div', { role: 'alert' }, layout.error) : null,
+      ),
       !session || session.state === 'ended' ? h('div', { className: 'jb-debug-hint' }, t(session ? 'debug.endedHint' : 'debug.readyHint')) : null,
       h('div', { className: 'jb-debug-sections' }, session?.state === 'paused' ? h(React.Fragment, null,
         h('details', { open: true, className: 'jb-debug-section jb-debug-stack' }, h('summary', null, t('debug.stack'), h('span', { className: 'jb-debug-count' }, session.frames?.length ?? 0)),
@@ -322,5 +304,5 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
             ...(selectedScopes?.scopes ?? []).map((scope, index) => h(VariableTree, { key: scope.variablesReference, debug, reference: scope.variablesReference, title: scope.name, defaultOpen: index === 0, t }))))) : null,
       session?.output ? h('details', { open: true, className: 'jb-debug-section jb-debug-output' }, h('summary', null, t('debug.output')), h('pre', null, session.output)) : null));
   }
-  return { useDebugger, useDebugDock, DebugPane, EvaluationDialog, controlItems, isDebugVisible };
+  return { useDebugger, DebugPane, EvaluationDialog, controlItems };
 }

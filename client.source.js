@@ -3,6 +3,7 @@ import { createDebugUI } from './debug-client.js';
 import { createSourceEditor } from './source-editor.js';
 import { createMarkdownReader } from './markdown-reader.js';
 import { createPaneLayout } from './pane-layout.js';
+import { createBottomTools } from './bottom-tools.js';
 import { parsePreviewAddress, resolveDocumentPreview } from './document-preview.js';
 
 /**
@@ -23,6 +24,7 @@ window.__ModuleLoader__.load({
     const TerminalDock = createTerminalDock(React, () => require.async('./client.terminal.js'));
     const MarkdownReader = createMarkdownReader(React);
     const { usePaneLayout, PaneDivider } = createPaneLayout(React);
+    const useBottomTools = createBottomTools(React);
 
     // Stable installation, locale and dock ids preserve existing profiles and open panes.
     const NS = 'git-control';
@@ -69,6 +71,7 @@ window.__ModuleLoader__.load({
 
     // ------------------------------------------------------------- i18n
     const en = {
+      'tools.title': 'Tool windows', 'tools.hide': 'Hide tool window', 'tools.resize': 'Tool window height',
       'preview.original': 'Open original preview',
       'preview.retry': 'Retry',
       "debug.clearBreakpoints": "Remove all breakpoints",
@@ -111,12 +114,10 @@ window.__ModuleLoader__.load({
       "debug.continue": "Resume program", "debug.executionFrame": "Execution frame", "debug.external": "External source",
       "debug.variables": "Variables",
       "debug.output": "Program output",
-      "debug.dock": "Dock", "debug.dockRight": "Right", "debug.dockBottom": "Bottom",
-      "debug.dockUnsaved": "Position changed for this panel. Browser storage is unavailable, so it cannot be saved.",
       "debug.fullPath": "Full path", "debug.noVariables": "No variables in this scope",
       'document.preview': 'Reading preview', 'document.source': 'Source', 'document.mode': 'Document view',
       'document.image': 'Image: {alt}', 'document.readOnly': 'Markdown · Read-only', 'document.linkFailed': 'This link cannot be opened inside the workspace.',
-      'layout.treeWidth': 'File tree width', 'layout.treeHeight': 'File tree height', 'layout.debugWidth': 'Debugger width', 'layout.debugHeight': 'Debugger height',
+      'layout.treeWidth': 'File tree width', 'layout.treeHeight': 'File tree height',
       'layout.resizeHint': 'Drag to resize · Arrow keys to adjust · Double-click or Enter to reset', 'layout.pixels': '{n} pixels',
       'layout.unsaved': 'Size changed for this panel. Browser storage is unavailable, so it cannot be saved.',
 
@@ -208,6 +209,7 @@ window.__ModuleLoader__.load({
       'status.untracked': 'Untracked',
     };
     const zh = {
+      'tools.title': '工具窗口', 'tools.hide': '收起工具窗口', 'tools.resize': '工具窗口高度',
       'preview.original': '打开原预览',
       'preview.retry': '重试',
       "debug.clearBreakpoints": "清理全部断点",
@@ -250,12 +252,10 @@ window.__ModuleLoader__.load({
       "debug.continue": "继续运行", "debug.executionFrame": "当前执行帧", "debug.external": "工作区外源码",
       "debug.variables": "变量",
       "debug.output": "程序输出",
-      "debug.dock": "停靠", "debug.dockRight": "右侧", "debug.dockBottom": "底部",
-      "debug.dockUnsaved": "位置已切换，但浏览器存储不可用，仅对本次面板生效",
       "debug.fullPath": "完整路径", "debug.noVariables": "此作用域没有变量",
       'document.preview': '阅读预览', 'document.source': '源码', 'document.mode': '文档视图',
       'document.image': '图片：{alt}', 'document.readOnly': 'Markdown · 只读', 'document.linkFailed': '无法在当前工作区内打开此链接',
-      'layout.treeWidth': '文件树宽度', 'layout.treeHeight': '文件树高度', 'layout.debugWidth': '调试面板宽度', 'layout.debugHeight': '调试面板高度',
+      'layout.treeWidth': '文件树宽度', 'layout.treeHeight': '文件树高度',
       'layout.resizeHint': '拖动调整尺寸 · 方向键微调 · 双击或 Enter 恢复默认', 'layout.pixels': '{n} 像素',
       'layout.unsaved': '尺寸已调整，但浏览器存储不可用，仅对本次面板生效',
 
@@ -366,12 +366,26 @@ window.__ModuleLoader__.load({
 .jb-branchchip svg{width:13px;height:13px;color:${C.modified}}
 .jb-headchip{color:${C.textDim};font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap}
 .jb-spacer{flex:1}
-.jb-tabs{flex:none;display:flex;align-items:stretch;height:33px;padding:0 8px;background:${C.bg};border-bottom:1px solid ${C.border}}
-.jb-tab{display:inline-flex;align-items:center;padding:0 12px;color:${C.textDim};background:transparent;border:none;font:inherit;font-size:12.5px;cursor:pointer;position:relative}
-.jb-tab:hover{color:${C.text}}
-.jb-tab[data-active=true]{color:${C.text}}
-.jb-tab[data-active=true]:after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:2px;background:${C.accent}}
-.jb-content{flex:1;min-height:0;display:flex}
+
+.jb-tools-bar{display:flex;align-items:center;gap:4px;flex:none;min-height:34px;padding:0 8px;background:${C.toolbar};border-top:1px solid ${C.border}}
+.jb-tool-toggle{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none;width:32px;height:30px;border:0;border-radius:4px;background:transparent;color:${C.textDim};cursor:pointer;padding:0}
+.jb-tool-toggle svg{width:18px;height:18px}
+.jb-tool-toggle[aria-pressed=true]{color:${C.accent};background:${C.selection}}
+.jb-tool-toggle[aria-pressed=true]:after{position:absolute;content:"";height:2px;left:6px;right:6px;bottom:0;background:${C.accent}}
+.jb-tool-toggle:hover:not(:disabled){color:${C.text};background:${C.hover}}
+.jb-tool-toggle:disabled{opacity:.4;cursor:default}
+.jb-tool-toggle:focus-visible,.jb-tools-divider:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
+.jb-tools-window{position:relative;display:flex;flex-direction:column;flex:0 0 auto;min-height:120px;max-height:60%;min-width:0;background:${C.panel};border-top:1px solid ${C.border}}
+.jb-tools-window[hidden],.jb-tool-panel[hidden]{display:none}
+.jb-tools-header{display:flex;align-items:center;justify-content:space-between;flex:none;min-height:28px;padding:0 8px 0 12px;border-bottom:1px solid ${C.border};font-size:12px}
+.jb-tool-panel{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
+.jb-tool-panel>.jb-changes,.jb-tool-panel>.jb-log{min-height:0;flex:1}
+.jb-tool-panel .jb-debug-sections{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:0 8px;align-items:start}
+.jb-tool-panel .jb-debug-section{max-height:100%;overflow:auto;margin-top:0}
+.jb-tools-divider{position:absolute;top:-4px;left:0;right:0;height:7px;cursor:row-resize;touch-action:none;z-index:3}
+.jb-tools-divider:hover{background:${C.hover}}
+.jb-tools-notice{padding:4px 8px;border-top:1px solid ${C.border};color:${C.text};font-size:12px}
+.jb-content{position:relative;flex:1;min-height:0;display:flex}
 .jb-browser-seat{flex:1;min-width:0;min-height:0;display:flex}
 .jb-filebutton{box-sizing:border-box;width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left}
 .jb-filebutton:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
@@ -387,13 +401,10 @@ window.__ModuleLoader__.load({
 .jb-source-tab button:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
 .jb-source-panel{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}
 @media(hover:hover){.jb-source-tab-close:hover{background:${C.hover};color:${C.text}}}
-.jb-debug-pane{box-sizing:border-box;display:flex;flex-direction:column;flex:0 0 clamp(min(220px,30%),var(--jb-debug-width,30%),max(0px,calc(100% - 412px)));min-width:0;min-height:0;max-width:none;overflow:auto;background:${C.panel};color:${C.text};border-left:1px solid ${C.border};padding:8px;font-size:13px;line-height:20px}
+.jb-debug-pane{box-sizing:border-box;display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;max-width:none;overflow:auto;background:${C.panel};color:${C.text};padding:8px;font-size:13px;line-height:20px}
 .jb-debug-pane pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:8px;font:12px/20px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:${C.code};user-select:text}
 .jb-debug-pane summary{cursor:default;padding:3px 8px}
 .jb-debug-topbar{display:flex;flex:none;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-bottom:8px}
-.jb-debug-dock{display:flex;flex:none;align-items:center;gap:5px;margin-left:auto;color:${C.textDim};font-size:12px}
-.jb-debug-dock select{min-height:28px;max-width:100%;border:1px solid ${C.border};border-radius:4px;padding:2px 4px;background:${C.toolbar};color:${C.text};font:inherit}
-.jb-debug-dock select:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
 .jb-debug-sections{min-height:0;flex:1;overflow:auto}
 .jb-debug-section{min-width:0;border-top:1px solid ${C.border};margin-top:4px}
 .jb-debug-section>summary{position:sticky;top:0;z-index:1;background:${C.toolbar};font-weight:500;min-height:24px}
@@ -444,22 +455,17 @@ window.__ModuleLoader__.load({
 @media(hover:hover){.jb-stack-frame:hover:not([aria-selected=true]){background:${C.hover}}}
 .jb-sourcebody{flex:1;min-height:0;overflow:hidden}
 .jb-sourcebody[hidden]{display:none}
-.jb-terminal{flex:none;min-height:34px;border-top:1px solid ${C.border};background:${C.bg};display:flex;flex-direction:column;min-width:0}
-.jb-terminal[data-open=true]{min-height:120px;max-height:60%}
+.jb-terminal{flex:1;min-height:0;background:${C.bg};display:flex;flex-direction:column;min-width:0}
 .jb-terminal-bar{display:flex;align-items:center;gap:10px;min-height:34px;padding:0 12px;background:${C.panel};flex:none}
 .jb-terminal-bar button,.jb-terminal-notice button{background:none;border:0;color:${C.textDim};font:inherit;padding:4px 6px;cursor:pointer;border-radius:4px}
 .jb-terminal-bar button:hover{background:${C.hover};color:${C.text}}
-.jb-terminal-bar button:focus-visible,.jb-terminal-divider:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
+.jb-terminal-bar button:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
 .jb-terminal-bar button:disabled{opacity:.45;cursor:default}
-.jb-terminal-toggle{display:flex;gap:8px;align-items:center}
-.jb-terminal-toggle[aria-expanded=true]{color:${C.text};box-shadow:inset 0 -2px ${C.accent}}
 .jb-terminal-path{color:${C.textDim};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
 .jb-terminal-screen{flex:1;min-height:0;min-width:0;padding:8px 12px;background:${C.bg};color:${C.text};overflow:hidden}
 .jb-terminal-screen[hidden]{display:none}
 .jb-terminal-emulator{height:100%;width:100%}
 .jb-terminal-notice{padding:4px 12px;color:${C.textDim};font:inherit;background:${C.panel};flex:none}
-.jb-terminal-divider{height:5px;flex:none;cursor:ns-resize;touch-action:none;background:${C.border}}
-.jb-terminal-divider:hover{background:${C.accent}}
 .jb-image-reader{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}
 .jb-image-reader>.jb-document-toolbar{flex-wrap:wrap}
 .jb-image-stage{flex:1;min-height:0;min-width:0;overflow:auto;outline:none;background:${C.bg}}
@@ -530,10 +536,6 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-code-browser{position:relative;min-height:0}
 .jb-code-workspace{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
 .jb-code-browser .jb-code-workspace>.jb-tree{box-sizing:border-box;width:clamp(160px,var(--jb-tree-width,340px),calc(100% - 246px));min-width:0}
-.jb-code-browser[data-debug-dock=bottom]{flex-direction:column}
-.jb-code-browser[data-debug-dock=bottom]>.jb-debug-pane{flex:0 0 clamp(min(100px,30%),var(--jb-debug-height,38%),max(0px,calc(100% - 166px)));min-width:0;min-height:0;max-height:none;max-width:none;border-left:0;border-top:1px solid ${C.border}}
-.jb-code-browser[data-debug-dock=bottom] .jb-debug-sections{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:0 8px;align-items:start}
-.jb-code-browser[data-debug-dock=bottom] .jb-debug-section{max-height:100%;overflow:auto;margin-top:0}
 .jb-pane-divider{position:relative;flex:none;align-self:stretch;background:${C.bg};touch-action:none;user-select:none;outline:none}
 .jb-pane-divider[hidden]{display:none}
 .jb-pane-divider[aria-orientation=vertical]{width:6px;cursor:col-resize}
@@ -653,7 +655,6 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-loghash{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:18px;color:${C.textDim};background:${C.panel};border:1px solid ${C.border};border-radius:6px;padding:1px 6px}
 
 @container git-panel (max-width:720px){
-.jb-code-browser>.jb-debug-pane{flex:0 0 clamp(min(100px,30%),var(--jb-debug-height,30%),max(0px,calc(100% - 166px)));max-width:none;max-height:none;min-height:0;border-left:0;border-top:1px solid ${C.border}}
 .jb-toolbar{height:auto;min-height:38px;flex-wrap:wrap;padding:6px 10px;gap:6px}
 .jb-toolbar .jb-selectwrap{flex:1 1 150px;max-width:100%}
 .jb-select{width:100%;max-width:100%;min-width:0}
@@ -788,6 +789,17 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     };
     const lucideSvg = (paths, size) => h('svg', { viewBox: '0 0 24 24', width: size, height: size, 'aria-hidden': true, ...LU.s }, ...paths);
     function branchGlyph(size) { return lucideSvg(LU.branch, size ?? 15); }
+    function toolGlyph(tool) {
+      const path = d => h('path', { d });
+      const icons = {
+        changes: LU.branch,
+        log: [path('M3 12a9 9 0 1 0 3-6.7L3 8'), path('M3 3v5h5M12 7v5l3 2')],
+        debug: [path('M8 7 6 3m10 4 2-4M3 13h4m10 0h4M3 7l4 3m10 0 4-3M3 19l4-3m10 0 4 3'), h('rect', { x: 7, y: 6, width: 10, height: 15, rx: 5 }), path('M12 6v15M7 11h10')],
+        terminal: [h('rect', { x: 3, y: 4, width: 18, height: 16, rx: 2 }), path('m7 9 3 3-3 3m6 0h4')],
+      };
+      return lucideSvg(icons[tool], 18);
+    }
+
     function folderGlyph(size) { return lucideSvg(LU.folder, size ?? 15); }
     function refreshGlyph(size) { return lucideSvg(LU.refresh, size ?? 15); }
     function chevronGlyph(size) { return lucideSvg(LU.chevron, size ?? 12); }
@@ -1141,7 +1153,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('small', { role: error ? 'alert' : undefined }, error ? t('files.invalidLine') : t('files.linePrompt'))), document.body);
     }
 
-    const { useDebugger, useDebugDock, DebugPane, EvaluationDialog, controlItems: debugControlItems, isDebugVisible } = createDebugUI(React, api, { createPortal, usePopupDismiss });
+    const { useDebugger, DebugPane, EvaluationDialog, controlItems: debugControlItems } = createDebugUI(React, api, { createPortal, usePopupDismiss });
 
     /** An explicit local port/PID prompt uses the editor's Enter/Escape interaction. */
     function AttachPrompt({ debug, t, onClose }) {
@@ -1307,7 +1319,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Own source/diff requests and definition history independently of the conversation. */
-    function CodeBrowser({ cwd, changes, initialTarget, t }) {
+    function CodeBrowser({ cwd, changes, initialTarget, debugHost, onShowDebug, t }) {
       const [files, setFiles] = useState(null);
       const [filter, setFilter] = useState('');
       const [treeError, setTreeError] = useState(null);
@@ -1429,10 +1441,12 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => { controller.abort(); navigationRef.current?.abort(); };
       }, [cwd, target?.path, view, changes, readRevision]);
-      const debug = useDebugger(cwd, t, at => visit(at), () => reader.current?.selectedText?.() ?? '');
+      const controller = useDebugger(cwd, t, at => { visit(at); onShowDebug(); }, () => reader.current?.selectedText?.() ?? '');
+      const debug = { ...controller, run: (...args) => { onShowDebug(); return controller.run(...args); },
+        start: (...args) => { onShowDebug(); return controller.start(...args); },
+        openEvaluation: (...args) => { onShowDebug(); return controller.openEvaluation(...args); } };
       const debugRef = useRef(debug); debugRef.current = debug;
       const closeEvaluation = useCallback(() => debugRef.current.closeEvaluation(), []);
-      const debugLayout = useDebugDock(t);
       const paneLayout = usePaneLayout(t);
       debug.cwd = cwd; debug.path = target?.path; debug.setPath(target?.path); debug.sourcePending = loading || (Boolean(loaded) && !contentMatches);
       debug.report = error => setError(error.message);
@@ -1458,7 +1472,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           setNavigation({ busy: false, targets: [], message: t(key, { message: error.message }) });
         }
       };
-      return h('div', { ref: paneLayout.root, className: 'jb-changes jb-code-browser', 'data-debug-dock': debugLayout.dock, style: paneLayout.style,
+      return h('div', { ref: paneLayout.root, className: 'jb-changes jb-code-browser', style: paneLayout.style,
         onAuxClick: event => { if (event.button === 3 || event.button === 4) { event.preventDefault(); event.stopPropagation(); } },
         onKeyDown: event => {
           if (view !== 'diff') return;
@@ -1468,7 +1482,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('div', { ref: paneLayout.workspace, className: 'jb-code-workspace' }, h('div', { className: 'jb-tree' },
           h('div', { className: 'jb-filter' }, searchGlyph(), h('input', { type: 'search', value: filter, placeholder: t('filter.placeholder'), onChange: event => setFilter(event.target.value) })),
           treeError ? h('div', { className: 'jb-notice' }, treeError) : files === null ? h('div', { className: 'jb-tree-hint' }, t('loading')) : h(WorkspaceTree, { files, changes, selectedPath: target?.path, onSelect: openFile, onMenu: fileMenu, filter, t })),
-        h(PaneDivider, { kind: 'tree', layout: paneLayout, t }),
+        h(PaneDivider, { layout: paneLayout, t }),
         h('div', { ref: detailRef, tabIndex: -1, className: 'jb-detail', 'aria-busy': loading },
           h(SourceTabs, { paths: openPaths, activePath: target?.path, panelId, t, onSelect: selectTab, onClose: closeTab, onEmpty: () => detailRef.current?.focus() }),
           h('div', { className: 'jb-editor-title' }, (loaded?.path ?? target?.path) ? fileIconGlyph(loaded?.path ?? target.path, false) : null,
@@ -1491,11 +1505,10 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                           if (line !== undefined) setHistory(old => ({ ...old, items: old.items.map((item, index) => index === old.index ? { ...item, line: Number(line) - 1, character: 0 } : item) }));
                           setView('source');
                         } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {} }))))),
-        h(PaneDivider, { kind: 'debug', layout: paneLayout, t, hidden: !isDebugVisible(debug) }),
-        h(DebugPane, { debug, t, layout: debugLayout, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
+        debugHost ? createPortal(h(DebugPane, { debug, t, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
           { id: 'source', label: t('files.read'), shortcut: 'Enter / F4', disabled: !frame.path, run: () => debug.selectFrame(frame.id, true) },
           ...debugControlItems(debug, t),
-        ] }) }),
+        ] }) }), debugHost) : null,
         debug.evaluation && debug.session?.state === 'paused' && debug.selectedFrameId != null ? h(EvaluationDialog, { key: `${cwd}:${debug.session.id}:${debug.session.pauseId}:${debug.selectedFrameId}`, debug, t, onClose: closeEvaluation }) : null,
         paneLayout.error ? h('div', { className: 'jb-layout-notice', role: 'alert' }, paneLayout.error) : null,
         menu ? h(EditorMenu, { menu, onClose: closeMenu }) : null);
@@ -1525,7 +1538,11 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const workspace = workspaces.find((item) => item.workspaceId === targetWorkspaceId) ?? null;
       const cwd = workspace ? workspace.path : null;
 
-      const [tab, setTab] = useState('files');
+      const tools = useBottomTools(currentSession?.id ?? null, t);
+      const tab = tools.active;
+      const [debugHost, setDebugHost] = useState(null);
+      const showDebug = useCallback(() => tools.show('debug'), [tools.show]);
+      const toolsId = React.useId();
       const [sourceTarget, setSourceTarget] = useState(null);
       const [status, setStatus] = useState(null);
       const [statusError, setStatusError] = useState(null);
@@ -1599,7 +1616,6 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         if (!props.previewRequest) return;
         setOverrideId(props.previewRequest.workspaceId);
         setSourceTarget(props.previewRequest.target);
-        setTab('files');
       }, [props.previewRequest]);
 
       useEffect(() => () => abortRef.current?.abort(), []);
@@ -1733,24 +1749,28 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('button', { type: 'button', className: 'jb-review-btn', disabled: cwd === null || reviewSending, onClick: () => openReview({ kind: 'workspace' }) }, t('review.button')),
         h('button', { type: 'button', className: 'jb-tb-btn', title: t('panel'), disabled: statusLoading || cwd === null, onClick: () => reload() }, refreshGlyph()));
 
-      const tabs = h('div', { className: 'jb-tabs' },
-        h('button', { type: 'button', className: 'jb-tab', 'data-active': tab === 'files', onClick: () => setTab('files') }, t('tabs.files')),
-        h('button', { type: 'button', className: 'jb-tab', 'data-active': tab === 'changes', onClick: () => setTab('changes') }, t('tabs.changes')),
-        h('button', { type: 'button', className: 'jb-tab', 'data-active': tab === 'log', onClick: () => setTab('log') }, t('tabs.log')));
+      const toolLabels = { changes: t('tabs.changes'), log: t('tabs.log'), debug: t('debug.title'), terminal: t('terminal.title') };
+      const toolBar = h('div', { className: 'jb-tools-bar', role: 'toolbar', 'aria-label': t('tools.title') },
+        ...Object.entries(toolLabels).map(([tool, label]) => h('button', {
+          key: tool, type: 'button', className: 'jb-tool-toggle', 'data-tool': tool,
+          'aria-label': label, title: label, 'aria-pressed': tab === tool, 'aria-controls': toolsId + '-' + tool,
+          disabled: tool === 'terminal' ? !props.terminalAvailable || !currentSession?.id : !status?.isRepo || Boolean(statusError),
+          onClick: () => tools.toggle(tool),
+        }, toolGlyph(tool))));
 
-      let content;
+      let notice;
       if (status === null && statusLoading) {
-        content = h('div', { className: 'jb-empty' }, t('loading'));
+        notice = h('div', { className: 'jb-empty' }, t('loading'));
       } else if (statusError !== null) {
-        content = h('div', { className: 'jb-empty' }, t('error.load', { message: statusError }));
+        notice = h('div', { className: 'jb-empty' }, t('error.load', { message: statusError }));
       } else if (status === null || !status.isRepo) {
-        content = h('div', { className: 'jb-empty' }, t('repo.notGit'));
-      } else if (tab === 'files') {
-        content = null;
-      } else if (tab === 'changes') {
+        notice = h('div', { className: 'jb-empty' }, t('repo.notGit'));
+      }
+      let changesContent = null, logContent = null;
+      if (status?.isRepo) {
         const selectedEntry = selected;
         const diffTag = selectedEntry === null ? '' : t(selectedEntry.untracked ? 'diff.untracked' : selectedEntry.staged && selectedEntry.unstagedToo ? 'diff.both' : selectedEntry.staged ? 'diff.staged' : 'diff.unstaged');
-        content = h('div', { className: 'jb-changes' },
+        changesContent = h('div', { className: 'jb-changes' },
           h('div', { className: 'jb-tree' },
             h('div', { className: 'jb-filter' },
               searchGlyph(),
@@ -1775,7 +1795,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                 : h(DiffView, {
                   path: selectedEntry?.displayPath ?? '', tag: diffTag,
                   stats: selectedEntry && !selectedEntry.untracked ? { ins: selectedEntry.ins, del: selectedEntry.del } : null,
-                  diff, t, onReadSource: line => { setSourceTarget({ path: selectedEntry.path, line, character: 0 }); setTab('files'); },
+                  diff, t, onReadSource: line => { setSourceTarget({ path: selectedEntry.path, line, character: 0, focusSource: true }); },
                   review: { open: reviewOpen && reviewTarget?.kind === 'diff', sending: reviewSending, sent: reviewSent, error: reviewError },
                   codeSet: reviewCode,
                   onToggleCode: toggleReviewCode,
@@ -1784,9 +1804,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                   onReviewClose: closeReview,
                   onClearCode: clearReviewCode,
                 })));
-      } else {
         const graph = log === null ? null : buildGraph(log);
-        content = h('div', { className: 'jb-log' },
+        logContent = h('div', { className: 'jb-log' },
           logError !== null
             ? h('div', { className: 'jb-notice jb-notice-error' }, logError)
             : null,
@@ -1828,12 +1847,22 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('style', null, css),
         toolbar,
         reviewOpen && reviewTarget?.kind === 'workspace' ? h(ReviewComposer, { t, sending: reviewSending, sent: reviewSent, error: reviewError, code: reviewCode, onSubmit: sendReview, onClearCode: clearReviewCode, onClose: closeReview }) : null,
-        tabs,
         h('div', { className: 'jb-content' },
-          status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat', style: { display: tab === 'files' ? 'flex' : 'none' } },
-            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, t })) : null,
-          content),
-        h(TerminalDock, { key: currentSession?.id ?? 'none', sessionId: currentSession?.id, cwd: currentSession?.cwd, available: Boolean(props.terminalAvailable && currentSession?.id && cwd === currentSession.cwd), create: props.createTerminal, release: props.releaseTerminal, t }));
+          status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat' },
+            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, debugHost, onShowDebug: showDebug, t })) : notice),
+        h('div', { className: 'jb-tools-window', hidden: tab === null, style: { height: tools.height } },
+          h('div', { className: 'jb-tools-divider', ...tools.divider }),
+          h('div', { className: 'jb-tools-header' }, h('span', null, toolLabels[tab]),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tools.hide'), 'aria-label': t('tools.hide'), onClick: tools.hide }, '−')),
+          ...['changes', 'log', 'debug', 'terminal'].map(tool => h('div', {
+            key: tool, id: toolsId + '-' + tool, className: 'jb-tool-panel', 'data-tool': tool,
+            hidden: tab !== tool, role: 'region', 'aria-label': toolLabels[tool], ref: tool === 'debug' ? setDebugHost : undefined,
+          }, tool === 'changes' ? changesContent : tool === 'log' ? logContent : tool === 'terminal'
+            ? h(TerminalDock, { key: currentSession?.id ?? 'none', sessionId: currentSession?.id, cwd: currentSession?.cwd,
+              available: Boolean(props.terminalAvailable && currentSession?.id && cwd === currentSession.cwd), active: tab === 'terminal', onClose: tools.hide,
+              create: props.createTerminal, release: props.releaseTerminal, t }) : null)),
+          tools.error ? h('div', { className: 'jb-tools-notice', role: 'alert' }, tools.error) : null),
+        toolBar);
     }
 
     // ------------------------------------------------------------- icon

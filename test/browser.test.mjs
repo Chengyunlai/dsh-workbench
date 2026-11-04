@@ -9,7 +9,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const source = { 'src/main.ts': "const emoji = '😀'; render();", 'src/lib.ts': 'export function render() {}' };
 
-async function panel(testContext, fetch, { dock, paneSizes, platform, navigation } = {}) {
+async function panel(testContext, fetch, { dock, paneSizes, platform, navigation, terminal = false } = {}) {
   let dictionary = {};
   const t = (key, vars = {}) => Object.entries(vars).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), dictionary[key] ?? key);
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true, url: 'https://harness.test/' });
@@ -31,13 +31,21 @@ async function panel(testContext, fetch, { dock, paneSizes, platform, navigation
     disconnect() { resizeObservers.delete(this); }
   };
   let plugin, Panel;
+  const terminalCounts = { loads: 0, creates: 0, mounts: 0, closes: 0 };
+  const terminalService = terminal ? {
+    view: () => { terminalCounts.creates++; return { state: { getSnapshot: () => ({ phase: 'connected', writable: true }), subscribe: () => () => {} },
+      mount: () => { terminalCounts.mounts++; return () => { terminalCounts.mounts--; }; }, write() {}, connect() {}, refresh() {} }; },
+    close: () => { terminalCounts.closes++; },
+  } : undefined;
+  const requireClient = name => name === 'react-dom' ? { createPortal } : React;
+  requireClient.async = async () => { terminalCounts.loads++; return { mountTerminal: parent => { parent.textContent = 'retained terminal output'; return { update() {}, visible() {}, dispose() {} }; } }; };
   let onScreen = 'own', closeCount = 0;
   const opened = [], originals = [];
   const tabSignal = new AbortController();
   const tabInfo = { tab: { id: 'resource-tab', visible: true, signal: tabSignal.signal, actions: {
     openTab: (kind, options) => opened.push({ kind, options }), close: () => { closeCount++; },
   } } };
-  dom.window.__ModuleLoader__ = { load: spec => { plugin = spec.factory(name => name === 'react-dom' ? { createPortal } : React); } };
+  dom.window.__ModuleLoader__ = { load: spec => { plugin = spec.factory(requireClient); } };
   vm.runInNewContext(readFileSync(new URL('../client.js', import.meta.url), 'utf8'), {
     window: dom.window, document: dom.window.document, navigator: dom.window.navigator,
     MutationObserver: dom.window.MutationObserver, Node: dom.window.Node, Window: dom.window.Window,
@@ -47,6 +55,7 @@ async function panel(testContext, fetch, { dock, paneSizes, platform, navigation
   });
   plugin.apply({
     effect: fn => fn(), locale: { register: (namespace, dictionaries) => { dictionary = dictionaries.zh; return () => {}; }, bind: () => t },
+    webTerminals: terminalService,
     uiWorkspace: { openSession() {} }, sidebarRightTabs: { register: () => () => {} },
     sidebarRight: { mounted: { getSnapshot: () => onScreen }, openResource: (address, options) => originals.push({ address, options }) },
     slots: { inject: (name, fn) => fn(), register: (spec, component) => { if (spec.name === 'sidebar.right.pane.tab') Panel = component; return () => {}; } },
@@ -63,7 +72,7 @@ async function panel(testContext, fetch, { dock, paneSizes, platform, navigation
   await act(async () => { render(); });
   const reopen = async () => { await act(async () => renderer.unmount()); renderer = createRoot(container); await act(async () => render()); };
   testContext.after(async () => { await act(async () => renderer.unmount()); dom.window.close(); delete globalThis.window; delete globalThis.document; });
-  const button = key => { const label = t(key); return [...container.querySelectorAll('button')].find(node => node.textContent === label || [...node.querySelectorAll('span')].some(span => span.textContent === label)); };
+  const button = key => { const label = t(key); return [...container.querySelectorAll('button')].find(node => node.getAttribute('aria-label') === label || node.textContent === label || [...node.querySelectorAll('span')].some(span => span.textContent === label)); };
   const click = async label => { const node = button(label); assert.ok(node, label); assert.notEqual(node.disabled, true, label); await act(async () => { node.click(); }); };
   const editor = () => EditorView.findFromDOM(container.querySelector('.cm-content'));
   const key = async (name, options = {}) => { await act(async () => { container.querySelector('.cm-content').dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true, ...options })); }); };
@@ -76,7 +85,7 @@ async function panel(testContext, fetch, { dock, paneSizes, platform, navigation
   const resize = async () => act(async () => { for (const observer of [...resizeObservers]) observer.callback([]); });
   const navigate = async next => { navigation = next; await act(async () => render()); };
   return { container, button, click, t, editor, caret, key, menu, dom, reopen, resize, resizeObservers, navigate, opened, originals,
-    closeCount: () => closeCount, switchSession: id => { onScreen = id; } };
+    terminalCounts, closeCount: () => closeCount, switchSession: id => { onScreen = id; } };
 }
 
 function server(override, requests = []) {
@@ -162,6 +171,40 @@ test('a newer document cancels a pending summary, and summary failures offer ret
   assert.equal(ui.originals[0].options.kind, 'changes-review');
 });
 
+test('bottom icons switch one shared window, preserve terminal output and select debugging on a new breakpoint stop', async context => {
+  let revision = 1;
+  const session = () => ({ id: 'tool-window', name: 'Sample', state: 'paused', revision, pauseId: revision,
+    frames: [{ id: 1, name: 'main', path: 'src/main.ts', line: 1, column: 1 }], scopes: [], output: '' });
+  const ui = await panel(context, server((url, options) => {
+    if (url.pathname === '/api/git.debug.status') return { ok: true, json: async () => session() };
+    if (url.pathname === '/api/git.debug.action') { assert.equal(JSON.parse(options.body).action, 'next'); revision++; return { ok: true, json: async () => session() }; }
+  }), { terminal: true });
+  const editor = ui.editor();
+  assert.ok(editor);
+  assert.deepEqual([...ui.container.querySelectorAll('.jb-tools-bar button')].map(button => button.getAttribute('aria-label')), ['变更', '历史', '调试', '终端']);
+  assert.equal(ui.container.querySelector('.jb-tool-toggle[aria-pressed=true]').dataset.tool, 'debug');
+  await ui.click('terminal.title');
+  const screen = ui.container.querySelector('.jb-terminal-screen');
+  assert.equal(screen.textContent, 'retained terminal output');
+  assert.equal(ui.terminalCounts.creates, 1);
+  for (const label of ['tabs.changes', 'tabs.log', 'debug.title', 'terminal.title']) {
+    await ui.click(label);
+    assert.equal(ui.container.querySelectorAll('.jb-tool-panel:not([hidden])').length, 1);
+    assert.equal(ui.editor(), editor);
+  }
+  assert.equal(ui.container.querySelector('.jb-terminal-screen'), screen);
+  assert.equal(ui.terminalCounts.creates, 1); assert.equal(ui.terminalCounts.mounts, 1);
+  await ui.key('F8');
+  assert.equal(ui.container.querySelector('.jb-tool-toggle[aria-pressed=true]').dataset.tool, 'debug');
+  assert.equal(ui.container.querySelector('.jb-terminal-screen'), screen);
+  await ui.click('debug.title');
+  assert.equal(ui.container.querySelector('.jb-tools-window').hidden, true);
+  assert.equal(ui.terminalCounts.closes, 0);
+  const output = { tools: [...ui.container.querySelectorAll('.jb-tools-bar button')].map(button => ({ icon: Boolean(button.querySelector('svg')), label: button.getAttribute('aria-label') })),
+    expanded: !ui.container.querySelector('.jb-tools-window').hidden, terminalCreates: ui.terminalCounts.creates };
+  assert.deepEqual(output, JSON.parse(readFileSync(new URL('./fixtures/bottom-tools.expected.json', import.meta.url), 'utf8')));
+});
+
 test('file tree, source/diff, exact symbol position, definition and history work together', async context => {
   const requests = [];
   const ui = await panel(context, server(null, requests));
@@ -195,7 +238,7 @@ test('file tree, source/diff, exact symbol position, definition and history work
   assert.equal(ui.dom.window.document.activeElement, diff);
   await act(async () => diff.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'F4', bubbles: true, cancelable: true })));
   assert.ok(ui.container.querySelector('.cm-content'));
-  await ui.click('tabs.changes'); await ui.click('tabs.files');
+  await ui.click('tabs.changes'); await ui.click('tabs.changes');
   assert.ok([...ui.container.querySelectorAll('.jb-diffpath')].some(node => node.textContent === 'src/lib.ts'));
 });
 
@@ -736,7 +779,7 @@ test('a program ending before a step request is reconciled as ended without a fa
  assert.equal(ui.container.querySelector('.jb-debug-toolbar [data-action=run]').disabled, false);
 });
 
-test('debug dock changes preserve the editor, selected frame and expanded variables, and survive reopening', async context => {
+test('bottom tool switching preserves the editor, selected frame and expanded variables', async context => {
  const calls = [];
  const session = { id: 'layout', name: 'examples/06-job-coordination/user_code/base_job_coordination/main.py', state: 'paused', revision: 1, pauseId: 1,
   frames: [{ id: 1, name: 'main', path: 'src/main.ts', line: 1, column: 1 }, { id: 2, name: '<module>', path: 'src/lib.ts', line: 1, column: 1 }],
@@ -752,11 +795,7 @@ test('debug dock changes preserve the editor, selected frame and expanded variab
    throw new Error('Docking must not execute a debugger action: ' + body.action);
   }
  }));
- const browser = () => ui.container.querySelector('.jb-code-browser');
- const select = () => ui.container.querySelector('.jb-debug-dock select');
- const change = async value => act(async () => { select().value = value; select().dispatchEvent(new ui.dom.window.Event('change', { bubbles: true })); });
- assert.equal(browser().dataset.debugDock, 'right');
- assert.equal(select().labels[0].textContent, '停靠右侧底部');
+ assert.equal(ui.container.querySelector('.jb-tool-toggle[aria-pressed=true]').dataset.tool, 'debug');
  assert.equal(ui.container.querySelector('.jb-debug-name').textContent, 'main.py');
  assert.equal(ui.container.querySelector('.jb-debug-name').title, session.name);
  await act(async () => ui.container.querySelectorAll('.jb-stack-frame')[1].click());
@@ -766,7 +805,7 @@ test('debug dock changes preserve the editor, selected frame and expanded variab
  assert.equal(ui.container.querySelector('.jb-variable-value[data-kind=constant]').textContent, 'True');
  await ui.caret(8);
  const editor = ui.editor(), variableReads = calls.filter(call => call.action === 'variables').length;
- const output = { defaultDock: browser().dataset.debugDock, name: ui.container.querySelector('.jb-debug-name').textContent,
+ const output = { activeTool: ui.container.querySelector('.jb-tool-toggle[aria-pressed=true]').dataset.tool, name: ui.container.querySelector('.jb-debug-name').textContent,
   location: ui.container.querySelector('.jb-stack-location-file').textContent,
   sections: [...ui.container.querySelectorAll('.jb-debug-section>summary')].map(node => node.textContent),
   variables: [...ui.container.querySelectorAll('.jb-variable-leaf .jb-variable-row')].map(node => ({ name: node.querySelector('.jb-variable-name').textContent, type: node.querySelector('.jb-variable-type').textContent, value: node.querySelector('.jb-variable-value').textContent, kind: node.querySelector('.jb-variable-value').dataset.kind })) };
@@ -774,31 +813,29 @@ test('debug dock changes preserve the editor, selected frame and expanded variab
  const path = ui.container.querySelector('.jb-stack-path');
  await act(async () => { path.open = true; });
  assert.equal(path.querySelector('div').textContent, 'src/lib.ts');
- await change('bottom');
- assert.equal(browser().dataset.debugDock, 'bottom');
+ await ui.click('tabs.log');
+ assert.equal(ui.container.querySelector('[data-tool=debug].jb-tool-panel').hidden, true);
+ await ui.click('debug.title');
  assert.equal(ui.editor(), editor); assert.equal(ui.editor().state.selection.main.head, 8);
  assert.equal(ui.container.querySelector('.jb-stack-frame[aria-selected=true]').textContent, '<module>lib.ts:1');
  assert.equal(ui.container.querySelector('.jb-variable-list details'), service); assert.equal(service.open, true);
  assert.equal(path.open, true);
  assert.equal(calls.filter(call => call.action === 'variables').length, variableReads);
- assert.equal(ui.dom.window.localStorage.getItem('dsh.git-control.debugDock'), 'bottom');
- await ui.reopen();
- assert.equal(browser().dataset.debugDock, 'bottom'); assert.equal(select().value, 'bottom');
- await change('right'); await ui.reopen();
- assert.equal(browser().dataset.debugDock, 'right'); assert.equal(select().value, 'right');
+ assert.equal(ui.container.querySelectorAll('.jb-tools-window:not([hidden])').length, 1);
 });
 
-test('invalid or unavailable dock storage keeps the panel usable and reports an unsaved choice', async context => {
+test('shared tool height remains usable when storage is unavailable and old debug docking is ignored', async context => {
  const ui = await panel(context, server(), { dock: 'floating' });
- assert.equal(ui.container.querySelector('.jb-code-browser').dataset.debugDock, 'right');
- Object.defineProperty(ui.dom.window, 'localStorage', { get() { throw new ui.dom.window.DOMException('Storage blocked', 'SecurityError'); } });
- await ui.reopen();
+ assert.equal(ui.container.querySelector('.jb-debug-dock'), null);
  await ui.click('src'); await ui.click('main.ts');
- const select = ui.container.querySelector('.jb-debug-dock select');
- await act(async () => { select.value = 'bottom'; select.dispatchEvent(new ui.dom.window.Event('change', { bubbles: true })); });
- assert.equal(ui.container.querySelector('.jb-code-browser').dataset.debugDock, 'bottom');
- assert.equal(ui.container.querySelector('.jb-debug-pane [role=alert]').textContent, '位置已切换，但浏览器存储不可用，仅对本次面板生效');
- assert.ok(ui.editor());
+ const editor = ui.editor();
+ Object.defineProperty(ui.dom.window, 'localStorage', { get() { throw new ui.dom.window.DOMException('Storage blocked', 'SecurityError'); } });
+ await ui.click('tabs.changes');
+ const divider = ui.container.querySelector('.jb-tools-divider');
+ await act(async () => divider.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true })));
+ assert.equal(ui.container.querySelector('.jb-tools-window').style.height, '270px');
+ assert.equal(ui.container.querySelector('.jb-tools-notice').textContent, '尺寸已调整，但浏览器存储不可用，仅对本次面板生效');
+ assert.equal(ui.editor(), editor);
 });
 
 test('Markdown previews render structure and fenced syntax, retain source mode and document reading positions', async context => {
@@ -945,84 +982,75 @@ function paneGeometry(ui) {
  ui.dom.window.HTMLElement.prototype.getBoundingClientRect = function () {
   const root = ui.container.querySelector('.jb-code-browser');
   const value = (name, fallback) => parseFloat(root?.style.getPropertyValue('--jb-' + name)) || fallback;
-  const bottom = root?.dataset.debugDock === 'bottom' || narrow;
   const width = narrow ? 390 : 1200, height = 800;
-  const debug = root?.querySelector(':scope>.jb-debug-pane');
-  const workspaceWidth = debug && !bottom ? width - value('debug-width',360) - 6 : width;
-  const workspaceHeight = debug && bottom ? height - value('debug-height',304) - 6 : height;
   let w = 0, h = 0;
-  if (this.classList.contains('jb-code-browser')) { w = width; h = height; }
-  if (this.classList.contains('jb-code-workspace')) { w = workspaceWidth; h = workspaceHeight; }
-  if (this.classList.contains('jb-tree')) { w = narrow ? width : Math.min(value('tree-width',340),workspaceWidth-246); h = narrow ? value('tree-height',180) : workspaceHeight; }
-  if (this.classList.contains('jb-debug-pane')) { w = bottom ? width : value('debug-width',360); h = bottom ? value('debug-height',304) : height; }
-  if (this.classList.contains('jb-pane-divider')) { w = this.getAttribute('aria-orientation') === 'vertical' ? 6 : workspaceWidth; h = this.getAttribute('aria-orientation') === 'horizontal' ? 6 : height; }
+  if (this.classList.contains('jb-root') || this.classList.contains('jb-code-browser') || this.classList.contains('jb-code-workspace')) { w = width; h = height; }
+  if (this.classList.contains('jb-tree')) { w = narrow ? width : Math.min(value('tree-width',340),width-246); h = narrow ? value('tree-height',180) : height; }
+  if (this.classList.contains('jb-pane-divider')) { w = this.getAttribute('aria-orientation') === 'vertical' ? 6 : width; h = this.getAttribute('aria-orientation') === 'horizontal' ? 6 : height; }
   return { x:0,y:0,left:0,top:0,right:w,bottom:h,width:w,height:h,toJSON(){} };
  };
  return async () => {
   narrow = true;
-  ui.container.querySelector('.jb-code-browser').style.flexDirection = 'column';
   ui.container.querySelector('.jb-code-workspace').style.flexDirection = 'column';
   await ui.resize();
  };
 }
 
-test('pane dividers drag independently, keep source position, cancel safely and persist only committed sizes', async context => {
+test('file tree and shared tool resizing preserve the editor, cancel drags and persist only committed sizes', async context => {
  const ui = await panel(context, server());
  paneGeometry(ui);
  await ui.click('src'); await ui.click('main.ts'); await ui.caret(12); await ui.resize();
- const view = ui.editor(), root = () => ui.container.querySelector('.jb-code-browser');
+ const editor = ui.editor(), root = () => ui.container.querySelector('.jb-code-browser');
  const tree = () => ui.container.querySelector('[role=separator][data-pane=tree]');
- const debug = () => ui.container.querySelector('[role=separator][data-pane=debug]');
- const fire = async (node,type,x) => act(async () => node.dispatchEvent(new ui.dom.window.PointerEvent(type,{pointerId:1,isPrimary:true,button:0,clientX:x,bubbles:true,cancelable:true})));
+ const tools = () => ui.container.querySelector('.jb-tools-divider');
+ const fire = async (node,type,x,y=0) => act(async () => node.dispatchEvent(new ui.dom.window.PointerEvent(type,{pointerId:1,isPrimary:true,button:0,clientX:x,clientY:y,bubbles:true,cancelable:true})));
  const stored = () => JSON.parse(ui.dom.window.localStorage.getItem('dsh.git-control.paneSizes') ?? '{}');
- assert.equal(tree().getAttribute('aria-orientation'),'vertical');
  await fire(tree(),'pointerdown',340); await fire(tree(),'pointermove',260);
  assert.equal(root().style.getPropertyValue('--jb-tree-width'),'260px');
  assert.deepEqual(stored(),{});
- await fire(tree(),'pointerup',260);
- assert.equal(stored().treeWidth,260);
- await fire(debug(),'pointerdown',840); await fire(debug(),'pointermove',750); await fire(debug(),'pointerup',750);
- assert.equal(stored().debugWidth,450); assert.equal(stored().treeWidth,260);
- assert.equal(ui.editor(),view); assert.equal(ui.editor().state.selection.main.head,12);
- await fire(debug(),'pointerdown',750); await fire(debug(),'pointermove',600); await fire(debug(),'pointercancel',600);
- assert.equal(root().style.getPropertyValue('--jb-debug-width'),'450px'); assert.equal(stored().debugWidth,450);
- await fire(debug(),'pointerdown',750); await fire(debug(),'pointermove',700);
- await act(async () => debug().dispatchEvent(new ui.dom.window.Event('lostpointercapture',{bubbles:true})));
- assert.equal(root().style.getPropertyValue('--jb-debug-width'),'450px');
+ await fire(tree(),'pointerup',260); assert.equal(stored().treeWidth,260);
+ await ui.click('tabs.changes');
+ await fire(tools(),'pointerdown',0,400); await fire(tools(),'pointermove',0,320);
+ assert.equal(ui.dom.window.localStorage.getItem('dsh.workbench.toolHeight'),null);
+ await fire(tools(),'pointerup',0,320);
+ assert.equal(ui.dom.window.localStorage.getItem('dsh.workbench.toolHeight'),'340');
+ await fire(tools(),'pointerdown',0,400); await fire(tools(),'pointermove',0,200); await fire(tools(),'pointercancel',0,200);
+ assert.equal(ui.container.querySelector('.jb-tools-window').style.height,'340px');
+ await fire(tools(),'pointerdown',0,400); await fire(tools(),'pointermove',0,300);
+ await act(async () => tools().dispatchEvent(new ui.dom.window.Event('lostpointercapture',{bubbles:true})));
+ assert.equal(ui.container.querySelector('.jb-tools-window').style.height,'340px');
+ assert.equal(ui.editor(),editor); assert.equal(ui.editor().state.selection.main.head,12);
  await ui.reopen();
- assert.equal(root().style.getPropertyValue('--jb-tree-width'),'260px'); assert.equal(root().style.getPropertyValue('--jb-debug-width'),'450px');
+ assert.equal(root().style.getPropertyValue('--jb-tree-width'),'260px');
+ assert.equal(ui.container.querySelector('.jb-tools-window').style.height,'340px');
  await ui.click('src'); await ui.click('main.ts'); await ui.resize();
  await act(async () => tree().dispatchEvent(new ui.dom.window.MouseEvent('dblclick',{bubbles:true})));
- assert.equal(root().style.getPropertyValue('--jb-tree-width'),''); assert.equal(stored().treeWidth,undefined); assert.equal(stored().debugWidth,450);
+ assert.equal(stored().treeWidth,undefined);
 });
 
-test('keyboard resizing clamps panes and bottom or narrow layouts expose height dividers without losing focus', async context => {
- const ui = await panel(context, server(), {paneSizes:{treeWidth:300,debugWidth:320}});
+test('keyboard resizing shares one tool height while narrow layouts retain independent file-tree sizing', async context => {
+ const ui = await panel(context, server(), {paneSizes:{treeWidth:300}});
  const narrow = paneGeometry(ui);
  await ui.click('src'); await ui.click('main.ts'); await ui.resize();
- const divider = kind => ui.container.querySelector(`[role=separator][data-pane=${kind}]`);
- const press = async (kind,key,options={}) => act(async () => divider(kind).dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key,bubbles:true,cancelable:true,...options})));
+ const tree = () => ui.container.querySelector('[role=separator][data-pane=tree]');
+ const tools = () => ui.container.querySelector('.jb-tools-divider');
+ const press = async (node,key,options={}) => act(async () => node.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key,bubbles:true,cancelable:true,...options})));
  const stored = () => JSON.parse(ui.dom.window.localStorage.getItem('dsh.git-control.paneSizes') ?? '{}');
- await press('tree','ArrowRight'); assert.equal(stored().treeWidth,310);
- await press('tree','ArrowRight',{shiftKey:true}); assert.equal(stored().treeWidth,350);
- await press('tree','Home'); assert.equal(stored().treeWidth,160);
- await press('tree','End'); assert.equal(Number(divider('tree').getAttribute('aria-valuenow')),Number(divider('tree').getAttribute('aria-valuemax')));
- const editor = ui.editor(), handle = divider('debug'); handle.focus();
- const dock = ui.container.querySelector('.jb-debug-dock select');
- await act(async () => { dock.value='bottom';dock.dispatchEvent(new ui.dom.window.Event('change',{bubbles:true})); });
- await ui.resize();
- assert.equal(divider('debug'),handle); assert.equal(ui.dom.window.document.activeElement,handle);
- assert.equal(handle.getAttribute('aria-orientation'),'horizontal');
- await press('debug','ArrowDown'); assert.equal(stored().debugHeight,314); assert.equal(stored().debugWidth,320);
- await narrow();
- assert.equal(divider('tree').getAttribute('aria-orientation'),'horizontal');
- await press('tree','ArrowDown'); assert.equal(stored().treeHeight,190);
+ await press(tree(),'ArrowRight'); assert.equal(stored().treeWidth,310);
+ await press(tree(),'ArrowRight',{shiftKey:true}); assert.equal(stored().treeWidth,350);
+ await press(tree(),'Home'); assert.equal(stored().treeWidth,160);
+ await press(tree(),'End'); assert.equal(Number(tree().getAttribute('aria-valuenow')),Number(tree().getAttribute('aria-valuemax')));
+ const editor = ui.editor();
+ await ui.click('debug.title'); await press(tools(),'ArrowUp');
+ assert.equal(ui.dom.window.localStorage.getItem('dsh.workbench.toolHeight'),'270');
+ await ui.click('tabs.log'); assert.equal(ui.container.querySelector('.jb-tools-window').style.height,'270px');
+ await press(tools(),'End'); assert.equal(ui.dom.window.localStorage.getItem('dsh.workbench.toolHeight'),'480');
+ await press(tools(),'Home'); assert.equal(ui.dom.window.localStorage.getItem('dsh.workbench.toolHeight'),'120');
+ await press(tools(),'Enter'); assert.equal(ui.dom.window.localStorage.getItem('dsh.workbench.toolHeight'),'260');
+ await narrow(); await press(tree(),'ArrowDown'); assert.equal(stored().treeHeight,190);
  assert.equal(ui.editor(),editor);
  const output = [...ui.container.querySelectorAll('[role=separator]')].map(node=>({label:node.getAttribute('aria-label'),orientation:node.getAttribute('aria-orientation'),value:node.getAttribute('aria-valuenow')}));
  assert.deepEqual(output,JSON.parse(readFileSync(new URL('./fixtures/pane-layout.expected.json',import.meta.url),'utf8')));
- await press('debug','Enter'); assert.equal(stored().debugHeight,undefined); assert.equal(stored().debugWidth,320);
- await ui.click('tabs.log');
- assert.ok([...ui.container.querySelectorAll('[role=separator]')].length > 0,'hidden file tabs retain their layout instance');
 });
 
 test('invalid pane preferences fall back, and unavailable storage leaves resizing usable with visible feedback', async context => {

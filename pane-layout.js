@@ -1,6 +1,6 @@
 /** Client-local pane sizes and accessible drag/keyboard dividers without editor remounts. */
 const storageKey = 'dsh.git-control.paneSizes';
-const sizeKeys = ['treeWidth', 'treeHeight', 'debugWidth', 'debugHeight'];
+const sizeKeys = ['treeWidth', 'treeHeight'];
 const variable = key => '--jb-' + key.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase());
 
 /** Create pane layout controls using the host React instance.
@@ -29,23 +29,23 @@ export function createPaneLayout(React) {
     };
     return { root, workspace, save, error, style: Object.fromEntries(Object.entries(sizes).map(([key, value]) => [variable(key), value + 'px'])) };
   }
-  function PaneDivider({ kind, layout, t, hidden = false }) {
+  function PaneDivider({ layout, t, hidden = false }) {
     const ref = useRef(null), drag = useRef(null), latest = useRef(null);
     latest.current = { layout, t };
-    const [metrics, setMetrics] = useState({ axis: 'x', key: kind + 'Width', min: 0, max: 0, value: 0 });
+    const [metrics, setMetrics] = useState({ axis: 'x', key: 'treeWidth', min: 0, max: 0, value: 0 });
     const [dragging, setDragging] = useState(false);
     const geometry = () => {
       const root = ref.current.closest('.jb-code-browser');
-      const parent = kind === 'tree' ? ref.current.parentElement : root;
-      const pane = kind === 'tree' ? parent.querySelector('.jb-tree') : root.querySelector(':scope > .jb-debug-pane');
+      const parent = ref.current.parentElement;
+      const pane = parent.querySelector('.jb-tree');
       const vertical = window.getComputedStyle(parent).flexDirection !== 'column';
       const axis = vertical ? 'x' : 'y', dimension = vertical ? 'width' : 'height';
       const available = parent.getBoundingClientRect()[dimension];
       const gap = ref.current.getBoundingClientRect()[dimension];
-      const preferred = vertical ? kind === 'tree' ? 160 : 220 : kind === 'tree' ? 60 : 100;
-      const remaining = vertical ? kind === 'tree' ? 240 : 406 : 160;
-      const min = vertical && kind === 'tree' ? preferred : Math.min(preferred, available * .3);
-      return { axis, key: kind + (vertical ? 'Width' : 'Height'), min: Math.round(min), max: Math.round(Math.max(min, available - Math.min(remaining, available * .6) - gap)), value: Math.round(pane?.getBoundingClientRect()[dimension] ?? 0) };
+      const preferred = vertical ? 160 : 60;
+      const remaining = vertical ? 240 : 160;
+      const min = vertical ? preferred : Math.min(preferred, available * .3);
+      return { axis, key: vertical ? 'treeWidth' : 'treeHeight', min: Math.round(min), max: Math.round(Math.max(min, available - Math.min(remaining, available * .6) - gap)), value: Math.round(pane?.getBoundingClientRect()[dimension] ?? 0) };
     };
     const finish = cancelled => {
       const operation = drag.current;
@@ -71,7 +71,7 @@ export function createPaneLayout(React) {
       const observer = new window.ResizeObserver(measure);
       const root = ref.current.closest('.jb-code-browser'), workspace = root.querySelector('.jb-code-workspace');
       observer.observe(root); observer.observe(workspace);
-      const pane = kind === 'tree' ? workspace.querySelector('.jb-tree') : root.querySelector(':scope > .jb-debug-pane');
+      const pane = workspace.querySelector('.jb-tree');
       if (pane) observer.observe(pane);
       return () => observer.disconnect();
     }, [hidden, layout.root, layout.workspace]);
@@ -98,7 +98,7 @@ export function createPaneLayout(React) {
       layout.root.current.style.removeProperty(variable(next.key)); layout.save(next.key, null);
       setMetrics(geometry());
     };
-    return h('div', { ref, hidden, role: 'separator', tabIndex: hidden ? -1 : 0, className: 'jb-pane-divider', 'data-pane': kind, 'data-dragging': dragging,
+    return h('div', { ref, hidden, role: 'separator', tabIndex: hidden ? -1 : 0, className: 'jb-pane-divider', 'data-pane': 'tree', 'data-dragging': dragging,
       'aria-label': t('layout.' + metrics.key), 'aria-orientation': metrics.axis === 'x' ? 'vertical' : 'horizontal',
       'aria-valuemin': metrics.min, 'aria-valuemax': metrics.max, 'aria-valuenow': metrics.value, 'aria-valuetext': t('layout.pixels', { n: String(metrics.value) }),
       title: t('layout.resizeHint'),
@@ -114,7 +114,7 @@ export function createPaneLayout(React) {
         if (!operation || event.pointerId !== operation.pointerId) return;
         event.preventDefault();
         const position = operation.axis === 'x' ? event.clientX : event.clientY;
-        operation.value = apply(operation, operation.start + (position - operation.origin) * (kind === 'tree' ? 1 : -1));
+        operation.value = apply(operation, operation.start + (position - operation.origin) );
       },
       onPointerUp: event => { if (event.pointerId === drag.current?.pointerId) finish(false); },
       onPointerCancel: event => { if (event.pointerId === drag.current?.pointerId) finish(true); },

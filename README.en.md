@@ -14,7 +14,7 @@
 
 After an AI suggests changes, open the files beside the conversation, follow definitions, inspect the diff, and use a breakpoint to see what actually runs. Files, source, documents, Git, and debugging share one workbench while the conversation stays visible.
 
-Interactions take cues from JetBrains: file tabs, code folding, modifier-click definitions, Back/Forward, and stack frames linked to source. Resize the reader, tree, and debugger; dock debugging on the right or bottom and follow the host’s light/dark theme. An on-demand bottom terminal runs project commands.
+Interactions take cues from JetBrains: file tabs, code folding, modifier-click definitions, Back/Forward, and stack frames linked to source. Resize the tree and tool window while following the host’s light/dark theme. Bottom icons switch Changes, History, Debugger, and Terminal in one shared window while code stays visible. The terminal loads on demand to run project commands.
 
 ## Capabilities
 
