@@ -12,6 +12,6 @@ Include affected versions, OS and Harness version, a minimal reproduction, impac
 
 ## Debugging and automation
 
-Debugging executes real programs, evaluation may mutate state, and detaching should preserve existing processes. Filesystem escapes, unintended execution, credential exposure, and process ownership errors are suitable security reports. Use the bug form for ordinary feature problems.
+The manual terminal runs a shell as the execution-environment user independently of Agent file-access modes. Debugging executes real programs, evaluation may mutate state, and detaching should preserve existing processes. Filesystem escapes, unintended execution, credential exposure, and process ownership errors are suitable security reports. Use the bug form for ordinary feature problems.
 
 External PR CI uses ephemeral GitHub-hosted runners, read-only permissions, and commit-pinned Actions. Tests do not access maintainer machines, credentials, or existing processes. Only the separate publisher for trusted version tags receives write access to create a draft release.

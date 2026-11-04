@@ -6,7 +6,8 @@ import { checkReleaseTag } from './repository-checks.mjs';
 const exec = promisify(execFile);
 const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 checkReleaseTag('v' + version, version);
-if (process.env.GITHUB_EVENT_NAME === 'push') {
+const publishing = ['push', 'release'].includes(process.env.GITHUB_EVENT_NAME);
+if (publishing) {
   if (process.env.GITHUB_REF_TYPE !== 'tag') throw new Error('release publishing requires a version tag');
   checkReleaseTag(process.env.GITHUB_REF_NAME, version);
   await exec('git', ['fetch', '--no-tags', 'origin', 'main']);
@@ -16,4 +17,4 @@ if (process.env.GITHUB_EVENT_NAME === 'push') {
   if (head !== tag) throw new Error('tag does not identify the checked-out commit');
 }
 if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, 'version=' + version + '\n');
-console.log('Release version validated: ' + version + (process.env.GITHUB_EVENT_NAME === 'push' ? ' (tag on main history)' : ' (build-only rehearsal)'));
+console.log('Release version validated: ' + version + (publishing ? ' (tag on main history)' : ' (build-only rehearsal)'));

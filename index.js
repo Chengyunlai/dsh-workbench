@@ -434,10 +434,10 @@ async function handleReview(ctx, request, signal) {
 /** Register the read-only git routes plus the chat bridge inside Connection's authentication fence. */
 function registerRoutes(ctx, config, languageServers) {
   const debug = createDebugService(ctx, config, requireWorkspacePath, json);
-  ctx.effect(() => () => debug.dispose(), 'git-control: debug sessions');
+  ctx.effect(() => () => debug.dispose(), 'workbench: debug sessions');
   const lifetime = new AbortController();
   const pending = new Set();
-  ctx.effect(() => async () => { lifetime.abort(); await Promise.allSettled([...pending]); }, 'git-control: query lifetime');
+  ctx.effect(() => async () => { lifetime.abort(); await Promise.allSettled([...pending]); }, 'workbench: query lifetime');
   const run = (ctx, request, handler) => {
     const timeout = new AbortController();
     const timer = setTimeout(() => timeout.abort(), new URL(request.url).pathname === '/api/git.definition' ? config.navigationTimeoutMs : QUERY_TIMEOUT_MS);
@@ -482,6 +482,6 @@ export function apply(ctx, options = {}) {
   const config = Config(options);
   config.debugAdapters = { ...(config.useInstalledDebugAdapters ? installedDebugAdapters() : {}), ...config.debugAdapters };
   const servers = createLanguageServers(ctx, serverSpecifications({ ...(config.useInstalledServers ? installedServers() : {}), ...config.languageServers }), config);
-  ctx.effect(() => () => servers.dispose(), 'git-control: language servers');
+  ctx.effect(() => () => servers.dispose(), 'workbench: language servers');
   registerRoutes(ctx, config, servers);
 }

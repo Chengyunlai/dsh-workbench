@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Development workbench",
-    "description": "A development workbench beside DeepSeek Harness conversations: files, code navigation, document previews, Git diffs and history, breakpoint debugging, and expression evaluation."
+    "description": "A development workbench beside DeepSeek Harness conversations: files and images, code navigation, Git diffs and history, breakpoint debugging, expression evaluation, and a bottom terminal."
   }
 }

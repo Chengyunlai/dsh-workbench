@@ -14,7 +14,7 @@
 
 After an AI suggests changes, open the files beside the conversation, follow definitions, inspect the diff, and use a breakpoint to see what actually runs. Files, source, documents, Git, and debugging share one workbench while the conversation stays visible.
 
-Interactions take cues from JetBrains: file tabs, code folding, modifier-click definitions, Back/Forward, and stack frames linked to source. Resize the reader, tree, and debugger; dock debugging on the right or bottom and follow the host’s light/dark theme.
+Interactions take cues from JetBrains: file tabs, code folding, modifier-click definitions, Back/Forward, and stack frames linked to source. Resize the reader, tree, and debugger; dock debugging on the right or bottom and follow the host’s light/dark theme. An on-demand bottom terminal runs project commands.
 
 ## Capabilities
 
@@ -57,7 +57,7 @@ The cover is a concept illustration; product screenshots and GIFs come from isol
 
 ## Install
 
-**1. Clone the project and install runtime dependencies.** The repository includes a built client; using it requires no build.
+**1. Install online.** Enter `@yunlai/dsh-workbench` in the Harness plugin manager. Installation becomes available after the first npm publication; check and select newer versions in plugin details, then reload or restart when prompted. For local development, use the source installation below:
 
 ```sh
 git clone https://github.com/Chengyunlai/dsh-workbench.git
@@ -105,7 +105,7 @@ macOS desktop checks cover reading, navigation, folding, themes, and layout. CI 
 <details>
 <summary>Development and existing installations</summary>
 
-For development tests, use Node.js 24.15.0 or a newer 24.x release and run `npm ci`, `npm run verify`, and `npm run test:package`. The package remains `@local/dsh-git-control`; existing Cordis configuration, right-side tabs, preference keys, and `/api/git.*` routes retain their identifiers. The UI name is Development workbench.
+For development tests, use Node.js 24.15.0 or a newer 24.x release and run `npm ci`, `npm run verify`, and `npm run test:package`. The package is `@yunlai/dsh-workbench` and the plugin entry is `workbench`; update older installations using the [upgrade guide](UPGRADING.en.md). Right-side tab, preference, and `/api/git.*` identifiers retain their internal values to restore existing layouts.
 
 </details>
 

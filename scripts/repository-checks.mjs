@@ -31,7 +31,7 @@ export function checkPackageFiles(files) {
     assert.ok(!path.split('/').some(part => ['.tools', 'node_modules', '.git', 'test', 'screenshots'].includes(part)), 'private or development file in package: ' + path);
     assert.ok(!/(^|\/)\.env(?:\.|$)|\.log$|\.gif$/.test(path), 'private or media file in package: ' + path);
   }
-  for (const path of ['package.json', 'LICENSE', 'index.js', 'client.js', 'typescript-worker.js', 'debug-dap.js', 'debug-service.js', 'debug-targets.js', 'navigation.js', 'image-preview.js', 'language-config.js', 'language-servers.js', 'cordis.patch.yml', 'icon.svg', 'locale/en.json', 'locale/zh.json', 'README.md', 'README.en.md', 'USAGE.md', 'USAGE.en.md', 'DEBUGGING.md', 'DEBUGGING.en.md', 'CONTRIBUTING.md', 'CONTRIBUTING.en.md', 'SECURITY.md', 'SECURITY.en.md', 'AUTOMATION.md', 'AUTOMATION.en.md', 'scripts/configure-languages.mjs', 'scripts/configure-debuggers.mjs']) assert.ok(files.includes(path), 'missing package resource: ' + path);
+  for (const path of ['package.json', 'LICENSE', 'index.js', 'client.js', 'client.terminal.js', 'typescript-worker.js', 'debug-dap.js', 'debug-service.js', 'debug-targets.js', 'navigation.js', 'image-preview.js', 'language-config.js', 'language-servers.js', 'cordis.patch.yml', 'icon.svg', 'locale/en.json', 'locale/zh.json', 'README.md', 'README.en.md', 'USAGE.md', 'USAGE.en.md', 'DEBUGGING.md', 'DEBUGGING.en.md', 'CONTRIBUTING.md', 'CONTRIBUTING.en.md', 'SECURITY.md', 'SECURITY.en.md', 'AUTOMATION.md', 'AUTOMATION.en.md', 'UPGRADING.md', 'UPGRADING.en.md', 'scripts/configure-languages.mjs', 'scripts/configure-debuggers.mjs']) assert.ok(files.includes(path), 'missing package resource: ' + path);
 }
 
 /** Check a release tag against the package's declared version.
@@ -80,14 +80,18 @@ export async function checkRepository() {
     if (file.endsWith('.json')) JSON.parse(await readFile(resolve(root, file), 'utf8'));
     if (/^\.github\/.*\.ya?ml$/.test(file)) parse(await readFile(resolve(root, file), 'utf8'), { uniqueKeys: true });
   }
-  for (const name of ['README', 'USAGE', 'DEBUGGING', 'CONTRIBUTING', 'SECURITY', 'AUTOMATION']) {
+  for (const name of ['README', 'USAGE', 'DEBUGGING', 'CONTRIBUTING', 'SECURITY', 'AUTOMATION', 'UPGRADING']) {
     const [zh, en] = await Promise.all([name + '.md', name + '.en.md'].map(file => readFile(resolve(root, file), 'utf8').then(text => text.split('\n'))));
     assert.equal(zh.length, en.length, name + ': bilingual line count differs');
     assert.deepEqual(zh.map(line => Boolean(line.trim())), en.map(line => Boolean(line.trim())), name + ': bilingual paragraph breaks differ');
   }
   checkLocales(Object.fromEntries(await Promise.all(['en', 'zh'].map(async language => [language, JSON.parse(await readFile(resolve(root, 'locale', language + '.json'), 'utf8')).meta]))));
+  const packageName = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')).name;
+  const patch = parse(await readFile(resolve(root, 'cordis.patch.yml'), 'utf8'));
+  assert.equal(patch[0].insert[0].name, packageName);
+  assert.equal(patch[0].insert[0].id, 'workbench');
   let plugin, dictionaries;
-  vm.runInNewContext(await readFile(resolve(root, 'client.js'), 'utf8'), { window: { __ModuleLoader__: { load: spec => { plugin = spec.factory(() => ({ createElement: () => null })); } } } });
+  vm.runInNewContext(await readFile(resolve(root, 'client.js'), 'utf8'), { window: { __ModuleLoader__: { load: spec => { assert.equal(spec.id, packageName); plugin = spec.factory(() => ({ createElement: () => null })); } } } });
   plugin.apply({ effect: callback => callback(), locale: { register: (namespace, value) => { dictionaries = value; }, bind: () => key => key }, uiWorkspace: {}, sidebarRightTabs: { register: () => {} }, slots: { inject: (name, callback) => callback(), register: () => {} } });
   checkLocales(dictionaries);
   console.log('Repository checks passed: ' + files.length + ' files, locale parity, document links, and paired paragraphs.');

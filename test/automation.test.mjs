@@ -26,3 +26,17 @@ test('release checks require a matching version tag, including prerelease suffix
   assert.throws(() => checkReleaseTag('vbad', 'bad'));
   assert.throws(() => checkReleaseTag('v1.0.0\n', '1.0.0\n'));
 });
+
+test('published releases reject branch refs and mismatched versions before accessing Git history', async () => {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const { fileURLToPath } = await import('node:url');
+  const run = promisify(execFile);
+  const script = fileURLToPath(new URL('../scripts/release-check.mjs', import.meta.url));
+  for (const event of ['push', 'release']) {
+    await assert.rejects(run(process.execPath, [script], { env: { ...process.env, GITHUB_EVENT_NAME: event, GITHUB_REF_TYPE: 'branch', GITHUB_REF_NAME: 'main', GITHUB_OUTPUT: '' } }), /requires a version tag/);
+    await assert.rejects(run(process.execPath, [script], { env: { ...process.env, GITHUB_EVENT_NAME: event, GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v9.9.9', GITHUB_OUTPUT: '' } }), /release tag must match/);
+  }
+  const rehearsal = await run(process.execPath, [script], { env: { ...process.env, GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_OUTPUT: '' } });
+  assert.match(rehearsal.stdout, /build-only rehearsal/);
+});
