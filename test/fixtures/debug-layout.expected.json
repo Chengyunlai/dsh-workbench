@@ -1,5 +1,5 @@
 {
-  "defaultDock": "right",
+  "activeTool": "debug",
   "name": "main.py",
   "location": "lib.ts:1",
   "sections": ["调用栈2", "变量", "程序输出"],

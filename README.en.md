@@ -14,7 +14,7 @@
 
 After an AI suggests changes, open the files beside the conversation, follow definitions, inspect the diff, and use a breakpoint to see what actually runs. Files, source, documents, Git, and debugging share one workbench while the conversation stays visible.
 
-Interactions take cues from JetBrains: file tabs, code folding, modifier-click definitions, Back/Forward, and stack frames linked to source. Resize the reader, tree, and debugger; dock debugging on the right or bottom and follow the host’s light/dark theme. An on-demand bottom terminal runs project commands.
+Interactions take cues from JetBrains: file tabs, code folding, modifier-click definitions, Back/Forward, and stack frames linked to source. Resize the tree and tool window while following the host’s light/dark theme. Bottom icons switch Find, Changes, History, Debugger, and Terminal in one shared window while code stays visible. The terminal loads on demand to run project commands.
 
 ## Capabilities
 
@@ -22,7 +22,7 @@ Interactions take cues from JetBrains: file tabs, code folding, modifier-click d
 
 | Read the code | Review the changes | Inspect execution |
 | --- | --- | --- |
-| File trees, tabs, syntax and occurrence highlighting, definitions, code folding, and reading history. Markdown opens as a reading preview with a source view; images and ICNS icons preview directly. | Inspect working-tree changes, line diffs, commit graphs, and commit details. Follow a diff back to source and explicitly send selected lines to a new project conversation. | Launch or attach, set breakpoints, step, select stack frames, expand variables, evaluate expressions, and remove all breakpoints. |
+| File trees, path copying, file and directory search, tabs, syntax and occurrence highlighting, definitions, code folding, and reading history. Conversation Markdown opens directly in the workbench reading preview, with a source view; images and ICNS icons preview directly. | Inspect working-tree changes, line diffs, commit graphs, and commit details. Follow a diff back to source and explicitly send selected lines to a new project conversation. | Launch or attach, set breakpoints, step, select stack frames, expand variables, evaluate expressions, and remove all breakpoints. |
 
 ## Demos
 
@@ -57,7 +57,7 @@ The cover is a concept illustration; product screenshots and GIFs come from isol
 
 ## Install
 
-**1. Install online.** Enter `@yunlai/dsh-workbench` in the Harness plugin manager. Installation becomes available after the first npm publication; check and select newer versions in plugin details, then reload or restart when prompted. For local development, use the source installation below:
+**1. Install online.** Enter `@yunlai/dsh-workbench` in the Harness plugin manager. Check and select newer versions in plugin details, then reload or restart when prompted. For local development, use the source installation below:
 
 ```sh
 git clone https://github.com/Chengyunlai/dsh-workbench.git

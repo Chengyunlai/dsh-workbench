@@ -12,8 +12,11 @@ export const ServerConfig = Schema.object({
   waitForJavaReady: Schema.union([Schema.boolean(), Schema.const(null)]).default(null),
 });
 
-/** Language-server overrides are trusted deployment configuration, never supplied by a browser request. */
+/** Search budgets, previews and language/debugger launch overrides are trusted deployment configuration. */
 export const Config = Schema.object({
+  searchMaxResults: Schema.number().step(1).min(1).max(2000).default(200),
+  searchMaxFiles: Schema.number().step(1).min(1).max(10000).default(500),
+  searchMaxOutputBytes: Schema.number().step(1).min(1024).max(16 * 1024 * 1024).default(2 * 1024 * 1024),
   imagePreviewMaxBytes: Schema.number().step(1).min(1024).max(32 * 1024 * 1024).default(8 * 1024 * 1024),
   debugAdapters: Schema.dict(Schema.object({
     command: Schema.string().required(), args: Schema.array(Schema.string()).default([]),

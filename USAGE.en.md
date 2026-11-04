@@ -4,9 +4,9 @@
 
 ## Use
 
-Expand a conversation's right sidebar and choose **Development workbench** from Start or More tools. The tab follows its own conversation's project; the repository selector can inspect other registered workspaces.
+Expand a conversation's right sidebar and choose **Development workbench** from Start or More tools. The tab follows its own conversation's project; the repository selector can inspect other registered workspaces. Previously opened Git tabs also show the workbench name in the current language without clearing the layout.
 
-| View | Actions and results |
+| Area or tool | Actions and results |
 | --- | --- |
 | Files | The directory tree includes tracked and untracked files, excludes Git-ignored files, and annotates Git status. Expand directories or filter paths; select a file to read its current workspace source. |
 | Source reader | The read-only editor has continuous scrolling, syntax highlighting, line numbers, a caret and text selection, without paging or a navigation toolbar. |
@@ -14,7 +14,11 @@ Expand a conversation's right sidebar and choose **Development workbench** from 
 | Changes | Groups staged, worktree and untracked files, with line statistics and unified diffs. Double-click a diff line or press F4 to open current source. |
 | Log | Shows the commit graph, author, date and hash. Select a commit for file statistics and its full diff. |
 
-Drag the dividers between the file tree, reader, and debugger to resize their panes; the reader uses the remaining space. Right docking adjusts width; bottom docking and narrow stacked layouts adjust height, with independent stored sizes. Focus a divider and use arrow keys for fine changes, Shift for larger steps, and Home/End for its allowed minimum/maximum. Double-click or Enter resets that direction to its default. Cancelled drags or Esc restore the previous size; reopening restores committed adjustments.
+Five persistent bottom icons open Find, Changes, History, Debugger, and Terminal; hovering reveals their names. Switch tools in the same window, or click the selected icon or header minus to collapse it. Code stays visible, and switching retains the caret, Git selection, stack frame, expanded variables, and terminal output. Drag the top edge to adjust the shared tool height; the file-tree divider independently adjusts width or height in narrow layouts. Arrow keys resize a focused divider, Shift uses larger steps, and Home/End select its limits. Double-click or Enter resets the size. Cancelling or Escape restores the previous size; committed sizes are saved.
+
+Right-click a file or directory (Shift+F10 from the keyboard) to copy its name, workspace-relative path, or absolute path. If clipboard access is unavailable, selected read-only text is offered for manual copying. Directories also support recursive expansion/collapse, filename filtering, and scoped content search. The tree’s locate icon clears the filter, expands ancestors and scrolls to the current file; its magnifier opens project content search.
+
+Use ⌘F/Ctrl+F or the file menu to find within a file, without replacement; F3/Shift+F3 selects the next/previous match. Open project content search from the bottom Find icon, directory menu, or ⌘⇧F/Ctrl+Shift+F inside the workbench, then press Enter to submit. Search accepts literal text and a case toggle, shows one result per matching line, and opens current source at that position. It searches Git-tracked and nonignored new files, skipping binary, non-UTF-8, over-512-KiB and out-of-workspace files. Defaults return up to 200 lines, inspect 500 candidate files, and allow 2 MiB of Git output. Adjust these budgets through plugin configuration: `searchMaxResults` (1–2000), `searchMaxFiles` (1–10000), and `searchMaxOutputBytes` (1024–16777216). Result limits prompt a narrower query; exceeding the output budget fails visibly. Search never modifies files or Git state.
 
 Plain clicks place the caret or select text without querying definitions. A caret on a name highlights that word and matching case-sensitive whole words in the visible source, preserving syntax colors and outlining the current word. Selecting a whole word highlights its other matches; partial words or a caret on a blank line clear the marks. Matches use text, including the same words in strings and comments, and update when scrolling or changing files. Definition navigation locates and highlights the destination line; multiple destinations appear in a floating chooser. Switching Files/Changes/Log retains reading state, and Back restores the call-site caret. Narrow sidebars stack the tree above the reader.
 
@@ -23,6 +27,8 @@ Source keeps open-file tabs. The tree, definitions, and stack frames open or sel
 Use arrows beside line numbers to fold or unfold syntax-recognized code blocks; clicking the ellipsis also unfolds them. Python, Go, Java, JavaScript and TypeScript fold functions, classes and nested blocks according to their grammars, without guessing indentation for unknown files. Switching files retains folds for the same content version; changed content clears old folds. Definition jumps, line navigation and debugging expand blocks containing a hidden destination. Folds remain in the current panel’s memory only.
 
 Markdown (`.md`/`.markdown`/`.mdown`) opens in a reading preview with heading hierarchy, emphasis, lists, tasks, quotes, tables, inline code, and language-highlighted fenced blocks. The document view can switch to source with line numbers and original markup. View changes reuse the editor; file tabs and Back/Forward retain reading positions. Relative links open workspace files, including heading anchors and `#Lline` destinations; HTTP(S) links open a new window. Raw HTML is omitted, and images show their descriptions without automatic resource requests.
+
+When enabled, the plugin opens Markdown file links in conversations in the workbench. A Markdown row in a changed-files card, or its header when the first file is Markdown, opens the current document on disk. Existing workbench file tabs are reused; the card still says “Preview in sidebar”. Code, deleted documents, non-Git projects, and files outside registered workspaces keep the original Harness preview. A failed summary read offers Retry and the original preview. Reading shows the current file rather than the turn’s historical snapshot; use the workbench Git diff to inspect document changes line by line. Disabling the plugin restores the host’s default viewer for newly opened files.
 
 JSON, YAML, TOML, INI/properties/`.env`, shell, and Makefile receive basic syntax highlighting. Markdown source distinguishes headings, emphasis, links, and code markers. Preview and source follow the host light/dark theme; wide code blocks and tables scroll within their own regions.
 
@@ -44,7 +50,7 @@ Suggest to AI in the toolbar, change diff or commit detail creates a new project
 
 ## Bottom terminal
 
-Click Terminal at the bottom of the workbench to start a shell in the current session workspace. The screen loads on demand and supports interactive input, shell completion, Ctrl+C, ANSI colors, and scrollback through the official Harness terminal controller. Drag its top edge to resize, use arrow keys on the divider, or double-click to reset. Collapse Terminal to keep its process running. Closing the terminal, closing the workbench, or switching sessions requests process termination. New terminals are available only for the current session workspace, not an overridden repository. Commands run as the execution-environment user independently of Agent file-access modes; output is not automatically sent to the model. Enable the official terminal controller and use a Harness version supporting lazy client chunks. Retry failed connections; close an exited shell before starting another.
+Click Terminal at the bottom of the workbench to start a shell in the current session workspace. The screen loads on demand and supports interactive input, shell completion, Ctrl+C, ANSI colors, and scrollback through the official Harness terminal controller. The terminal uses the shared tool-window height. Switching tools or collapsing the window keeps its process running. Closing the terminal, closing its owning workbench, or unloading the plugin requests process termination; switching to another session never creates a shell automatically. New terminals are available only for the current session workspace, not an overridden repository. Commands run as the execution-environment user independently of Agent file-access modes; output is not automatically sent to the model. Enable the official terminal controller and use a Harness version supporting lazy client chunks. Retry failed connections; close an exited shell before starting another.
 
 ## Image and icon previews
 
@@ -97,7 +103,7 @@ Top-level `navigationTimeoutMs` defaults to 120000 and covers cold startup and q
 
 ## Breakpoint debugging
 
-After installing adapters, press F5 to debug the current Python, Go, or JS entry file; TS requires generated JS and source maps. Attach from the context menu using a local debugger port or Go process ID. The debugger defaults to the right; its Dock selector moves it to the bottom and remembers the choice. `.dsh/debug.json` is optional for custom project arguments. See [Debug configuration](DEBUGGING.en.md) for details, shortcuts, and process ownership. Programs execute only after an explicit launch or attach action.
+After installing adapters, press F5 to debug the current Python, Go, or JS entry file; TS requires generated JS and source maps. Attach from the context menu using a local debugger port or Go process ID. Debugging shares the bottom tool window with Changes, History, and Terminal. Starting debugging or reaching a new breakpoint stop selects it automatically; switching tools does not end debugging. `.dsh/debug.json` is optional for custom project arguments. See [Debug configuration](DEBUGGING.en.md) for details, shortcuts, and process ownership. Programs execute only after an explicit launch or attach action.
 
 ## Implementation and verification
 

@@ -1,4 +1,5 @@
 import { navigationHandlers } from './navigation.js';
+import { createWorkspaceSearch } from './workspace-search.js';
 import { Config, installedServers, installedDebugAdapters, serverSpecifications } from './language-config.js';
 import { createLanguageServers } from './language-servers.js';
 import { createDebugService } from './debug-service.js';
@@ -472,6 +473,7 @@ function registerRoutes(ctx, config, languageServers) {
   route('/api/git.tree', ['GET'], navigation.tree);
   route('/api/git.source', ['GET'], navigation.source);
   route('/api/git.definition', ['GET'], navigation.definition);
+  route('/api/git.search', ['GET'], createWorkspaceSearch({ runGit, requireWorkspacePath, requireRelativePath, json, config }));
   route('/api/git.review', ['POST'], handleReview);
   route('/api/git.debug.configurations', ['GET'], (ctx, request) => debug.configurations(request));
   route('/api/git.debug.status', ['GET'], (ctx, request) => debug.status(request));

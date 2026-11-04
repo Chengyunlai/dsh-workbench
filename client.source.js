@@ -3,6 +3,9 @@ import { createDebugUI } from './debug-client.js';
 import { createSourceEditor } from './source-editor.js';
 import { createMarkdownReader } from './markdown-reader.js';
 import { createPaneLayout } from './pane-layout.js';
+import { createBottomTools } from './bottom-tools.js';
+import { createWorkspaceSearchUI } from './workspace-search-client.js';
+import { parsePreviewAddress, resolveDocumentPreview } from './document-preview.js';
 
 /**
  * DSH Workbench — code, documents, Git inspection and debugging beside chat.
@@ -22,6 +25,8 @@ window.__ModuleLoader__.load({
     const TerminalDock = createTerminalDock(React, () => require.async('./client.terminal.js'));
     const MarkdownReader = createMarkdownReader(React);
     const { usePaneLayout, PaneDivider } = createPaneLayout(React);
+    const useBottomTools = createBottomTools(React);
+    const WorkspaceSearch = createWorkspaceSearchUI(React, api);
 
     // Stable installation, locale and dock ids preserve existing profiles and open panes.
     const NS = 'git-control';
@@ -68,6 +73,45 @@ window.__ModuleLoader__.load({
 
     // ------------------------------------------------------------- i18n
     const en = {
+      "tree.locate": "Locate current file",
+      "tree.findName": "Find by file name",
+      "tree.findFile": "Find in file",
+      "tree.findDirectory": "Find in directory",
+      "tree.expand": "Expand directory recursively",
+      "tree.collapse": "Collapse directory recursively",
+      "tree.copyName": "Copy name",
+      "tree.copyRelative": "Copy relative path",
+      "tree.copyAbsolute": "Copy absolute path",
+      "tree.copied": "Copied: {value}",
+      "tree.manualCopy": "Copy path",
+      "tree.copyHint": "Clipboard access is unavailable. Press ⌘C / Ctrl+C to copy the selected text.",
+      "tree.close": "Close",
+      "search.title": "Find",
+      "search.invalid": "The search response is invalid.",
+      "search.failed": "Search failed: {message}",
+      "search.query": "Find text",
+      "search.case": "Match case",
+      "search.run": "Search",
+      "search.scope": "Scope: {path}",
+      "search.project": "Entire project",
+      "search.count": "{n} matches",
+      "search.limited": "Showing partial results. Narrow the scope or use a more specific query.",
+      "search.skipped": "Skipped {n} files that cannot be previewed.",
+      "search.open": "Open {path} at line {line}",
+      "search.empty": "No matches",
+      "find.current": "Current match", "find.onLine": "on line",
+      "find.label": "Find",
+      "find.next": "Next",
+      "find.previous": "Previous",
+      "find.all": "All",
+      "find.case": "Match case",
+      "find.regexp": "Regular expression",
+      "find.word": "Whole word",
+      "find.close": "Close",
+
+      'tools.title': 'Tool windows', 'tools.hide': 'Hide tool window', 'tools.resize': 'Tool window height',
+      'preview.original': 'Open original preview',
+      'preview.retry': 'Retry',
       "debug.clearBreakpoints": "Remove all breakpoints",
       "debug.evaluate": "Evaluate expression",
       "debug.inspection": "Inspection controls",
@@ -108,12 +152,10 @@ window.__ModuleLoader__.load({
       "debug.continue": "Resume program", "debug.executionFrame": "Execution frame", "debug.external": "External source",
       "debug.variables": "Variables",
       "debug.output": "Program output",
-      "debug.dock": "Dock", "debug.dockRight": "Right", "debug.dockBottom": "Bottom",
-      "debug.dockUnsaved": "Position changed for this panel. Browser storage is unavailable, so it cannot be saved.",
       "debug.fullPath": "Full path", "debug.noVariables": "No variables in this scope",
       'document.preview': 'Reading preview', 'document.source': 'Source', 'document.mode': 'Document view',
       'document.image': 'Image: {alt}', 'document.readOnly': 'Markdown · Read-only', 'document.linkFailed': 'This link cannot be opened inside the workspace.',
-      'layout.treeWidth': 'File tree width', 'layout.treeHeight': 'File tree height', 'layout.debugWidth': 'Debugger width', 'layout.debugHeight': 'Debugger height',
+      'layout.treeWidth': 'File tree width', 'layout.treeHeight': 'File tree height',
       'layout.resizeHint': 'Drag to resize · Arrow keys to adjust · Double-click or Enter to reset', 'layout.pixels': '{n} pixels',
       'layout.unsaved': 'Size changed for this panel. Browser storage is unavailable, so it cannot be saved.',
 
@@ -205,6 +247,45 @@ window.__ModuleLoader__.load({
       'status.untracked': 'Untracked',
     };
     const zh = {
+      "tree.locate": "定位当前文件",
+      "tree.findName": "按文件名查找",
+      "tree.findFile": "在文件中查找",
+      "tree.findDirectory": "在目录中查找内容",
+      "tree.expand": "展开此目录及子目录",
+      "tree.collapse": "收起此目录及子目录",
+      "tree.copyName": "复制名称",
+      "tree.copyRelative": "复制相对路径",
+      "tree.copyAbsolute": "复制绝对路径",
+      "tree.copied": "已复制：{value}",
+      "tree.manualCopy": "复制路径",
+      "tree.copyHint": "无法访问剪贴板，请按 ⌘C / Ctrl+C 复制已选中的文本。",
+      "tree.close": "关闭",
+      "search.title": "查找",
+      "search.invalid": "搜索响应无效。",
+      "search.failed": "查找失败：{message}",
+      "search.query": "查找内容",
+      "search.case": "区分大小写",
+      "search.run": "查找",
+      "search.scope": "范围：{path}",
+      "search.project": "整个项目",
+      "search.count": "{n} 条匹配",
+      "search.limited": "仅显示部分结果，请缩小范围或使用更具体的关键词。",
+      "search.skipped": "略过 {n} 个无法预览的文件。",
+      "search.open": "打开 {path} 第 {line} 行",
+      "search.empty": "没有匹配内容",
+      "find.current": "当前匹配", "find.onLine": "所在行",
+      "find.label": "查找",
+      "find.next": "下一个",
+      "find.previous": "上一个",
+      "find.all": "全部",
+      "find.case": "区分大小写",
+      "find.regexp": "正则表达式",
+      "find.word": "全字匹配",
+      "find.close": "关闭",
+
+      'tools.title': '工具窗口', 'tools.hide': '收起工具窗口', 'tools.resize': '工具窗口高度',
+      'preview.original': '打开原预览',
+      'preview.retry': '重试',
       "debug.clearBreakpoints": "清理全部断点",
       "debug.evaluate": "计算表达式",
       "debug.inspection": "检查操作",
@@ -245,12 +326,10 @@ window.__ModuleLoader__.load({
       "debug.continue": "继续运行", "debug.executionFrame": "当前执行帧", "debug.external": "工作区外源码",
       "debug.variables": "变量",
       "debug.output": "程序输出",
-      "debug.dock": "停靠", "debug.dockRight": "右侧", "debug.dockBottom": "底部",
-      "debug.dockUnsaved": "位置已切换，但浏览器存储不可用，仅对本次面板生效",
       "debug.fullPath": "完整路径", "debug.noVariables": "此作用域没有变量",
       'document.preview': '阅读预览', 'document.source': '源码', 'document.mode': '文档视图',
       'document.image': '图片：{alt}', 'document.readOnly': 'Markdown · 只读', 'document.linkFailed': '无法在当前工作区内打开此链接',
-      'layout.treeWidth': '文件树宽度', 'layout.treeHeight': '文件树高度', 'layout.debugWidth': '调试面板宽度', 'layout.debugHeight': '调试面板高度',
+      'layout.treeWidth': '文件树宽度', 'layout.treeHeight': '文件树高度',
       'layout.resizeHint': '拖动调整尺寸 · 方向键微调 · 双击或 Enter 恢复默认', 'layout.pixels': '{n} 像素',
       'layout.unsaved': '尺寸已调整，但浏览器存储不可用，仅对本次面板生效',
 
@@ -361,12 +440,26 @@ window.__ModuleLoader__.load({
 .jb-branchchip svg{width:13px;height:13px;color:${C.modified}}
 .jb-headchip{color:${C.textDim};font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap}
 .jb-spacer{flex:1}
-.jb-tabs{flex:none;display:flex;align-items:stretch;height:33px;padding:0 8px;background:${C.bg};border-bottom:1px solid ${C.border}}
-.jb-tab{display:inline-flex;align-items:center;padding:0 12px;color:${C.textDim};background:transparent;border:none;font:inherit;font-size:12.5px;cursor:pointer;position:relative}
-.jb-tab:hover{color:${C.text}}
-.jb-tab[data-active=true]{color:${C.text}}
-.jb-tab[data-active=true]:after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:2px;background:${C.accent}}
-.jb-content{flex:1;min-height:0;display:flex}
+
+.jb-tools-bar{display:flex;align-items:center;gap:4px;flex:none;min-height:34px;padding:0 8px;background:${C.toolbar};border-top:1px solid ${C.border}}
+.jb-tool-toggle{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none;width:32px;height:30px;border:0;border-radius:4px;background:transparent;color:${C.textDim};cursor:pointer;padding:0}
+.jb-tool-toggle svg{width:18px;height:18px}
+.jb-tool-toggle[aria-pressed=true]{color:${C.accent};background:${C.selection}}
+.jb-tool-toggle[aria-pressed=true]:after{position:absolute;content:"";height:2px;left:6px;right:6px;bottom:0;background:${C.accent}}
+.jb-tool-toggle:hover:not(:disabled){color:${C.text};background:${C.hover}}
+.jb-tool-toggle:disabled{opacity:.4;cursor:default}
+.jb-tool-toggle:focus-visible,.jb-tools-divider:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
+.jb-tools-window{position:relative;display:flex;flex-direction:column;flex:0 0 auto;min-height:120px;max-height:60%;min-width:0;background:${C.panel};border-top:1px solid ${C.border}}
+.jb-tools-window[hidden],.jb-tool-panel[hidden]{display:none}
+.jb-tools-header{display:flex;align-items:center;justify-content:space-between;flex:none;min-height:28px;padding:0 8px 0 12px;border-bottom:1px solid ${C.border};font-size:12px}
+.jb-tool-panel{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
+.jb-tool-panel>.jb-changes,.jb-tool-panel>.jb-log{min-height:0;flex:1}
+.jb-tool-panel .jb-debug-sections{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:0 8px;align-items:start}
+.jb-tool-panel .jb-debug-section{max-height:100%;overflow:auto;margin-top:0}
+.jb-tools-divider{position:absolute;top:-4px;left:0;right:0;height:7px;cursor:row-resize;touch-action:none;z-index:3}
+.jb-tools-divider:hover{background:${C.hover}}
+.jb-tools-notice{padding:4px 8px;border-top:1px solid ${C.border};color:${C.text};font-size:12px}
+.jb-content{position:relative;flex:1;min-height:0;display:flex}
 .jb-browser-seat{flex:1;min-width:0;min-height:0;display:flex}
 .jb-filebutton{box-sizing:border-box;width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left}
 .jb-filebutton:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
@@ -382,13 +475,10 @@ window.__ModuleLoader__.load({
 .jb-source-tab button:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
 .jb-source-panel{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}
 @media(hover:hover){.jb-source-tab-close:hover{background:${C.hover};color:${C.text}}}
-.jb-debug-pane{box-sizing:border-box;display:flex;flex-direction:column;flex:0 0 clamp(min(220px,30%),var(--jb-debug-width,30%),max(0px,calc(100% - 412px)));min-width:0;min-height:0;max-width:none;overflow:auto;background:${C.panel};color:${C.text};border-left:1px solid ${C.border};padding:8px;font-size:13px;line-height:20px}
+.jb-debug-pane{box-sizing:border-box;display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;max-width:none;overflow:auto;background:${C.panel};color:${C.text};padding:8px;font-size:13px;line-height:20px}
 .jb-debug-pane pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:8px;font:12px/20px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:${C.code};user-select:text}
 .jb-debug-pane summary{cursor:default;padding:3px 8px}
 .jb-debug-topbar{display:flex;flex:none;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-bottom:8px}
-.jb-debug-dock{display:flex;flex:none;align-items:center;gap:5px;margin-left:auto;color:${C.textDim};font-size:12px}
-.jb-debug-dock select{min-height:28px;max-width:100%;border:1px solid ${C.border};border-radius:4px;padding:2px 4px;background:${C.toolbar};color:${C.text};font:inherit}
-.jb-debug-dock select:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
 .jb-debug-sections{min-height:0;flex:1;overflow:auto}
 .jb-debug-section{min-width:0;border-top:1px solid ${C.border};margin-top:4px}
 .jb-debug-section>summary{position:sticky;top:0;z-index:1;background:${C.toolbar};font-weight:500;min-height:24px}
@@ -439,22 +529,17 @@ window.__ModuleLoader__.load({
 @media(hover:hover){.jb-stack-frame:hover:not([aria-selected=true]){background:${C.hover}}}
 .jb-sourcebody{flex:1;min-height:0;overflow:hidden}
 .jb-sourcebody[hidden]{display:none}
-.jb-terminal{flex:none;min-height:34px;border-top:1px solid ${C.border};background:${C.bg};display:flex;flex-direction:column;min-width:0}
-.jb-terminal[data-open=true]{min-height:120px;max-height:60%}
+.jb-terminal{flex:1;min-height:0;background:${C.bg};display:flex;flex-direction:column;min-width:0}
 .jb-terminal-bar{display:flex;align-items:center;gap:10px;min-height:34px;padding:0 12px;background:${C.panel};flex:none}
 .jb-terminal-bar button,.jb-terminal-notice button{background:none;border:0;color:${C.textDim};font:inherit;padding:4px 6px;cursor:pointer;border-radius:4px}
 .jb-terminal-bar button:hover{background:${C.hover};color:${C.text}}
-.jb-terminal-bar button:focus-visible,.jb-terminal-divider:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
+.jb-terminal-bar button:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
 .jb-terminal-bar button:disabled{opacity:.45;cursor:default}
-.jb-terminal-toggle{display:flex;gap:8px;align-items:center}
-.jb-terminal-toggle[aria-expanded=true]{color:${C.text};box-shadow:inset 0 -2px ${C.accent}}
 .jb-terminal-path{color:${C.textDim};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
 .jb-terminal-screen{flex:1;min-height:0;min-width:0;padding:8px 12px;background:${C.bg};color:${C.text};overflow:hidden}
 .jb-terminal-screen[hidden]{display:none}
 .jb-terminal-emulator{height:100%;width:100%}
 .jb-terminal-notice{padding:4px 12px;color:${C.textDim};font:inherit;background:${C.panel};flex:none}
-.jb-terminal-divider{height:5px;flex:none;cursor:ns-resize;touch-action:none;background:${C.border}}
-.jb-terminal-divider:hover{background:${C.accent}}
 .jb-image-reader{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}
 .jb-image-reader>.jb-document-toolbar{flex-wrap:wrap}
 .jb-image-stage{flex:1;min-height:0;min-width:0;overflow:auto;outline:none;background:${C.bg}}
@@ -525,10 +610,6 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-code-browser{position:relative;min-height:0}
 .jb-code-workspace{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
 .jb-code-browser .jb-code-workspace>.jb-tree{box-sizing:border-box;width:clamp(160px,var(--jb-tree-width,340px),calc(100% - 246px));min-width:0}
-.jb-code-browser[data-debug-dock=bottom]{flex-direction:column}
-.jb-code-browser[data-debug-dock=bottom]>.jb-debug-pane{flex:0 0 clamp(min(100px,30%),var(--jb-debug-height,38%),max(0px,calc(100% - 166px)));min-width:0;min-height:0;max-height:none;max-width:none;border-left:0;border-top:1px solid ${C.border}}
-.jb-code-browser[data-debug-dock=bottom] .jb-debug-sections{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:0 8px;align-items:start}
-.jb-code-browser[data-debug-dock=bottom] .jb-debug-section{max-height:100%;overflow:auto;margin-top:0}
 .jb-pane-divider{position:relative;flex:none;align-self:stretch;background:${C.bg};touch-action:none;user-select:none;outline:none}
 .jb-pane-divider[hidden]{display:none}
 .jb-pane-divider[aria-orientation=vertical]{width:6px;cursor:col-resize}
@@ -542,6 +623,23 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 @media(pointer:coarse){.jb-pane-divider[aria-orientation=vertical]{width:10px}.jb-pane-divider[aria-orientation=horizontal]{height:10px}}
 .jb-layout-notice{position:absolute;z-index:3;right:8px;bottom:8px;max-width:calc(100% - 16px);padding:6px 10px;background:${C.toolbar};color:${C.text};border:1px solid ${C.border};border-radius:4px;overflow-wrap:anywhere}
 .jb-tree{flex:none;width:340px;min-width:260px;overflow-y:auto;background:${C.panel};border-right:1px solid ${C.border};scrollbar-gutter:stable}
+.jb-tree-toolbar{display:flex;align-items:center;gap:2px;padding-right:6px;min-width:0}
+.jb-tree-toolbar .jb-filter{flex:1;min-width:0;margin-right:2px}
+.jb-tree-toolbar>.jb-tb-btn{flex:none}
+.jb-search-panel{display:flex;flex:1;min-width:0;flex-direction:column;min-height:0;height:100%;color:${C.text};font-size:12px}
+.jb-search-form{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px}
+.jb-search-form>input{flex:1;min-width:140px;background:${C.bg};color:${C.text};border:1px solid ${C.border};border-radius:4px;padding:5px 8px;font:inherit}
+.jb-search-form label{display:flex;align-items:center;gap:4px;white-space:nowrap;color:${C.textDim}}
+.jb-search-summary{display:flex;gap:12px;justify-content:space-between;padding:0 10px 7px;color:${C.textDim};border-bottom:1px solid ${C.border}}
+.jb-search-summary>span:first-child{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.jb-search-summary>span:last-child{flex-shrink:0}
+.jb-search-results{overflow:auto;flex:1;min-height:0}
+.jb-search-result{display:flex;gap:12px;align-items:baseline;width:100%;border:0;background:transparent;color:${C.text};text-align:left;padding:6px 10px;font:inherit;cursor:pointer}
+.jb-search-result:hover{background:${C.hover}}
+.jb-search-result:focus-visible{outline:1px solid ${C.accent};outline-offset:-1px;background:${C.selection}}
+.jb-search-location{flex:0 0 35%;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${C.modified}}
+.jb-search-result code{overflow:hidden;white-space:pre;text-overflow:ellipsis;color:${C.code};font:12px/1.5 ui-monospace,monospace}
+.jb-search-notice{padding:6px 10px;color:${C.textDim}}
 .jb-filter{box-sizing:border-box;display:flex;align-items:center;gap:6px;height:30px;margin:8px 10px;padding:0 8px;background:${C.toolbar};border:1px solid ${C.border};border-radius:4px}
 .jb-filter svg{flex:none;width:14px;height:14px;color:${C.textDim}}
 .jb-filter input{flex:1;min-width:0;height:100%;background:transparent;border:none;outline:none;color:${C.text};font:inherit;font-size:12.5px}
@@ -648,7 +746,6 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-loghash{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:18px;color:${C.textDim};background:${C.panel};border:1px solid ${C.border};border-radius:6px;padding:1px 6px}
 
 @container git-panel (max-width:720px){
-.jb-code-browser>.jb-debug-pane{flex:0 0 clamp(min(100px,30%),var(--jb-debug-height,30%),max(0px,calc(100% - 166px)));max-width:none;max-height:none;min-height:0;border-left:0;border-top:1px solid ${C.border}}
 .jb-toolbar{height:auto;min-height:38px;flex-wrap:wrap;padding:6px 10px;gap:6px}
 .jb-toolbar .jb-selectwrap{flex:1 1 150px;max-width:100%}
 .jb-select{width:100%;max-width:100%;min-width:0}
@@ -783,6 +880,18 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     };
     const lucideSvg = (paths, size) => h('svg', { viewBox: '0 0 24 24', width: size, height: size, 'aria-hidden': true, ...LU.s }, ...paths);
     function branchGlyph(size) { return lucideSvg(LU.branch, size ?? 15); }
+    function toolGlyph(tool) {
+      const path = d => h('path', { d });
+      const icons = {
+        find: LU.search,
+        changes: LU.branch,
+        log: [path('M3 12a9 9 0 1 0 3-6.7L3 8'), path('M3 3v5h5M12 7v5l3 2')],
+        debug: [path('M8 7 6 3m10 4 2-4M3 13h4m10 0h4M3 7l4 3m10 0 4-3M3 19l4-3m10 0 4 3'), h('rect', { x: 7, y: 6, width: 10, height: 15, rx: 5 }), path('M12 6v15M7 11h10')],
+        terminal: [h('rect', { x: 3, y: 4, width: 18, height: 16, rx: 2 }), path('m7 9 3 3-3 3m6 0h4')],
+      };
+      return lucideSvg(icons[tool], 18);
+    }
+
     function folderGlyph(size) { return lucideSvg(LU.folder, size ?? 15); }
     function refreshGlyph(size) { return lucideSvg(LU.refresh, size ?? 15); }
     function chevronGlyph(size) { return lucideSvg(LU.chevron, size ?? 12); }
@@ -1029,7 +1138,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Render only expanded directories; a path filter bounds its visible results. */
-    function WorkspaceTree({ files, changes, selectedPath, onSelect, onMenu, filter, t }) {
+    function WorkspaceTree({ files, changes, selectedPath, revealRevision, onSelect, onMenu, filter, t }) {
+      const root = useRef(null), revealed = useRef(0);
       const [expanded, setExpanded] = useState(() => new Set());
       useEffect(() => {
         if (!selectedPath) return;
@@ -1038,7 +1148,24 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           for (let end = 1; end < segments.length; end++) next.add(segments.slice(0, end).join('/') + '/');
           return next;
         });
-      }, [selectedPath]);
+      }, [selectedPath, revealRevision]);
+      useLayoutEffect(() => {
+        if (!revealRevision || revealed.current === revealRevision) return;
+        const row = [...root.current.querySelectorAll('[data-file-path]')].find(row => row.dataset.filePath === selectedPath);
+        if (row) { row.focus(); row.scrollIntoView({ block: 'nearest' }); revealed.current = revealRevision; }
+      }, [expanded, selectedPath, revealRevision, filter]);
+      const directoryKeys = useMemo(() => [...new Set(files.flatMap(path => path.split('/').slice(0, -1).map((_, index, parts) => parts.slice(0, index + 1).join('/') + '/')))], [files]);
+      const expandDirectory = (path, open) => setExpanded(old => {
+        const next = new Set(old);
+        for (const key of directoryKeys) if (key.startsWith(path)) { if (open) next.add(key); else next.delete(key); }
+        return next;
+      });
+      const context = (entry, event) => {
+        event.preventDefault(); event.stopPropagation();
+        const box = event.currentTarget.getBoundingClientRect();
+        onMenu(entry, event.type === 'keydown' ? { clientX: box.left + 12, clientY: box.bottom } : event);
+      };
+      const contextKey = entry => event => { if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) context(entry, event); };
       const changeMap = useMemo(() => new Map(changes.map(entry => [entry.path, entry])), [changes]);
       const query = filter.trim().toLowerCase();
       const matches = useMemo(() => files.filter(path => path.toLowerCase().includes(query)), [files, query]);
@@ -1047,9 +1174,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const fileRow = (path, depth, fullPath = false) => {
         const change = changeMap.get(path);
         return h('button', { key: path, type: 'button', className: 'jb-node jb-filebutton',
-          'data-selected': path === selectedPath, 'data-status': change?.letter,
+          'data-selected': path === selectedPath, 'data-status': change?.letter, 'data-file-path': path,
           title: path + (change ? ` · ${t(change.key)}` : ''), style: { paddingLeft: 8 + depth * 14 }, onClick: () => onSelect(path),
-          onContextMenu: event => { event.preventDefault(); onMenu(path, event); } },
+          onContextMenu: event => context({ path, directory: false }, event), onKeyDown: contextKey({ path, directory: false }) },
           fileIconGlyph(path, change?.untracked),
           h('span', { className: 'jb-filename' }, fullPath ? path : path.split('/').at(-1)),
           change ? h('span', { className: 'jb-stats' }, change.letter) : null);
@@ -1060,6 +1187,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           const open = expanded.has(path);
           return h('div', { key: path },
             h('button', { type: 'button', className: 'jb-node jb-filebutton', 'data-open': open, 'aria-expanded': open,
+              onContextMenu: event => context({ path: path.slice(0, -1), directory: true, expand: () => expandDirectory(path, true), collapse: () => expandDirectory(path, false) }, event),
+              onKeyDown: contextKey({ path: path.slice(0, -1), directory: true, expand: () => expandDirectory(path, true), collapse: () => expandDirectory(path, false) }),
               style: { paddingLeft: 8 + depth * 14 }, onClick: () => setExpanded(old => {
                 const next = new Set(old); if (next.has(path)) next.delete(path); else next.add(path); return next;
               }) }, h('span', { className: 'jb-chevron' }, chevronGlyph()), folderGlyph(), h('span', { className: 'jb-filename' }, child.name)),
@@ -1067,7 +1196,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         }),
         ...node.files.map(entry => fileRow(entry.path, depth)),
       ];
-      return h('div', null,
+      return h('div', { ref: root },
         query ? matches.slice(0, 300).map(path => fileRow(path, 0, true)) : nodeRows(tree),
         matches.length === 0 ? h('div', { className: 'jb-tree-hint' }, t('files.empty')) : null,
         query && matches.length > 300 ? h('div', { className: 'jb-tree-hint' }, t('files.more', { shown: '300', total: String(matches.length) })) : null);
@@ -1136,7 +1265,18 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('small', { role: error ? 'alert' : undefined }, error ? t('files.invalidLine') : t('files.linePrompt'))), document.body);
     }
 
-    const { useDebugger, useDebugDock, DebugPane, EvaluationDialog, controlItems: debugControlItems, isDebugVisible } = createDebugUI(React, api, { createPortal, usePopupDismiss });
+    /** Clipboard denial leaves a selected, read-only value for manual copying. */
+    function CopyPathDialog({ value, t, onClose }) {
+      const ref = useRef(null), input = useRef(null);
+      usePopupDismiss(ref, onClose);
+      useLayoutEffect(() => { input.current.focus(); input.current.select(); }, []);
+      return createPortal(h('div', { ref, role: 'dialog', 'aria-label': t('tree.manualCopy'), className: 'jb-editor-popup jb-goto' },
+        h('label', null, t('tree.manualCopy'), h('input', { ref: input, readOnly: true, value, 'aria-label': t('tree.manualCopy') })),
+        h('small', null, t('tree.copyHint')),
+        h('button', { type: 'button', className: 'jb-btn', onClick: onClose }, t('tree.close'))), document.body);
+    }
+
+    const { useDebugger, DebugPane, EvaluationDialog, controlItems: debugControlItems } = createDebugUI(React, api, { createPortal, usePopupDismiss });
 
     /** An explicit local port/PID prompt uses the editor's Enter/Escape interaction. */
     function AttachPrompt({ debug, t, onClose }) {
@@ -1185,6 +1325,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         ...debugControlItems(debug, t).filter(item => item.id !== 'debug-continue').map(item => item.id === 'debug-evaluate' ? { ...item, run: () => debug.openEvaluation(editor.current.selectedText()) } : item),
         { id: 'debug-breakpoint', label: t('debug.breakpoint'), shortcut: 'F9', run: () => debug.toggle(at.line + 1) },
         { id: 'definition', label: t('files.definition'), shortcut: 'F12', disabled: callbacks.current.busy, run: () => callbacks.current.onDefinition(at.line, at.character) },
+        { id: 'find', label: t('tree.findFile'), shortcut: '⌘F / Ctrl F', run: () => editor.current.find() },
         { id: 'line', label: t('files.goLine'), shortcut: '⌘L / Ctrl G', run: () => setGoLine(true) },
         { id: 'diff', label: t('files.diff'), run: () => callbacks.current.onShowDiff() },
         { id: 'back', label: t('files.back'), disabled: !callbacks.current.canBack, run: () => callbacks.current.onNavigate(-1, editor.current.position()) },
@@ -1194,6 +1335,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       useLayoutEffect(() => {
         const instance = createSourceEditor(parent.current, {
           text: source.text, path: source.path, version: source.version, position: target, label: t('files.source'), colors: C,
+          searchPhrases: { 'current match': t('find.current'), 'on line': t('find.onLine'), Find: t('find.label'), next: t('find.next'), previous: t('find.previous'), all: t('find.all'), 'match case': t('find.case'), regexp: t('find.regexp'), 'by word': t('find.word'), close: t('find.close') },
           foldPhrases: { 'Fold line': t('files.fold'), 'Unfold line': t('files.unfold'), 'folded code': t('files.foldedCode'), unfold: t('files.unfold'), 'Folded lines': t('files.foldedLines'), 'Unfolded lines': t('files.unfoldedLines'), to: t('files.rangeTo') },
           takeFocus: document.activeElement === document.body || (parent.current.closest('.jb-changes')?.contains(document.activeElement) && document.activeElement.closest('.jb-filebutton') !== null),
           onDefinition: at => { if (!callbacks.current.busy && !callbacks.current.blocked) callbacks.current.onDefinition(at.line, at.character); },
@@ -1214,7 +1356,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           editor.current.setSource(source, target); applied.current = source;
         }
       }, [source.path, source.text]);
-      useLayoutEffect(() => { if (!blocked) { editor.current?.reveal(target); if (mode === 'source') { editor.current?.measure(); if (target.focusSource) editor.current?.focus(); } } }, [target, blocked, mode]);
+      useLayoutEffect(() => { if (!blocked) { editor.current?.reveal(target); if (mode === 'source') { editor.current?.measure(); if (target.focusSource) editor.current?.focus(); if (target.find) editor.current?.find(); } } }, [target, blocked, mode]);
       useEffect(() => { if (blocked) { setMenu(null); setGoLine(false); } }, [blocked]);
       useEffect(() => {
         const paused = debug.session?.state === 'paused';
@@ -1294,7 +1436,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           const basename = path.split('/').at(-1);
           const label = paths.some(other => other !== path && other.split('/').at(-1) === basename) ? path : basename;
           return h('div', { key: path, className: 'jb-source-tab', 'data-active': path === activePath, 'data-tab-index': index, role: 'presentation',
-            onAuxClick: event => { if (event.button === 1) { event.preventDefault(); event.stopPropagation(); close(path); } } },
+            onKeyDownCapture: event => { if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'f') { event.preventDefault(); event.stopPropagation(); onFindInFiles(''); } },
+        onAuxClick: event => { if (event.button === 1) { event.preventDefault(); event.stopPropagation(); close(path); } } },
             h('button', { type: 'button', role: 'tab', id: `${panelId}-tab-${index}`, 'aria-controls': panelId, 'aria-selected': path === activePath, 'aria-label': path, tabIndex: index === activeIndex ? 0 : -1, title: path,
               onClick: () => onSelect(path, true) }, fileIconGlyph(path, false), h('span', null, label)),
             h('button', { type: 'button', className: 'jb-source-tab-close', tabIndex: path === activePath ? 0 : -1, 'aria-label': t('files.closeTab', { path }), title: t('files.closeTab', { path }), onClick: () => close(path) }, '×'));
@@ -1302,9 +1445,15 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Own source/diff requests and definition history independently of the conversation. */
-    function CodeBrowser({ cwd, changes, initialTarget, t }) {
+    function CodeBrowser({ cwd, changes, initialTarget, debugHost, onShowDebug, onFindInFiles, t }) {
       const [files, setFiles] = useState(null);
       const [filter, setFilter] = useState('');
+      const filterInput = useRef(null), alive = useRef(true), copySequence = useRef(0);
+      const [filterFocus, setFilterFocus] = useState(0), [revealRevision, setRevealRevision] = useState(0);
+      const [copyNotice, setCopyNotice] = useState(null), [manualCopy, setManualCopy] = useState(null);
+      const closeCopy = useCallback(() => setManualCopy(null), []);
+      useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+      useLayoutEffect(() => { if (filterFocus) { filterInput.current.focus(); filterInput.current.setSelectionRange?.(filter.length, filter.length); } }, [filterFocus]);
       const [treeError, setTreeError] = useState(null);
       const [history, setHistory] = useState(() => ({ items: initialTarget ? [initialTarget] : [], index: initialTarget ? 0 : -1 }));
       const [openPaths, setOpenPaths] = useState(() => initialTarget ? [initialTarget.path] : []);
@@ -1386,10 +1535,38 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           navigationRef.current?.abort(); setHistory({ items: [], index: -1 }); setLoaded(null); setLoading(false); setError(null); setView('source');
         }
       };
-      const fileMenu = (path, event) => setMenu({ x: event.clientX, y: event.clientY, items: [
-        { id: 'source', label: t('files.read'), run: () => openFile(path) },
-        { id: 'diff', label: t('files.diff'), run: () => visit({ path, line: 0, character: 0 }, null, 'diff') },
-      ] });
+      const copy = value => {
+        const sequence = ++copySequence.current;
+        setCopyNotice(null);
+        const fallback = () => { if (alive.current && sequence === copySequence.current) setManualCopy(value); };
+        try {
+          if (!navigator.clipboard?.writeText) { fallback(); return; }
+          Promise.resolve(navigator.clipboard.writeText(value)).then(() => {
+            if (alive.current && sequence === copySequence.current) setCopyNotice(t('tree.copied', { value }));
+          }, fallback);
+        } catch (error) { fallback(); }
+      };
+      const fileMenu = (entry, event) => {
+        setCopyNotice(null);
+        const { path, directory } = entry;
+        const separator = cwd.includes('\\') ? '\\' : '/';
+        const absolute = cwd.replace(/[\\/]+$/, '') + separator + path.replaceAll('/', separator);
+        setMenu({ x: event.clientX, y: event.clientY, title: path, items: [
+          ...(directory ? [
+            { id: 'expand', label: t('tree.expand'), run: entry.expand },
+            { id: 'collapse', label: t('tree.collapse'), run: entry.collapse },
+            { id: 'find-name', label: t('tree.findName'), run: () => { setFilter(path + '/'); setFilterFocus(value => value + 1); } },
+            { id: 'find-directory', label: t('tree.findDirectory'), shortcut: '⌘⇧F / Ctrl Shift F', run: () => onFindInFiles(path) },
+          ] : [
+            { id: 'source', label: t('files.read'), run: () => openFile(path) },
+            { id: 'find-file', label: t('tree.findFile'), shortcut: '⌘F / Ctrl F', disabled: /\.(?:png|jpe?g|gif|webp|bmp|ico|icns|avif)$/i.test(path), run: () => visit({ path, line: 0, character: 0, documentMode: 'source', focusSource: true, find: true }) },
+            { id: 'diff', label: t('files.diff'), run: () => visit({ path, line: 0, character: 0 }, null, 'diff') },
+          ]),
+          { id: 'copy-name', label: t('tree.copyName'), run: () => copy(path.split('/').at(-1)) },
+          { id: 'copy-relative', label: t('tree.copyRelative'), run: () => copy(path) },
+          { id: 'copy-absolute', label: t('tree.copyAbsolute'), run: () => copy(absolute) },
+        ] });
+      };
       useEffect(() => {
         if (initialTarget && initialRef.current !== initialTarget) visit(initialTarget);
         initialRef.current = initialTarget;
@@ -1424,10 +1601,12 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => { controller.abort(); navigationRef.current?.abort(); };
       }, [cwd, target?.path, view, changes, readRevision]);
-      const debug = useDebugger(cwd, t, at => visit(at), () => reader.current?.selectedText?.() ?? '');
+      const controller = useDebugger(cwd, t, at => { visit(at); onShowDebug(); }, () => reader.current?.selectedText?.() ?? '');
+      const debug = { ...controller, run: (...args) => { onShowDebug(); return controller.run(...args); },
+        start: (...args) => { onShowDebug(); return controller.start(...args); },
+        openEvaluation: (...args) => { onShowDebug(); return controller.openEvaluation(...args); } };
       const debugRef = useRef(debug); debugRef.current = debug;
       const closeEvaluation = useCallback(() => debugRef.current.closeEvaluation(), []);
-      const debugLayout = useDebugDock(t);
       const paneLayout = usePaneLayout(t);
       debug.cwd = cwd; debug.path = target?.path; debug.setPath(target?.path); debug.sourcePending = loading || (Boolean(loaded) && !contentMatches);
       debug.report = error => setError(error.message);
@@ -1453,7 +1632,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           setNavigation({ busy: false, targets: [], message: t(key, { message: error.message }) });
         }
       };
-      return h('div', { ref: paneLayout.root, className: 'jb-changes jb-code-browser', 'data-debug-dock': debugLayout.dock, style: paneLayout.style,
+      return h('div', { ref: paneLayout.root, className: 'jb-changes jb-code-browser', style: paneLayout.style,
         onAuxClick: event => { if (event.button === 3 || event.button === 4) { event.preventDefault(); event.stopPropagation(); } },
         onKeyDown: event => {
           if (view !== 'diff') return;
@@ -1461,9 +1640,12 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           if ((event.metaKey || event.ctrlKey) && ['[', ']'].includes(event.key)) { event.preventDefault(); event.stopPropagation(); navigate(event.key === '[' ? -1 : 1); }
         } },
         h('div', { ref: paneLayout.workspace, className: 'jb-code-workspace' }, h('div', { className: 'jb-tree' },
-          h('div', { className: 'jb-filter' }, searchGlyph(), h('input', { type: 'search', value: filter, placeholder: t('filter.placeholder'), onChange: event => setFilter(event.target.value) })),
-          treeError ? h('div', { className: 'jb-notice' }, treeError) : files === null ? h('div', { className: 'jb-tree-hint' }, t('loading')) : h(WorkspaceTree, { files, changes, selectedPath: target?.path, onSelect: openFile, onMenu: fileMenu, filter, t })),
-        h(PaneDivider, { kind: 'tree', layout: paneLayout, t }),
+          h('div', { className: 'jb-tree-toolbar' },
+            h('div', { className: 'jb-filter' }, searchGlyph(), h('input', { ref: filterInput, type: 'search', value: filter, 'aria-label': t('tree.findName'), placeholder: t('filter.placeholder'), onChange: event => setFilter(event.target.value) })),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.locate'), 'aria-label': t('tree.locate'), disabled: !target || !files?.includes(target.path), onClick: () => { setFilter(''); setRevealRevision(value => value + 1); } }, lucideSvg([h('circle', { cx: 12, cy: 12, r: 6 }), h('path', { d: 'M12 2v6m0 8v6M2 12h6m8 0h6' })], 16)),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.findDirectory'), 'aria-label': t('tree.findDirectory'), onClick: () => onFindInFiles('') }, searchGlyph(16))),
+          treeError ? h('div', { className: 'jb-notice' }, treeError) : files === null ? h('div', { className: 'jb-tree-hint' }, t('loading')) : h(WorkspaceTree, { files, changes, selectedPath: target?.path, onSelect: openFile, onMenu: fileMenu, filter, revealRevision, t })),
+        h(PaneDivider, { layout: paneLayout, t }),
         h('div', { ref: detailRef, tabIndex: -1, className: 'jb-detail', 'aria-busy': loading },
           h(SourceTabs, { paths: openPaths, activePath: target?.path, panelId, t, onSelect: selectTab, onClose: closeTab, onEmpty: () => detailRef.current?.focus() }),
           h('div', { className: 'jb-editor-title' }, (loaded?.path ?? target?.path) ? fileIconGlyph(loaded?.path ?? target.path, false) : null,
@@ -1486,12 +1668,13 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                           if (line !== undefined) setHistory(old => ({ ...old, items: old.items.map((item, index) => index === old.index ? { ...item, line: Number(line) - 1, character: 0 } : item) }));
                           setView('source');
                         } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {} }))))),
-        h(PaneDivider, { kind: 'debug', layout: paneLayout, t, hidden: !isDebugVisible(debug) }),
-        h(DebugPane, { debug, t, layout: debugLayout, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
+        debugHost ? createPortal(h(DebugPane, { debug, t, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
           { id: 'source', label: t('files.read'), shortcut: 'Enter / F4', disabled: !frame.path, run: () => debug.selectFrame(frame.id, true) },
           ...debugControlItems(debug, t),
-        ] }) }),
+        ] }) }), debugHost) : null,
         debug.evaluation && debug.session?.state === 'paused' && debug.selectedFrameId != null ? h(EvaluationDialog, { key: `${cwd}:${debug.session.id}:${debug.session.pauseId}:${debug.selectedFrameId}`, debug, t, onClose: closeEvaluation }) : null,
+        manualCopy !== null ? h(CopyPathDialog, { value: manualCopy, t, onClose: closeCopy }) : null,
+        copyNotice ? h('div', { className: 'jb-layout-notice', role: 'status' }, copyNotice) : null,
         paneLayout.error ? h('div', { className: 'jb-layout-notice', role: 'alert' }, paneLayout.error) : null,
         menu ? h(EditorMenu, { menu, onClose: closeMenu }) : null);
     }
@@ -1520,8 +1703,14 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const workspace = workspaces.find((item) => item.workspaceId === targetWorkspaceId) ?? null;
       const cwd = workspace ? workspace.path : null;
 
-      const [tab, setTab] = useState('files');
+      const tools = useBottomTools(currentSession?.id ?? null, t);
+      const tab = tools.active;
+      const [debugHost, setDebugHost] = useState(null);
+      const showDebug = useCallback(() => tools.show('debug'), [tools.show]);
+      const toolsId = React.useId();
       const [sourceTarget, setSourceTarget] = useState(null);
+      const [searchScope, setSearchScope] = useState(''), [findRequest, setFindRequest] = useState(0);
+      const openFind = useCallback(scope => { setSearchScope(scope); setFindRequest(value => value + 1); tools.show('find'); }, [tools.show]);
       const [status, setStatus] = useState(null);
       const [statusError, setStatusError] = useState(null);
       const [statusLoading, setStatusLoading] = useState(false);
@@ -1585,10 +1774,16 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         setDiff(null);
         setSelected(null);
         setDetail(null);
-        setLogSelected(null);
-        setSourceTarget(null);
+        setLogSelected(null); setSearchScope('');
+        setSourceTarget(props.previewRequest?.workspaceId === targetWorkspaceId ? props.previewRequest.target : null);
         if (cwd !== null) reload();
       }, [cwd, reload]);
+
+      useEffect(() => {
+        if (!props.previewRequest) return;
+        setOverrideId(props.previewRequest.workspaceId);
+        setSourceTarget(props.previewRequest.target);
+      }, [props.previewRequest]);
 
       useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -1721,24 +1916,28 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('button', { type: 'button', className: 'jb-review-btn', disabled: cwd === null || reviewSending, onClick: () => openReview({ kind: 'workspace' }) }, t('review.button')),
         h('button', { type: 'button', className: 'jb-tb-btn', title: t('panel'), disabled: statusLoading || cwd === null, onClick: () => reload() }, refreshGlyph()));
 
-      const tabs = h('div', { className: 'jb-tabs' },
-        h('button', { type: 'button', className: 'jb-tab', 'data-active': tab === 'files', onClick: () => setTab('files') }, t('tabs.files')),
-        h('button', { type: 'button', className: 'jb-tab', 'data-active': tab === 'changes', onClick: () => setTab('changes') }, t('tabs.changes')),
-        h('button', { type: 'button', className: 'jb-tab', 'data-active': tab === 'log', onClick: () => setTab('log') }, t('tabs.log')));
+      const toolLabels = { find: t('search.title'), changes: t('tabs.changes'), log: t('tabs.log'), debug: t('debug.title'), terminal: t('terminal.title') };
+      const toolBar = h('div', { className: 'jb-tools-bar', role: 'toolbar', 'aria-label': t('tools.title') },
+        ...Object.entries(toolLabels).map(([tool, label]) => h('button', {
+          key: tool, type: 'button', className: 'jb-tool-toggle', 'data-tool': tool,
+          'aria-label': label, title: label, 'aria-pressed': tab === tool, 'aria-controls': toolsId + '-' + tool,
+          disabled: tool === 'terminal' ? !props.terminalAvailable || !currentSession?.id : !status?.isRepo || Boolean(statusError),
+          onClick: () => tools.toggle(tool),
+        }, toolGlyph(tool))));
 
-      let content;
+      let notice;
       if (status === null && statusLoading) {
-        content = h('div', { className: 'jb-empty' }, t('loading'));
+        notice = h('div', { className: 'jb-empty' }, t('loading'));
       } else if (statusError !== null) {
-        content = h('div', { className: 'jb-empty' }, t('error.load', { message: statusError }));
+        notice = h('div', { className: 'jb-empty' }, t('error.load', { message: statusError }));
       } else if (status === null || !status.isRepo) {
-        content = h('div', { className: 'jb-empty' }, t('repo.notGit'));
-      } else if (tab === 'files') {
-        content = null;
-      } else if (tab === 'changes') {
+        notice = h('div', { className: 'jb-empty' }, t('repo.notGit'));
+      }
+      let changesContent = null, logContent = null;
+      if (status?.isRepo) {
         const selectedEntry = selected;
         const diffTag = selectedEntry === null ? '' : t(selectedEntry.untracked ? 'diff.untracked' : selectedEntry.staged && selectedEntry.unstagedToo ? 'diff.both' : selectedEntry.staged ? 'diff.staged' : 'diff.unstaged');
-        content = h('div', { className: 'jb-changes' },
+        changesContent = h('div', { className: 'jb-changes' },
           h('div', { className: 'jb-tree' },
             h('div', { className: 'jb-filter' },
               searchGlyph(),
@@ -1763,7 +1962,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                 : h(DiffView, {
                   path: selectedEntry?.displayPath ?? '', tag: diffTag,
                   stats: selectedEntry && !selectedEntry.untracked ? { ins: selectedEntry.ins, del: selectedEntry.del } : null,
-                  diff, t, onReadSource: line => { setSourceTarget({ path: selectedEntry.path, line, character: 0 }); setTab('files'); },
+                  diff, t, onReadSource: line => { setSourceTarget({ path: selectedEntry.path, line, character: 0, focusSource: true }); },
                   review: { open: reviewOpen && reviewTarget?.kind === 'diff', sending: reviewSending, sent: reviewSent, error: reviewError },
                   codeSet: reviewCode,
                   onToggleCode: toggleReviewCode,
@@ -1772,9 +1971,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                   onReviewClose: closeReview,
                   onClearCode: clearReviewCode,
                 })));
-      } else {
         const graph = log === null ? null : buildGraph(log);
-        content = h('div', { className: 'jb-log' },
+        logContent = h('div', { className: 'jb-log' },
           logError !== null
             ? h('div', { className: 'jb-notice jb-notice-error' }, logError)
             : null,
@@ -1816,15 +2014,30 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('style', null, css),
         toolbar,
         reviewOpen && reviewTarget?.kind === 'workspace' ? h(ReviewComposer, { t, sending: reviewSending, sent: reviewSent, error: reviewError, code: reviewCode, onSubmit: sendReview, onClearCode: clearReviewCode, onClose: closeReview }) : null,
-        tabs,
         h('div', { className: 'jb-content' },
-          status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat', style: { display: tab === 'files' ? 'flex' : 'none' } },
-            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, t })) : null,
-          content),
-        h(TerminalDock, { key: currentSession?.id ?? 'none', sessionId: currentSession?.id, cwd: currentSession?.cwd, available: Boolean(props.terminalAvailable && currentSession?.id && cwd === currentSession.cwd), create: props.createTerminal, release: props.releaseTerminal, t }));
+          status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat' },
+            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, debugHost, onShowDebug: showDebug, onFindInFiles: openFind, t })) : notice),
+        h('div', { className: 'jb-tools-window', hidden: tab === null, style: { height: tools.height } },
+          h('div', { className: 'jb-tools-divider', ...tools.divider }),
+          h('div', { className: 'jb-tools-header' }, h('span', null, toolLabels[tab]),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tools.hide'), 'aria-label': t('tools.hide'), onClick: tools.hide }, '−')),
+          ...['find', 'changes', 'log', 'debug', 'terminal'].map(tool => h('div', {
+            key: tool, id: toolsId + '-' + tool, className: 'jb-tool-panel', 'data-tool': tool,
+            hidden: tab !== tool, role: 'region', 'aria-label': toolLabels[tool], ref: tool === 'debug' ? setDebugHost : undefined,
+          }, tool === 'find' ? (cwd ? h(WorkspaceSearch, { key: cwd, cwd, scope: searchScope, request: findRequest, active: tab === 'find', onOpen: setSourceTarget, t }) : notice) : tool === 'changes' ? changesContent : tool === 'log' ? logContent : tool === 'terminal'
+            ? h(TerminalDock, { key: currentSession?.id ?? 'none', sessionId: currentSession?.id, cwd: currentSession?.cwd,
+              available: Boolean(props.terminalAvailable && currentSession?.id && cwd === currentSession.cwd), active: tab === 'terminal', onClose: tools.hide,
+              create: props.createTerminal, release: props.releaseTerminal, t }) : null)),
+          tools.error ? h('div', { className: 'jb-tools-notice', role: 'alert' }, tools.error) : null),
+        toolBar);
     }
 
     // ------------------------------------------------------------- icon
+    /** Localized titles also replace labels captured by previously opened tabs. */
+    function WorkbenchTabTitle({ t }) {
+      return t('panel');
+    }
+
     /** Fixed-palette artwork matching the official guide canvas and blue palette. */
     function WorkbenchIcon({ size = 36, className }) {
       return h('svg', { viewBox: '0 0 36 36', width: size, height: size, className, 'aria-hidden': true, fill: 'none', xmlns: 'http://www.w3.org/2000/svg' },
@@ -1835,7 +2048,45 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     // ------------------------------------------------------------- apply
-    const inject = { slots: { required: true }, locale: { required: true }, uiWorkspace: { required: true }, sidebarRightTabs: { required: true }, webTerminals: { required: false } };
+    function DocumentPreviewBridge({ resource, info, sessionId, useSessions, useWorkspaces, t, openOriginal, isCurrentSession }) {
+      const sessions = useSessions(state => state.byId ?? {});
+      const workspaces = useWorkspaces(state => state.items);
+      const cwd = sessions[resource.sessionId]?.cwd;
+      const { tab } = info;
+      const [error, setError] = useState(null), [retry, setRetry] = useState(0);
+      const originalKind = resource.kind === 'review' ? 'changes-review' : 'text';
+      const fallback = () => {
+        if (!isCurrentSession(sessionId)) return;
+        openOriginal(tab.navigation.address, originalKind, tab.navigation.params, tab.id);
+        tab.actions.close();
+      };
+      useEffect(() => {
+        if (!tab.visible || tab.signal.aborted) return;
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        tab.signal.addEventListener('abort', abort, { once: true });
+        setError(null);
+        const index = tab.navigation.params?.index ?? 0;
+        if (resource.sessionId !== sessionId || !Number.isSafeInteger(index) || index < 0) fallback();
+        else resolveDocumentPreview(resource, index, cwd, workspaces, path => api(path, { signal: controller.signal }))
+          .then(request => {
+            if (controller.signal.aborted || !isCurrentSession(sessionId)) return;
+            if (!request) { fallback(); return; }
+            tab.actions.openTab(PANEL_ID, { replaceTab: true, params: { documentPreview: request } });
+            tab.actions.close();
+          })
+          .catch(error => { if (!controller.signal.aborted) setError(error.message); });
+        return () => { controller.abort(); tab.signal.removeEventListener('abort', abort); };
+      }, [tab.visible, tab.navigation.revision, tab.navigation.address, cwd, workspaces, retry]);
+      return h('div', { className: 'jb-root' }, h('style', null, css),
+        h('div', { className: 'jb-empty', role: error ? 'alert' : 'status' }, error ? [
+          h('span', { key: 'error' }, t('error.load', { message: error })),
+          h('button', { key: 'retry', className: 'jb-btn', onClick: () => setRetry(value => value + 1) }, t('preview.retry')),
+          h('button', { key: 'original', className: 'jb-btn', onClick: fallback }, t('preview.original')),
+        ] : t('loading')));
+    }
+
+    const inject = { slots: { required: true }, locale: { required: true }, uiWorkspace: { required: true }, sidebarRightTabs: { required: true }, sidebarRight: { required: true }, webTerminals: { required: false } };
     function apply(ctx) {
       const openSession = (id) => ctx.uiWorkspace.openSession(id);
       const terminals = ctx.get?.('webTerminals') ?? ctx.webTerminals;
@@ -1848,6 +2099,16 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         activeTerminals.add(entry); return entry;
       };
       const Panel = (props) => h(WorkbenchPanel, { ...props, openSession, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
+      const SidebarPanel = props => {
+        const info = props.useTabInfo?.();
+        const navigation = info?.tab.navigation;
+        const request = useMemo(() => navigation?.params?.documentPreview, [navigation?.revision, navigation?.params]);
+        const resource = navigation && parsePreviewAddress(navigation.address);
+        return resource ? h(DocumentPreviewBridge, { ...props, resource, info,
+          isCurrentSession: sessionId => ctx.sidebarRight.mounted.getSnapshot() === sessionId,
+          openOriginal: (address, kind, params, replaceTab) => ctx.sidebarRight.openResource(address, { kind, params, replaceTab }) })
+          : h(WorkbenchPanel, { ...props, openSession, previewRequest: request, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
+      };
       ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'workbench: dictionaries');
       const t = ctx.locale.bind(NS);
       ctx.slots.inject('main', () => ctx.slots.register({
@@ -1855,11 +2116,17 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }, Panel));
       ctx.effect(() => ctx.sidebarRightTabs.register({
         id: TAB_ID, kind: PANEL_ID, title: () => t('panel'),
+        keepMounted: true,
+        patterns: ['*.md', '*.markdown', '*.mdown', 'dsh-resource://changes-review/session/**'],
+        canOpen: address => parsePreviewAddress(address) !== null,
         guide: [{ id: PANEL_ID, order: 40, title: () => t('panel'), description: () => t('guide.description'), icon: WorkbenchIcon }],
       }), 'workbench: right sidebar type');
       ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
         name: 'sidebar.right.pane.tab', key: TAB_ID, locale: NS,
-      }, Panel)), 'workbench: right sidebar body');
+      }, SidebarPanel)), 'workbench: right sidebar body');
+      ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
+        name: 'sidebar.right.pane.tab.title', key: TAB_ID, locale: NS,
+      }, WorkbenchTabTitle)), 'workbench: right sidebar title');
     }
     return { inject, apply };
   },

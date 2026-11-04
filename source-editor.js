@@ -2,7 +2,7 @@
 import { EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
 import { EditorView, Decoration, gutter, GutterMarker, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from '@codemirror/view';
 import { defaultKeymap } from '@codemirror/commands';
-import { highlightSelectionMatches } from '@codemirror/search';
+import { highlightSelectionMatches, search, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { LanguageSupport, StreamLanguage, syntaxHighlighting, bracketMatching, foldGutter, foldKeymap, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language';
 import { javascript } from '@codemirror/lang-javascript';
 import { go } from '@codemirror/lang-go';
@@ -178,11 +178,14 @@ export function createSourceEditor(parent, options) {
   const createState = (text, path) => EditorState.create({ doc: text, extensions: [
     EditorState.readOnly.of(true), EditorState.tabSize.of(2), EditorView.editable.of(false),
     EditorState.phrases.of(options.foldPhrases),
+    EditorState.phrases.of(options.searchPhrases ?? {}),
     EditorView.contentAttributes.of({ tabindex: '0', 'aria-label': options.label, 'aria-readonly': 'true' }),
     debugField, executionLine,
     gutter({ class: 'jb-breakpoints', lineMarker: (view, line) => { const number = view.state.doc.lineAt(line.from).number, value = view.state.field(debugField); const point = value.breakpoints.find(item => item.line === number); return new BreakpointMarker(Boolean(point), point?.verified === true, value.currentLine === number, options.breakpointLabel); }, lineMarkerChange: update => update.transactions.some(transaction => transaction.effects.some(effect => effect.is(debugEffect))), domEventHandlers: { mousedown: (view, line, event) => { event.preventDefault(); options.onToggleBreakpoint(view.state.doc.lineAt(line.from).number); return true; } } }),
     lineNumbers(), foldGutter(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(), bracketMatching(),
     highlightSelectionMatches({ highlightWordAroundCursor: true, wholeWords: true }),
+    search({ top: true }),
+    keymap.of(searchKeymap.filter(binding => ['Mod-f', 'Mod-g', 'Mod-Shift-g', 'F3', 'Shift-F3', 'Escape'].includes(binding.key))),
     syntaxHighlighting(sourceHighlighting), sourceLanguage(path),
     linkField,
     Prec.highest(keymap.of([
@@ -234,6 +237,12 @@ export function createSourceEditor(parent, options) {
       '&.cm-focused': { outline: 'none' },
       '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace', lineHeight: '22px' },
       '.cm-content': { caretColor: options.colors.text, padding: '6px 0' },
+      '.cm-panels': { backgroundColor: options.colors.panel, color: options.colors.text, borderColor: options.colors.border },
+      '.cm-search': { padding: '6px 8px', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', fontSize: '12px' },
+      '.cm-search .cm-textfield, .cm-search .cm-button': { background: options.colors.bg, color: options.colors.text, border: '1px solid ' + options.colors.border, borderRadius: '3px', font: 'inherit' },
+      '.cm-search input[type=checkbox]': { accentColor: options.colors.accent },
+      '.cm-searchMatch': { backgroundColor: options.colors.textSelection, outline: '1px solid ' + options.colors.border },
+      '.cm-searchMatch-selected': { backgroundColor: options.colors.textSelection, outline: '1px solid ' + options.colors.accent },
       '.cm-gutters': { backgroundColor: options.colors.gutter, color: options.colors.textDim, borderRight: '1px solid ' + options.colors.border },
       '.cm-foldGutter .cm-gutterElement': { padding: '0 2px', minWidth: '14px', textAlign: 'center' },
       '.cm-foldGutter span': { color: options.colors.textDim, fontSize: '16px', lineHeight: '22px' },
@@ -298,6 +307,7 @@ export function createSourceEditor(parent, options) {
       return { ...positionAt(view), viewport: { version: sourceVersion, effect: view.scrollSnapshot() }, folding: { version: sourceVersion, ranges } };
     },
     selectedText: () => view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to),
+    find: () => openSearchPanel(view),
     focus: () => view.focus(), position: () => positionAt(view), reveal,
     measure: () => view.requestMeasure(),
     anchor: () => { const box = view.coordsAtPos(view.state.selection.main.head); return { x: box?.left ?? parent.getBoundingClientRect().left, y: box?.bottom ?? parent.getBoundingClientRect().top }; },

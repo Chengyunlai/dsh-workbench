@@ -8,6 +8,7 @@ test('project review works before selecting a file and opens the new conversatio
   const state = [], sent = [], opened = [];
   const React = {
     createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
+    useId: () => 'test-tools',
     useState: (initial) => { const i = cursor++; state[i] ??= typeof initial === 'function' ? initial() : initial; return [state[i], (value) => { state[i] = typeof value === 'function' ? value(state[i]) : value; }]; },
     useEffect: () => {}, useCallback: (fn) => fn, useMemo: (fn) => fn(), useRef: () => ({ current: null }),
   };
@@ -61,12 +62,21 @@ test('workbench branding preserves installed dock identifiers and leaves the con
   assert.equal(types.length, 1);
   assert.equal(types[0].kind, 'git');
   assert.equal(types[0].id, '@local/dsh-git-control');
+  assert.equal(types[0].keepMounted, true);
+  assert.equal(types[0].canOpen('dsh-resource://file/session/s/docs/guide.md'), true);
+  assert.equal(types[0].canOpen('dsh-resource://changes-review/session/s/1/1'), true);
+  assert.equal(types[0].canOpen('dsh-resource://file/session/s/main.py'), false);
   assert.deepEqual({
     title: types[0].title(), description: types[0].guide[0].description(), englishTitle: dictionaries.en.panel,
     pluginTitle: JSON.parse(readFileSync(new URL('../locale/zh.json', import.meta.url), 'utf8')).meta.title,
   }, JSON.parse(readFileSync(new URL('./fixtures/workbench-registration.expected.json', import.meta.url), 'utf8')));
   assert.equal(typeof types[0].guide[0].icon, 'function');
   assert.ok(registrations.some(x => x.spec.name === 'sidebar.right.pane.tab' && x.spec.key === types[0].id));
+  const title = registrations.find(x => x.spec.name === 'sidebar.right.pane.tab.title' && x.spec.key === types[0].id);
+  assert.ok(title);
+  const restoredTab = { tab: { title: 'Git' } };
+  assert.equal(title.component({ useTabInfo: () => restoredTab, t: key => dictionaries.zh[key] }), '开发工作台');
+  assert.equal(title.component({ useTabInfo: () => restoredTab, t: key => dictionaries.en[key] }), 'Development workbench');
   assert.ok(!registrations.some(x => x.spec.name === 'sidebar.panellist'));
   for (const cleanup of cleanups.reverse()) cleanup?.();
   assert.equal(types.length, 0);
@@ -76,6 +86,7 @@ test('a right-side Git tab follows its own session instead of a different foregr
   let plugin, Panel;
   const React = {
     createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
+    useId: () => 'test-tools',
     useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}],
     useEffect: () => {}, useCallback: (f) => f, useMemo: (f) => f(), useRef: () => ({ current: null }),
   };
