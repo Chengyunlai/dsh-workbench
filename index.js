@@ -477,7 +477,7 @@ function registerRoutes(ctx, config, languageServers) {
   route('/api/git.review', ['POST'], handleReview);
   route('/api/git.debug.configurations', ['GET'], (ctx, request) => debug.configurations(request));
   route('/api/git.debug.status', ['GET'], (ctx, request) => debug.status(request));
-  route('/api/git.debug.action', ['POST'], (ctx, request) => debug.action(request));
+  route('/api/git.debug.action', ['POST'], (ctx, request, signal) => debug.action(request, signal));
 }
 
 export function apply(ctx, options = {}) {

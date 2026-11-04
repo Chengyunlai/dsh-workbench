@@ -24,6 +24,8 @@ async function status(h, id, predicate) {
   throw new Error('debug state deadline exceeded: ' + JSON.stringify(last));
 }
 async function evaluateAndClear(h, paused, expression) {
+  const inspected = await request(h, { action: 'inspect', id: paused.id, pauseId: paused.pauseId, frameId: paused.frames[0].id, expression: expression.split(' +')[0] });
+  assert.equal(inspected.variable.value, '41', JSON.stringify(inspected));
   const result = await request(h, { action: 'evaluate', id: paused.id, pauseId: paused.pauseId, frameId: paused.frames[0].id, expression });
   assert.equal(result.result, '42', JSON.stringify(result));
   const cleared = await request(h, { action: 'breakpoints', id: paused.id, breakpoints: {} });

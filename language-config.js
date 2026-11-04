@@ -23,6 +23,7 @@ export const Config = Schema.object({
     env: Schema.dict(Schema.string()).default({}), transport: Schema.union(['stdio', 'tcp']).default('stdio'),
   })).default({}),
   useInstalledDebugAdapters: Schema.boolean().default(true),
+  debugInspectMaxVariables: Schema.number().step(1).min(1).max(10000).default(1000),
   debugTimeoutMs: Schema.number().step(1).min(1000).max(300000).default(30000),
   debugOutputChars: Schema.number().step(1).min(1000).max(1000000).default(65536),
   languageServers: Schema.dict(ServerConfig).default({}),

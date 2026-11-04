@@ -168,3 +168,17 @@ test('partial adapter breakpoint failures report unverified state rather than su
  assert.equal(status.breakpoints[0].verified, false);
  await action(h, { action: 'stop', id: started.id });
 });
+
+for (const readAction of ['inspect','variables']) test(`a slow ${readAction} read cannot hold execution controls and expires when the program resumes`, async t => {
+ const h=await fixture(t,null,{debugAdapters:{javascript:{...adapter,args:[...adapter.args,'--paused','--inspect-defer']}}});
+ const started=await action(h,{action:'start',currentFile:'new.js',breakpoints:{'new.js':[2]}});
+ let paused;
+ const wait=async predicate=>{const deadline=Date.now()+3000;while(Date.now()<deadline){const data=await h.call('debug.status',{id:started.id});if(predicate(data))return data;await new Promise(resolve=>setTimeout(resolve,10));}throw new Error('adapter did not reach the requested state');};
+ paused=await wait(data=>data.frames?.length>0);
+ const pending=action(h,{action:readAction,id:paused.id,frameId:paused.frames[1].id,pauseId:paused.pauseId,expression:'path',reference:101});
+ await wait(data=>data.output.includes('inspection pending'));
+ const continued=await action(h,{action:'continue',id:paused.id});
+ assert.equal(continued.status,200);
+ assert.equal((await pending).code,'DEBUG_INSPECTION_STALE');
+ await action(h,{action:'stop',id:paused.id});
+});

@@ -42,3 +42,16 @@ test('disposing a DAP peer rejects outstanding requests without reporting a tran
  assert.deepEqual(failures,[]);
  input.destroy();output.destroy();
 });
+
+test('aborting a DAP read removes its deadline and ignores a late response while later requests still work', async () => {
+ const input=new PassThrough(),output=new PassThrough(),controller=new AbortController();
+ const peer=dapPeer(input,output,()=>{},async()=>({}),10000,()=>{});
+ const pending=peer.request('scopes',{frameId:1},controller.signal);controller.abort();
+ await assert.rejects(pending,{name:'AbortError'});
+ const response=(id,body)=>{const json=JSON.stringify({type:'response',request_seq:id,success:true,body});input.write(`Content-Length: ${Buffer.byteLength(json)}\r\n\r\n${json}`);};
+ response(1,{scopes:[{name:'late'}]});
+ const next=peer.request('threads');response(2,{threads:[{id:1}]});
+ assert.deepEqual(await next,{threads:[{id:1}]});
+ await assert.rejects(peer.request('scopes',{},controller.signal),{name:'AbortError'});
+ peer.dispose();input.destroy();output.destroy();
+});

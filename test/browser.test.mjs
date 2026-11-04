@@ -1501,3 +1501,70 @@ test('editing a pending content search cancels it and ignores its eventual respo
  await act(async () => release({ ok: true, json: async () => ({ matches: [{ path: 'src/lib.ts', line: 1, character: 0, text: 'stale' }], limited: false, skipped: 0 }) }));
  assert.equal(ui.container.querySelector('.jb-search-result'), null);
 });
+
+async function inspectAtCaret(ui) {
+ await ui.key('F10',{shiftKey:true});
+ const item=[...ui.dom.window.document.querySelectorAll('[role=menuitem]')].find(item=>item.textContent===ui.t('debug.inspect'));
+ assert.ok(item);assert.equal(item.disabled,false);await act(async()=>item.click());
+ await act(async()=>{const deadline=Date.now()+2000;while(!ui.dom.window.document.querySelector('.jb-debug-hover')&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,10));});
+}
+
+test('paused variable hovers show typed values and expandable objects, follow frames and dismiss with Escape', async context => {
+ const requests=[];
+ const text='const path = args.config;\nconsole.log(path);';
+ const session={id:'hover-session',name:'Sample',state:'paused',revision:1,pauseId:4,frames:[{id:10,name:'main',path:'src/main.ts',line:2,column:1},{id:11,name:'caller',path:'src/main.ts',line:1,column:1}],scopes:[],output:''};
+ const ui=await panel(context,server((url,options)=>{
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:url.searchParams.get('path'),text,version:'hover-v1'})};
+  if(url.pathname==='/api/git.debug.status')return {ok:true,json:async()=>session};
+  if(url.pathname==='/api/git.debug.action'){
+   const body=JSON.parse(options.body);requests.push(body);
+   const data=body.action==='inspect'?{variable:{name:body.expression,value:body.expression==='args'?'Namespace(config="demo.json")':'"/sample/frame-'+body.frameId+'.json"',type:body.expression==='args'?'Namespace':'str',variablesReference:body.expression==='args'?99:0},limited:false}
+    :body.action==='variables'?{variables:[{name:'config',value:'"demo.json"',type:'str',variablesReference:0}]}:body.action==='next'?{...session,pauseId:5,revision:2}:{scopes:[]};
+   return {ok:true,json:async()=>data};
+  }
+ }));
+ const doc=ui.dom.window.document;
+ await ui.caret(text.indexOf('path')+1);await inspectAtCaret(ui);
+ const hover=()=>doc.querySelector('.jb-debug-hover-body');
+ assert.ok(hover());assert.ok(hover().textContent.includes('"/sample/frame-10.json"'));
+ assert.equal(doc.activeElement.closest('.jb-debug-hover'),null,'inspection does not steal focus');
+ await ui.key('Escape');assert.equal(hover(),null);
+ await act(async()=>ui.container.querySelector('[role=option][aria-selected=false]').click());
+ await ui.caret(text.indexOf('path')+1);await inspectAtCaret(ui);
+ assert.ok(hover().textContent.includes('"/sample/frame-11.json"'));
+ await ui.key('Escape');
+ await ui.caret(text.indexOf('args')+1);await inspectAtCaret(ui);
+ await act(async()=>{const details=hover().querySelector('details');details.open=true;details.dispatchEvent(new ui.dom.window.Event('toggle'));});
+ assert.ok(hover().textContent.includes('"demo.json"'));
+ const output={label:hover().getAttribute('aria-label'),frame:hover().querySelector('.jb-debug-hover-frame').textContent,expression:hover().querySelector('.jb-variable-name').textContent,value:hover().querySelector('.jb-variable-value').textContent,child:hover().querySelector('.jb-variable-list .jb-variable-value').textContent,readOnly:ui.editor().state.readOnly};
+ assert.deepEqual(output,JSON.parse(readFileSync(new URL('./fixtures/debug-hover.expected.json',import.meta.url),'utf8')));
+ assert.deepEqual(requests.filter(row=>row.action==='inspect').map(row=>[row.frameId,row.pauseId,row.expression]),[[10,4,'path'],[11,4,'path'],[11,4,'args']]);
+ assert.equal(requests.some(row=>row.action==='evaluate'),false);
+ await act(async()=>hover().querySelector('summary').dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'F8',bubbles:true,cancelable:true})));
+ assert.equal(hover(),null);assert.equal(requests.at(-1).action,'next');
+ assert.equal(doc.activeElement,ui.container.querySelector('.cm-content'),'stepping from a hover returns focus to source');
+ await ui.caret(text.indexOf('path')+4);await inspectAtCaret(ui);
+ assert.ok(hover(),'inspection at the identifier end remains available');
+ await ui.click('lib.ts');assert.equal(hover(),null);
+});
+
+test('continuing during a pending hover cancels the query and cannot display a late value', async context=>{
+ let release,inspectionSignal;
+ let session={id:'hover-late',name:'Sample',state:'paused',revision:1,pauseId:2,frames:[{id:1,name:'main',path:'src/main.ts',line:1,column:1}],scopes:[],output:''};
+ const ui=await panel(context,server((url,options)=>{
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:'src/main.ts',text:'const path = 42;',version:'hover-late-v1'})};
+  if(url.pathname==='/api/git.debug.status')return {ok:true,json:async()=>session};
+  if(url.pathname==='/api/git.debug.action'){
+   const body=JSON.parse(options.body);
+   if(body.action==='inspect'){inspectionSignal=options.signal;return new Promise(resolve=>{release=resolve;});}
+   if(body.action==='continue'){session={...session,state:'running',revision:2,frames:[]};return {ok:true,json:async()=>session};}
+   return {ok:true,json:async()=>({scopes:[]})};
+  }
+ }));
+ await ui.caret(7);await inspectAtCaret(ui);
+ assert.ok(ui.dom.window.document.querySelector('.jb-debug-hover'));
+ await ui.key('F5');
+ assert.equal(inspectionSignal.aborted,true);
+ await act(async()=>release({ok:true,json:async()=>({variable:{name:'path',value:'stale',variablesReference:0},limited:false})}));
+ assert.equal(ui.dom.window.document.querySelector('.jb-debug-hover'),null);
+});

@@ -73,6 +73,7 @@ window.__ModuleLoader__.load({
 
     // ------------------------------------------------------------- i18n
     const en = {
+      'debug.inspect': 'Inspect variable value', 'debug.hoverMissing': 'Not exposed in the selected frame', 'debug.hoverLimited': 'Variable limit reached; use Evaluate expression', 'debug.hoverInvalid': 'Invalid variable response', 'debug.hoverFailed': 'Could not inspect this variable: {message}',
       "tree.locate": "Locate current file",
       "tree.findName": "Find by file name",
       "tree.findFile": "Find in file",
@@ -247,6 +248,7 @@ window.__ModuleLoader__.load({
       'status.untracked': 'Untracked',
     };
     const zh = {
+      'debug.inspect': '查看变量值', 'debug.hoverMissing': '当前栈帧未提供此变量', 'debug.hoverLimited': '已达到变量读取上限，请使用计算表达式', 'debug.hoverInvalid': '变量响应无效', 'debug.hoverFailed': '无法读取此变量：{message}',
       "tree.locate": "定位当前文件",
       "tree.findName": "按文件名查找",
       "tree.findFile": "在文件中查找",
@@ -593,6 +595,14 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-editor-popup [role=menuitem]:focus-visible{outline:none;background:${C.selection}}
 .jb-editor-popup [role=menuitem]:disabled{opacity:.45}
 .jb-editor-popup kbd{font:inherit;white-space:nowrap;color:inherit}
+.cm-tooltip-hover:has(>.jb-debug-hover){background:${C.panel};color:${C.text};border:1px solid ${C.border};border-radius:5px;overflow:hidden;z-index:10000}
+.jb-debug-hover{width:max-content;min-width:min(240px,calc(100vw - 24px));max-width:min(460px,calc(100vw - 24px));font:12px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;user-select:text}
+.jb-debug-hover-body{padding:8px 10px;max-height:min(400px,60vh);overflow:auto;box-sizing:border-box}
+.jb-debug-hover-frame{color:${C.textDim};font-size:11px;border-bottom:1px solid ${C.border};padding-bottom:5px;margin-bottom:5px;overflow-wrap:anywhere}
+.jb-debug-hover .jb-variable-row{flex-wrap:wrap;white-space:pre-wrap;overflow-wrap:anywhere}
+.jb-debug-hover .jb-variable-value{white-space:pre-wrap;overflow-wrap:anywhere}
+.jb-debug-hover code{font:inherit;color:${C.text}}
+.jb-debug-hover .jb-variable-list{padding-left:12px}
 .jb-evaluate{width:620px;max-height:calc(88vh - 16px);left:50%;top:12%;transform:translateX(-50%);padding:14px;display:flex;flex-direction:column;gap:10px}
 .jb-evaluate-heading,.jb-evaluate-submit{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .jb-evaluate-heading{font-weight:500}.jb-evaluate-frame{color:${C.textDim};overflow-wrap:anywhere}
@@ -1276,7 +1286,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('button', { type: 'button', className: 'jb-btn', onClick: onClose }, t('tree.close'))), document.body);
     }
 
-    const { useDebugger, DebugPane, EvaluationDialog, controlItems: debugControlItems } = createDebugUI(React, api, { createPortal, usePopupDismiss });
+    const { useDebugger, DebugPane, EvaluationDialog, DebugHover, controlItems: debugControlItems } = createDebugUI(React, api, { createPortal, usePopupDismiss });
 
     /** An explicit local port/PID prompt uses the editor's Enter/Escape interaction. */
     function AttachPrompt({ debug, t, onClose }) {
@@ -1305,11 +1315,14 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     function SourceEditor(props) {
       const { source, target, t, definitions, debug, blocked } = props;
       const parent = useRef(null); const editor = useRef(null); const callbacks = useRef(props);
-      const documentRef = useRef(null), modeRef = useRef(null);
+      const documentRef = useRef(null), modeRef = useRef(null), mounted = useRef(true);
+      const [hover, setHover] = useState(null), [inspectRequest, setInspectRequest] = useState(0);
       const [documentView, setDocumentView] = useState(null);
       const markdown = /\.(?:md|markdown|mdown)$/i.test(source.path);
       const mode = markdown ? (documentView?.path === source.path && documentView.target === target ? documentView.mode : target.documentMode ?? 'preview') : 'source';
       modeRef.current = mode;
+      const inspectionKey = !blocked && mode === 'source' && !debug.busy && !debug.evaluation && debug.session?.state === 'paused' && debug.selectedFrameId != null
+        ? `${debug.cwd}:${debug.session.id}:${debug.session.pauseId}:${debug.selectedFrameId}:${debug.variablesVersion}` : null;
       const applied = useRef(null);
       callbacks.current = props;
       const [position, setPosition] = useState({ line: target.line ?? 0, character: target.character ?? 0 });
@@ -1320,6 +1333,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const showMenu = (anchor, at) => {
         const { debug, t } = callbacks.current;
         setMenu({ ...anchor, items: [
+        { id: 'debug-inspect', label: t('debug.inspect'), disabled: callbacks.current.blocked || debug.busy || debug.session?.state !== 'paused' || debug.selectedFrameId == null, run: () => setInspectRequest(value => value + 1) },
         { id: 'debug-start', label: t(debug.session?.state === 'paused' ? 'debug.continue' : 'debug.launch'), shortcut: 'F5', disabled: debug.busy || (debug.session?.id && !['paused', 'ended'].includes(debug.session.state)), run: () => debug.run() },
         { id: 'debug-attach', label: t('debug.attach'), disabled: debug.busy || (debug.session?.id && debug.session.state !== 'ended'), run: () => debug.start('attach') },
         ...debugControlItems(debug, t).filter(item => item.id !== 'debug-continue').map(item => item.id === 'debug-evaluate' ? { ...item, run: () => debug.openEvaluation(editor.current.selectedText()) } : item),
@@ -1333,11 +1347,13 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         ] });
       };
       useLayoutEffect(() => {
+        mounted.current = true;
         const instance = createSourceEditor(parent.current, {
           text: source.text, path: source.path, version: source.version, position: target, label: t('files.source'), colors: C,
           searchPhrases: { 'current match': t('find.current'), 'on line': t('find.onLine'), Find: t('find.label'), next: t('find.next'), previous: t('find.previous'), all: t('find.all'), 'match case': t('find.case'), regexp: t('find.regexp'), 'by word': t('find.word'), close: t('find.close') },
           foldPhrases: { 'Fold line': t('files.fold'), 'Unfold line': t('files.unfold'), 'folded code': t('files.foldedCode'), unfold: t('files.unfold'), 'Folded lines': t('files.foldedLines'), 'Unfolded lines': t('files.unfoldedLines'), to: t('files.rangeTo') },
           takeFocus: document.activeElement === document.body || (parent.current.closest('.jb-changes')?.contains(document.activeElement) && document.activeElement.closest('.jb-filebutton') !== null),
+          onHoverMount: value => { if (mounted.current) setHover(value); }, onHoverUnmount: dom => { if (mounted.current) setHover(value => value?.dom === dom ? null : value); },
           onDefinition: at => { if (!callbacks.current.busy && !callbacks.current.blocked) callbacks.current.onDefinition(at.line, at.character); },
           onBack: at => callbacks.current.onNavigate(-1, at), onForward: at => callbacks.current.onNavigate(1, at),
           onToggleBreakpoint: line => { if (!callbacks.current.blocked) callbacks.current.debug.toggle(line); }, breakpointLabel: t('debug.breakpoint'),
@@ -1349,7 +1365,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           snapshot: () => ({ ...instance.snapshot(), ...(/\.(?:md|markdown|mdown)$/i.test(callbacks.current.source.path) ? { documentMode: modeRef.current, documentScroll: documentRef.current?.scrollTop ?? 0 } : {}) }),
           focus: () => modeRef.current === 'preview' ? documentRef.current?.focus() : instance.focus(),
         });
-        return () => { callbacks.current.onReader(null); editor.current = null; instance.destroy(); };
+        return () => { mounted.current = false; callbacks.current.onReader(null); editor.current = null; instance.destroy(); };
       }, []);
       useLayoutEffect(() => {
         if (applied.current.path !== source.path || applied.current.text !== source.text) {
@@ -1357,6 +1373,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         }
       }, [source.path, source.text]);
       useLayoutEffect(() => { if (!blocked) { editor.current?.reveal(target); if (mode === 'source') { editor.current?.measure(); if (target.focusSource) editor.current?.focus(); if (target.find) editor.current?.find(); } } }, [target, blocked, mode]);
+      useLayoutEffect(() => { editor.current?.setInspection(inspectionKey); }, [inspectionKey]);
+      useEffect(() => { if (inspectRequest) editor.current?.inspect(); }, [inspectRequest]);
       useEffect(() => { if (blocked) { setMenu(null); setGoLine(false); } }, [blocked]);
       useEffect(() => {
         const paused = debug.session?.state === 'paused';
@@ -1381,6 +1399,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           mode === 'source' ? h('span', null, t('files.position', { line: String(position.line + 1), column: String(position.character + 1) })) : null,
           h('span', null, t(mode === 'preview' ? 'document.readOnly' : 'files.readOnly'))),
         menu ? h(EditorMenu, { menu, onClose: closeMenu }) : null,
+        hover && hover.key === inspectionKey ? createPortal(h(DebugHover, { key: inspectionKey + ':' + hover.expression, debug, expression: hover.expression, t, onClose: (focus = false) => { editor.current?.closeInspection(); if (focus) editor.current?.focus(); } }), hover.dom) : null,
         debug.attach ? h(AttachPrompt, { debug, t, onClose: closeAttach }) : null,
         goLine && editor.current ? h(GoToLine, { editor: editor.current, t, onClose: closeGo }) : null);
     }
