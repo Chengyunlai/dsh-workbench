@@ -1,6 +1,6 @@
 /** Continuous, read-only source editor with JetBrains-style pointer and keyboard navigation. */
 import { EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
-import { EditorView, Decoration, gutter, GutterMarker, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, hoverTooltip, tooltips, closeHoverTooltips, hasHoverTooltips, activateHover } from '@codemirror/view';
+import { EditorView, Decoration, WidgetType, gutter, GutterMarker, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, hoverTooltip, tooltips, closeHoverTooltips, hasHoverTooltips, activateHover } from '@codemirror/view';
 import { defaultKeymap } from '@codemirror/commands';
 import { highlightSelectionMatches, search, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { LanguageSupport, StreamLanguage, syntaxTree, syntaxHighlighting, bracketMatching, foldGutter, foldKeymap, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language';
@@ -129,6 +129,50 @@ const executionLine = StateField.define({
   provide: field => EditorView.decorations.from(field),
 });
 
+const inlineEffect = StateEffect.define();
+class InlineValue extends WidgetType {
+  constructor(text) { super(); this.text = text; }
+  eq(other) { return this.text === other.text; }
+  toDOM() { const span = document.createElement('span'); span.className = 'jb-debug-inline'; span.textContent = this.text; return span; }
+}
+const inlineValues = StateField.define({
+  create: () => Decoration.none,
+  update(value, transaction) {
+    for (const effect of transaction.effects) if (effect.is(inlineEffect)) return Decoration.set(effect.value.map(item =>
+      Decoration.widget({ widget: new InlineValue(item.text), side: 1 }).range(transaction.state.doc.line(item.line).to)), true);
+    return transaction.docChanged ? Decoration.none : value;
+  },
+  provide: field => EditorView.decorations.from(field),
+});
+
+/** Match adapter locals to parsed identifiers through the selected frame's paused line.
+ * @param state - Parsed source document.
+ * @param lineNumber - One-based paused line.
+ * @param variables - Adapter variables in scope order; nearest bindings win.
+ * @returns Line-end annotations with values and available types.
+ */
+export function debugInlineValues(state, lineNumber, variables) {
+  if (!lineNumber || lineNumber > state.doc.lines) return [];
+  const line = state.doc.line(lineNumber), tree = syntaxTree(state);
+  const isFunction = node => /^(?:FunctionDeclaration|FunctionExpression|ArrowFunction|FunctionDefinition|MethodDeclaration|MethodDecl|FunctionDecl|ConstructorDeclaration)$/.test(node.name);
+  let owner = tree.resolveInner(line.from + line.text.search(/\S|$/), 1);
+  while (owner.parent && !isFunction(owner)) owner = owner.parent;
+  const bindings = new Map(), lines = new Map();
+  for (const variable of variables) if (!bindings.has(variable.name)) bindings.set(variable.name, variable);
+  tree.iterate({ from: owner.from, to: line.to, enter(node) {
+    if (isFunction(node) && node.from !== owner.from) return false;
+    if (!/^(?:VariableName|VariableDefinition|DefName|Identifier|self|this)$/.test(node.name)) return;
+    const target = debugHoverAt(state, node.from + 1, -1);
+    const variable = target && !target.expression.includes('.') ? bindings.get(target.expression) : null;
+    if (!variable) return;
+    const number = state.doc.lineAt(node.from).number;
+    if (!lines.has(number)) lines.set(number, new Map());
+    lines.get(number).set(variable.name, variable);
+  } });
+  return [...lines].map(([line, values]) => ({ line, text: '  ' + [...values.values()].map(item =>
+    item.name + (item.type ? ': ' + item.type : '') + ' = ' + item.value.replace(/\s*\n\s*/g, ' ')).join('  ·  ') }));
+}
+
 const linkEffect = StateEffect.define();
 const linkField = StateField.define({
   create: () => Decoration.none,
@@ -171,13 +215,29 @@ export function debugHoverAt(state, position, side = 1) {
 }
 
 /**
+ * Choose how a navigation target enters the viewport: keep an already comfortable target
+ * untouched, center one that would sit flush against a vertical edge, and pull back only
+ * horizontally for a target that left the side.
+ * @param box - Scroll viewport bounds of the editor in client coordinates.
+ * @param coords - Rendered bounds of the target, or null when it is not rendered.
+ * @returns Scroll options for the target, or null when the current scroll already shows it.
+ */
+export function navigationScrollOptions(box, coords) {
+  if (!coords || box.height <= 0) return { y: 'center' };
+  const margin = Math.min(80, box.height / 4);
+  if (coords.top < box.top + margin || coords.bottom > box.bottom - margin) return { y: 'center' };
+  if (coords.left < box.left || coords.right > box.right) return { y: 'nearest', x: 'nearest' };
+  return null;
+}
+
+/**
  * Mount a source reader; callers own its returned disposer.
  * @param parent - Empty editor container.
  * @param options - Source, initial position, localized name, and callbacks scoped to this reader.
  * @returns Focus, caret/viewport/fold snapshots, reveal, host-source replacement and disposal actions; user edits remain disabled.
  */
 export function createSourceEditor(parent, options) {
-  let sourceVersion = options.version, inspectionKey = null;
+  let sourceVersion = options.version, inspectionKey = null, hoverTimer = null, hoverTarget = null;
   const inspection = hoverTooltip((view, position, side) => {
     if (!inspectionKey || view.state.field(linkField).size) return null;
     const target = debugHoverAt(view.state, position, side);
@@ -213,7 +273,7 @@ export function createSourceEditor(parent, options) {
     EditorState.phrases.of(options.foldPhrases),
     EditorState.phrases.of(options.searchPhrases ?? {}),
     EditorView.contentAttributes.of({ tabindex: '0', 'aria-label': options.label, 'aria-readonly': 'true' }),
-    debugField, executionLine, inspection, tooltips({ parent: document.body, position: 'fixed' }),
+    debugField, executionLine, inlineValues, inspection, tooltips({ parent: document.body, position: 'fixed' }),
     gutter({ class: 'jb-breakpoints', lineMarker: (view, line) => { const number = view.state.doc.lineAt(line.from).number, value = view.state.field(debugField); const point = value.breakpoints.find(item => item.line === number); return new BreakpointMarker(Boolean(point), point?.verified === true, value.currentLine === number, options.breakpointLabel); }, lineMarkerChange: update => update.transactions.some(transaction => transaction.effects.some(effect => effect.is(debugEffect))), domEventHandlers: { mousedown: (view, line, event) => { event.preventDefault(); options.onToggleBreakpoint(view.state.doc.lineAt(line.from).number); return true; } } }),
     lineNumbers(), foldGutter(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(), bracketMatching(),
     highlightSelectionMatches({ highlightWordAroundCursor: true, wholeWords: true }),
@@ -257,13 +317,22 @@ export function createSourceEditor(parent, options) {
         options.onContextMenu({ x: event.clientX, y: event.clientY }, positionAt(view)); return true;
       },
       mousemove(event, view) {
+        if (!event.sourceCapabilities?.firesTouchEvents && inspectionKey && !event.metaKey && !event.ctrlKey) {
+          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+          const target = pos === null ? null : debugHoverAt(view.state, pos, -1);
+          if (target?.from !== hoverTarget) {
+            clearTimeout(hoverTimer); hoverTarget = target?.from;
+            if (target) hoverTimer = setTimeout(() => activateHover(view, pos, -1, { tooltip: inspection,
+              until: transaction => transaction.selection !== undefined }), 200);
+          }
+        }
         const position = event.metaKey || event.ctrlKey ? view.posAtCoords({ x: event.clientX, y: event.clientY }) : null;
         const range = position === null ? null : wordAt(view.state, position);
         const current = view.state.field(linkField);
         if (range || current.size) view.dispatch({ effects: linkEffect.of(range) });
       },
       keyup(event, view) { if (!event.metaKey && !event.ctrlKey && view.state.field(linkField).size) view.dispatch({ effects: linkEffect.of(null) }); },
-      mouseleave(event, view) { if (view.state.field(linkField).size) view.dispatch({ effects: linkEffect.of(null) }); },
+      mouseleave(event, view) { clearTimeout(hoverTimer); hoverTarget = null; if (view.state.field(linkField).size) view.dispatch({ effects: linkEffect.of(null) }); },
       blur(event, view) { if (view.state.field(linkField).size) view.dispatch({ effects: linkEffect.of(null) }); },
     }),
     EditorView.theme({
@@ -293,6 +362,7 @@ export function createSourceEditor(parent, options) {
       '.jb-breakpoint-enabled': { color: options.colors.deleted, opacity: '.5' },
       '.jb-breakpoint-verified': { opacity: '1' },
       '.jb-debug-current': { color: options.colors.accent, opacity: '1' },
+      '.jb-debug-inline': { color: options.colors.textDim, fontStyle: 'italic', whiteSpace: 'pre', userSelect: 'none' },
       '.jb-debug-line': { backgroundColor: options.colors.selection },
       '.jb-debug-frame-line': { backgroundColor: options.colors.hover, boxShadow: 'inset 2px 0 ' + options.colors.accent },
       '.cm-cursor': { borderLeftColor: options.colors.text },
@@ -312,10 +382,18 @@ export function createSourceEditor(parent, options) {
     }),
   ] });
   const view = new EditorView({ parent, state: createState(options.text, options.path) });
+  // Navigation keeps a target that is already comfortably visible where it is; anything
+  // else is centered (or pulled back horizontally) so the code around the destination is
+  // readable without another scroll.
   const reveal = (position, center = false) => {
     const anchor = offsetAt(view.state, position);
-    const scroll = position.viewport && position.viewport.version === sourceVersion ? position.viewport.effect : EditorView.scrollIntoView(anchor, { y: center ? 'center' : 'nearest' });
-    view.dispatch({ selection: { anchor }, effects: scroll });
+    let scroll = null;
+    if (position.viewport && position.viewport.version === sourceVersion) scroll = position.viewport.effect;
+    else {
+      const options = center ? { y: 'center' } : navigationScrollOptions(view.scrollDOM.getBoundingClientRect(), view.coordsAtPos(anchor));
+      if (options) scroll = EditorView.scrollIntoView(anchor, options);
+    }
+    view.dispatch(scroll ? { selection: { anchor }, effects: scroll } : { selection: { anchor } });
   };
   const restoreFolds = position => {
     if (position.folding?.version === sourceVersion) view.dispatch({ effects: position.folding.ranges.map(range => foldEffect.of(range)) });
@@ -323,10 +401,13 @@ export function createSourceEditor(parent, options) {
   restoreFolds(options.position);
   reveal(options.position, true);
   if (options.takeFocus) view.focus();
+  const dismiss = event => { clearTimeout(hoverTimer); if (!view.dom.contains(event.target) && !event.target.closest?.('.jb-debug-hover')) view.dispatch({ effects: closeHoverTooltips }); };
+  document.addEventListener('pointerdown', dismiss, true);
   return {
-    setInspection: key => { if (key !== inspectionKey) { inspectionKey = key; view.dispatch({ effects: closeHoverTooltips }); } },
+    setInlineValues: (line, variables) => view.dispatch({ effects: inlineEffect.of(debugInlineValues(view.state, line, variables)) }),
+    setInspection: key => { if (key !== inspectionKey) { inspectionKey = key; clearTimeout(hoverTimer); hoverTarget = null; view.dispatch({ effects: [closeHoverTooltips, inlineEffect.of([])] }); } },
     inspect: () => { const head = view.state.selection.main.head; if (inspectionKey) activateHover(view, head, wordAt(view.state, head)?.to === head ? -1 : 1, { tooltip: inspection, until: transaction => transaction.selection !== undefined }); },
-    closeInspection: () => view.dispatch({ effects: closeHoverTooltips }),
+    closeInspection: () => { clearTimeout(hoverTimer); hoverTarget = null; view.dispatch({ effects: closeHoverTooltips }); },
     setDebug: value => {
       const previous = view.state.field(debugField), effects = [debugEffect.of(value)];
       for (const key of ['currentLine', 'selectedLine']) {
@@ -337,7 +418,7 @@ export function createSourceEditor(parent, options) {
       }
       view.dispatch({ effects });
     },
-    setSource: (source, position) => { sourceVersion = source.version; view.setState(createState(source.text, source.path)); restoreFolds(position); reveal(position, true); },
+    setSource: (source, position) => { clearTimeout(hoverTimer); hoverTarget = null; sourceVersion = source.version; view.setState(createState(source.text, source.path)); restoreFolds(position); reveal(position, true); },
     snapshot: () => {
       const ranges = [];
       foldedRanges(view.state).between(0, view.state.doc.length, (from, to) => ranges.push({ from, to }));
@@ -349,6 +430,6 @@ export function createSourceEditor(parent, options) {
     measure: () => view.requestMeasure(),
     anchor: () => { const box = view.coordsAtPos(view.state.selection.main.head); return { x: box?.left ?? parent.getBoundingClientRect().left, y: box?.bottom ?? parent.getBoundingClientRect().top }; },
     lineLength: number => number < 1 || number > view.state.doc.lines ? null : view.state.doc.line(number).length,
-    destroy: () => view.destroy(),
+    destroy: () => { clearTimeout(hoverTimer); document.removeEventListener('pointerdown', dismiss, true); view.destroy(); },
   };
 }

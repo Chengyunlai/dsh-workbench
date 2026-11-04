@@ -87,3 +87,13 @@ test('object child reads propagate cancellation and reject replies from an expir
  await assert.rejects(readDebugVariables(h.session,h.peer,{reference:3,pauseId:null},h.controller.signal),{code:'DEBUG_INSPECTION_STALE'});
  const cancelled=read();h.controller.abort();release({variables:[]});await assert.rejects(cancelled,{name:'AbortError'});
 });
+
+test('inline values use nearest bindings, skip literals and nested functions, and stop at the paused line', async () => {
+ const { debugInlineValues } = await import('../source-editor.js');
+ const text='function run() {\n const path = "path"; // path\n function nested() { return path; }\n console.log(path);\n return path;\n}';
+ const state=EditorState.create({doc:text,extensions:[javascript()]});
+ assert.deepEqual(debugInlineValues(state,4,[{name:'path',value:'"local"',type:'string'},{name:'path',value:'"outer"',type:'string'}]),[
+  {line:2,text:'  path: string = "local"'}, {line:4,text:'  path: string = "local"'}
+ ]);
+ assert.deepEqual(debugInlineValues(state,null,[]),[]);
+});

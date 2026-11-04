@@ -84,6 +84,8 @@ F5/F7/F8/Shift+F8/Alt+F5/Shift+F5 also work while the stack or variables have fo
 
 ### Hover variable inspection
 
+While paused, variable lines through the selected frame’s execution location in its source function show `name: type = value`. These are current paused values, not historical values from each line. Annotations read non-expensive scopes without evaluating expressions; types appear when supplied by the adapter. Changing frames or files and resuming clears old annotations. The hover stays open for pointer movement, expansion and copying; click outside or press Esc to dismiss.
+
 While paused, hover a source variable or dotted member (such as `path` or `args.config`) to see its value and type in the selected stack frame. Expand objects to load children; select and copy long values. Alternatively, press Shift+F10 at the variable and choose Inspect variable value. Esc dismisses the popup. Changing files or frames, stepping, resuming, or ending closes the old popup and cancels pending queries.
 
 Inspection looks up adapter scopes/variables without sending evaluate requests and skips scopes marked expensive. Use Evaluate expression for calls, indexed expressions, or members the adapter does not expose. Each query reads at most `debugInspectMaxVariables` variable rows across scopes and member levels: 1000 by default, configurable from 1–10000 in plugin settings. Reaching the limit shows a hint. Values and types come from the debug adapter.

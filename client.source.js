@@ -1,3 +1,4 @@
+import { createClassGraphUI } from './class-graph-client.js';
 import { createTerminalDock } from './terminal-client.js';
 import { createDebugUI } from './debug-client.js';
 import { createSourceEditor } from './source-editor.js';
@@ -78,6 +79,32 @@ window.__ModuleLoader__.load({
       "tree.findName": "Find by file name",
       "tree.findFile": "Find in file",
       "tree.findDirectory": "Find in directory",
+      "classes.inherits": "Inheritance", "classes.protocolBase": "Declared Protocol base", "classes.abstractHint": "Italic: abstract method",
+      "classes.title": "Python class relationships",
+      "classes.dock": "Position",
+      "classes.right": "Right",
+      "classes.bottom": "Bottom",
+      "classes.close": "Close class relationships",
+      "classes.search": "Find a class",
+      "classes.refresh": "Refresh",
+      "classes.all": "All classes",
+      "classes.zoomOut": "Zoom out",
+      "classes.zoomIn": "Zoom in",
+      "classes.zoomReset": "Reset zoom",
+      "classes.hint": "Declared inheritance · Double-click a class or click a method to open source · Drag blank space to pan",
+      "classes.limited": "Partial graph: scan or display limit reached. Narrow the project or increase the scan limits.",
+      "classes.skipped": "Skipped {n} files",
+      "classes.empty": "No Python class declarations found.",
+      "classes.class": "Class",
+      "classes.abc": "ABC base",
+      "classes.abstract": "Abstract methods",
+      "classes.protocol": "Protocol",
+      "classes.open": "Open source",
+      "classes.unresolved": "Unresolved base",
+      "classes.decorated": "Decorated declaration; runtime behavior may differ",
+      "classes.invalid": "Invalid class graph response",
+      "classes.failed": "Could not read class relationships: {message}",
+      "classes.changed": "Source changed since the scan. Refresh the class graph before navigating.",
       "tree.expand": "Expand directory recursively",
       "tree.collapse": "Collapse directory recursively",
       "tree.copyName": "Copy name",
@@ -253,6 +280,32 @@ window.__ModuleLoader__.load({
       "tree.findName": "按文件名查找",
       "tree.findFile": "在文件中查找",
       "tree.findDirectory": "在目录中查找内容",
+      "classes.inherits": "继承", "classes.protocolBase": "显式 Protocol 基类", "classes.abstractHint": "斜体：抽象方法",
+      "classes.title": "Python 类关系图",
+      "classes.dock": "位置",
+      "classes.right": "右侧",
+      "classes.bottom": "底部",
+      "classes.close": "关闭类关系图",
+      "classes.search": "查找类",
+      "classes.refresh": "刷新",
+      "classes.all": "全部类",
+      "classes.zoomOut": "缩小",
+      "classes.zoomIn": "放大",
+      "classes.zoomReset": "重置缩放",
+      "classes.hint": "源码声明的继承关系 · 双击类或点击方法跳转源码 · 拖动空白处平移",
+      "classes.limited": "当前为部分关系图：已达到扫描或显示上限，可缩小项目范围或调整扫描配置。",
+      "classes.skipped": "已跳过 {n} 个文件",
+      "classes.empty": "未找到 Python 类声明。",
+      "classes.class": "类",
+      "classes.abc": "ABC 基类",
+      "classes.abstract": "抽象方法",
+      "classes.protocol": "Protocol",
+      "classes.open": "打开源码",
+      "classes.unresolved": "未解析基类",
+      "classes.decorated": "含类装饰器，运行时行为可能不同",
+      "classes.invalid": "类关系响应无效",
+      "classes.failed": "无法读取类关系：{message}",
+      "classes.changed": "源码在扫描后发生了变化，请刷新类关系图再跳转。",
       "tree.expand": "展开此目录及子目录",
       "tree.collapse": "收起此目录及子目录",
       "tree.copyName": "复制名称",
@@ -601,6 +654,27 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-debug-hover-frame{color:${C.textDim};font-size:11px;border-bottom:1px solid ${C.border};padding-bottom:5px;margin-bottom:5px;overflow-wrap:anywhere}
 .jb-debug-hover .jb-variable-row{flex-wrap:wrap;white-space:pre-wrap;overflow-wrap:anywhere}
 .jb-debug-hover .jb-variable-value{white-space:pre-wrap;overflow-wrap:anywhere}
+
+.jb-class-window{position:fixed;z-index:9000;right:12px;top:48px;width:min(760px,calc(100vw - 24px));height:calc(100vh - 72px);min-width:min(360px,calc(100vw - 24px));min-height:240px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);display:flex;flex-direction:column;resize:both;overflow:hidden;border:1px solid ${C.border};border-radius:6px;background:${C.panel};color:${C.text};box-shadow:0 3px 8px #0003;font:12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.jb-class-window[data-dock=bottom]{top:auto;bottom:12px;left:12px;width:calc(100vw - 24px);height:min(480px,70vh)}
+.jb-class-window header,.jb-class-controls{display:flex;gap:6px;align-items:center;padding:8px;border-bottom:1px solid ${C.border};flex-wrap:wrap}
+.jb-class-window button,.jb-class-window select,.jb-class-window input{font:inherit;color:inherit;background:${C.panel};border:1px solid ${C.border};border-radius:4px;padding:3px 7px}
+.jb-class-window button{cursor:pointer}.jb-class-window button:hover{background:${C.hover}}.jb-class-window button:focus-visible,.jb-class-window input:focus-visible{outline:2px solid ${C.accent};outline-offset:1px}
+.jb-class-window input{min-width:90px;flex:1}.jb-class-hint{padding:4px 10px;color:${C.textDim};font-size:11px;overflow-wrap:anywhere}.jb-class-hint[role=alert]{color:${C.text}}
+.jb-class-results{display:flex;flex-direction:column;max-height:140px;overflow:auto}.jb-class-results button{text-align:left}
+.jb-class-viewport{flex:1;min-height:0;overflow:auto;cursor:grab;touch-action:none}.jb-class-canvas{position:relative;transform-origin:top left}.jb-class-links{position:absolute;inset:0;stroke:${C.textDim};stroke-width:1.5;pointer-events:none}
+.jb-class-card{position:absolute;box-sizing:border-box;border:1px solid color-mix(in srgb,${C.modified} 22%,${C.border});border-radius:3px;background:color-mix(in srgb,${C.modified} 3%,${C.panel});display:flex;flex-direction:column;overflow:hidden;cursor:default;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.jb-class-card[data-kind=protocol]{border-color:color-mix(in srgb,${C.added} 28%,${C.border});background:color-mix(in srgb,${C.added} 4%,${C.panel})}
+.jb-class-card[data-selected=true]{border-color:${C.accent};box-shadow:0 0 0 1px ${C.accent}}
+.jb-class-heading{display:flex;align-items:center;gap:7px;padding:7px 9px 3px;min-height:25px}.jb-class-symbol{display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:18px;border-radius:50%;font:600 11px/1 ui-monospace,monospace;color:${C.modified};background:color-mix(in srgb,${C.modified} 16%,${C.panel})}.jb-class-card[data-kind=protocol] .jb-class-symbol{color:${C.added};background:color-mix(in srgb,${C.added} 15%,${C.panel})}.jb-class-card[data-kind=abstract] .jb-class-name{font-style:italic}
+.jb-class-window .jb-class-name{padding:0;border:0;border-radius:0;text-align:left;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;min-width:0;color:${C.code}}
+.jb-class-path{font-size:10px;padding:0 9px 6px 34px;color:${C.textDim};overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.jb-class-members{display:flex;flex-direction:column;overflow:auto;min-height:0;flex:1;border-top:1px solid ${C.border};padding:3px 0}.jb-class-window .jb-class-members button{display:flex;gap:6px;align-items:center;flex:none;height:25px;padding:2px 9px;border:0;border-radius:0;text-align:left;font-family:inherit;background:transparent;font-size:11px}
+.jb-class-members button[data-abstract=true]{font-style:italic;color:${C.modified}}.jb-class-method-symbol{flex:none;width:14px;font:600 11px/1 ui-monospace,monospace;color:${C.modified}}.jb-class-method-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.jb-class-parameters{color:${C.textDim};font-weight:400}.jb-class-return{color:${C.textDim};margin-left:auto;flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jb-class-unresolved{padding:2px 6px;font-size:10px;color:${C.textDim};overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.jb-class-links{stroke:${C.modified};stroke-linejoin:round;stroke-linecap:round}.jb-class-links .jb-class-arrow{fill:${C.panel}}.jb-class-links [data-protocol=true]{stroke:${C.added}}.jb-class-links [data-protocol=true] .jb-class-edge{stroke-dasharray:5 4}
+.jb-class-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:${C.textDim};padding:2px 10px 7px}.jb-class-legend-inherit:before,.jb-class-legend-protocol:before{content:"";display:inline-block;vertical-align:middle;width:18px;border-top:1.5px solid ${C.modified};margin-right:5px}.jb-class-legend-protocol:before{border-color:${C.added};border-top-style:dashed}
+
 .jb-debug-hover code{font:inherit;color:${C.text}}
 .jb-debug-hover .jb-variable-list{padding-left:12px}
 .jb-evaluate{width:620px;max-height:calc(88vh - 16px);left:50%;top:12%;transform:translateX(-50%);padding:14px;display:flex;flex-direction:column;gap:10px}
@@ -1286,6 +1360,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('button', { type: 'button', className: 'jb-btn', onClick: onClose }, t('tree.close'))), document.body);
     }
 
+    const ClassGraphWindow = createClassGraphUI(React, api, createPortal);
     const { useDebugger, DebugPane, EvaluationDialog, DebugHover, controlItems: debugControlItems } = createDebugUI(React, api, { createPortal, usePopupDismiss });
 
     /** An explicit local port/PID prompt uses the editor's Enter/Escape interaction. */
@@ -1333,6 +1408,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const showMenu = (anchor, at) => {
         const { debug, t } = callbacks.current;
         setMenu({ ...anchor, items: [
+        { id: 'class-relations', label: t('classes.title'), disabled: !source.path.endsWith('.py'), run: () => callbacks.current.onClasses({ path: callbacks.current.source.path, line: at.line }) },
         { id: 'debug-inspect', label: t('debug.inspect'), disabled: callbacks.current.blocked || debug.busy || debug.session?.state !== 'paused' || debug.selectedFrameId == null, run: () => setInspectRequest(value => value + 1) },
         { id: 'debug-start', label: t(debug.session?.state === 'paused' ? 'debug.continue' : 'debug.launch'), shortcut: 'F5', disabled: debug.busy || (debug.session?.id && !['paused', 'ended'].includes(debug.session.state)), run: () => debug.run() },
         { id: 'debug-attach', label: t('debug.attach'), disabled: debug.busy || (debug.session?.id && debug.session.state !== 'ended'), run: () => debug.start('attach') },
@@ -1374,6 +1450,29 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }, [source.path, source.text]);
       useLayoutEffect(() => { if (!blocked) { editor.current?.reveal(target); if (mode === 'source') { editor.current?.measure(); if (target.focusSource) editor.current?.focus(); if (target.find) editor.current?.find(); } } }, [target, blocked, mode]);
       useLayoutEffect(() => { editor.current?.setInspection(inspectionKey); }, [inspectionKey]);
+      useEffect(() => {
+        editor.current?.setInlineValues(null, []);
+        const frame = debug.session?.frames?.find(frame => frame.id === debug.selectedFrameId);
+        if (!inspectionKey || frame?.path !== source.path) return;
+        const controller = new AbortController();
+        const request = body => api('/api/git.debug.action', { method: 'POST', signal: controller.signal,
+          body: { cwd: debug.cwd, id: debug.session.id, pauseId: debug.session.pauseId, ...body } });
+        (async () => {
+          const { scopes } = frame.id === debug.session.frames[0]?.id ? { scopes: debug.session.scopes }
+            : await request({ action: 'scopes', frameId: frame.id });
+          const variables = [];
+          for (const scope of scopes ?? []) {
+            if (scope.expensive || !scope.variablesReference) continue;
+            const data = await request({ action: 'variables', reference: scope.variablesReference });
+            variables.push(...(data.variables ?? []));
+          }
+          if (!controller.signal.aborted) editor.current?.setInlineValues(frame.line, variables);
+        })().catch(error => {
+          // Optional annotations leave query errors to the existing variable pane.
+          if (!controller.signal.aborted) editor.current?.setInlineValues(null, []);
+        });
+        return () => controller.abort();
+      }, [inspectionKey, source.path, source.text]);
       useEffect(() => { if (inspectRequest) editor.current?.inspect(); }, [inspectRequest]);
       useEffect(() => { if (blocked) { setMenu(null); setGoLine(false); } }, [blocked]);
       useEffect(() => {
@@ -1491,6 +1590,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const [navigation, setNavigation] = useState({ busy: false, targets: [], message: null });
       const [menu, setMenu] = useState(null);
       const closeMenu = useCallback(() => setMenu(null), []);
+      const [classSeed, setClassSeed] = useState(null);
       const navigationRef = useRef(null);
       const diffRef = useRef(null);
       const initialRef = useRef(initialTarget);
@@ -1661,6 +1761,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('div', { ref: paneLayout.workspace, className: 'jb-code-workspace' }, h('div', { className: 'jb-tree' },
           h('div', { className: 'jb-tree-toolbar' },
             h('div', { className: 'jb-filter' }, searchGlyph(), h('input', { ref: filterInput, type: 'search', value: filter, 'aria-label': t('tree.findName'), placeholder: t('filter.placeholder'), onChange: event => setFilter(event.target.value) })),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('classes.title'), 'aria-label': t('classes.title'), onClick: () => setClassSeed({ path: target?.path, line: target?.line ?? 0 }) }, lucideSvg([h('rect', { x: 8, y: 2, width: 8, height: 6, rx: 1 }), h('path', { d: 'M12 8v5M5 13h14M5 13v3m14-3v3' }), h('rect', { x: 2, y: 16, width: 6, height: 6, rx: 1 }), h('rect', { x: 16, y: 16, width: 6, height: 6, rx: 1 })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.locate'), 'aria-label': t('tree.locate'), disabled: !target || !files?.includes(target.path), onClick: () => { setFilter(''); setRevealRevision(value => value + 1); } }, lucideSvg([h('circle', { cx: 12, cy: 12, r: 6 }), h('path', { d: 'M12 2v6m0 8v6M2 12h6m8 0h6' })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.findDirectory'), 'aria-label': t('tree.findDirectory'), onClick: () => onFindInFiles('') }, searchGlyph(16))),
           treeError ? h('div', { className: 'jb-notice' }, treeError) : files === null ? h('div', { className: 'jb-tree-hint' }, t('loading')) : h(WorkspaceTree, { files, changes, selectedPath: target?.path, onSelect: openFile, onMenu: fileMenu, filter, revealRevision, t })),
@@ -1674,7 +1775,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             : navigation.busy || navigation.message ? h('div', { className: 'jb-source-notice', role: 'status' }, navigation.busy ? t('loading') : navigation.message) : null,
           h('div', { className: 'jb-source-panel', role: 'tabpanel', id: panelId, 'aria-labelledby': target ? `${panelId}-tab-${openPaths.indexOf(target.path)}` : undefined },
           !content ? h('div', { className: 'jb-diffempty', role: error ? 'alert' : undefined }, error ?? t(loading ? 'loading' : 'files.pick'))
-                : shownView === 'source' ? h(content.kind === 'image' ? ImageReader : SourceEditor, { ...(content.kind === 'image' ? { key: content.path + ':' + content.version } : {}), source: content, target: shownTarget, onDefinition: define, t, debug, busy: navigation.busy, blocked: loading || !contentMatches,
+                : shownView === 'source' ? h(content.kind === 'image' ? ImageReader : SourceEditor, { ...(content.kind === 'image' ? { key: content.path + ':' + content.version } : {}), source: content, target: shownTarget, onClasses: setClassSeed, onDefinition: define, t, debug, busy: navigation.busy, blocked: loading || !contentMatches,
                   onReader: instance => { reader.current = instance; }, canBack: history.index > 0, canForward: history.index + 1 < history.items.length, onNavigate: navigate, onShowDiff: () => { remember(); setView('diff'); },
                   onOpenDocument: destination => visit(destination),
                   definitions: navigation.targets, onChooseDefinition: item => visit({ ...item, focusSource: true }, navigation.origin) })
@@ -1687,6 +1788,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                           if (line !== undefined) setHistory(old => ({ ...old, items: old.items.map((item, index) => index === old.index ? { ...item, line: Number(line) - 1, character: 0 } : item) }));
                           setView('source');
                         } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {} }))))),
+        classSeed ? h(ClassGraphWindow, { cwd, seed: classSeed, onOpen: destination => visit(destination), onClose: () => { setClassSeed(null); reader.current?.focus(); }, t }) : null,
         debugHost ? createPortal(h(DebugPane, { debug, t, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
           { id: 'source', label: t('files.read'), shortcut: 'Enter / F4', disabled: !frame.path, run: () => debug.selectFrame(frame.id, true) },
           ...debugControlItems(debug, t),

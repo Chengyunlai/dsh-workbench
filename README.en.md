@@ -22,13 +22,26 @@ Interactions take cues from JetBrains: file tabs, code folding, modifier-click d
 
 | Read the code | Review the changes | Inspect execution |
 | --- | --- | --- |
-| File trees, path copying, file and directory search, tabs, syntax and occurrence highlighting, definitions, code folding, and reading history. Conversation Markdown opens directly in the workbench reading preview, with a source view; images and ICNS icons preview directly. | Inspect working-tree changes, line diffs, commit graphs, and commit details. Follow a diff back to source and explicitly send selected lines to a new project conversation. | Launch or attach, set breakpoints, step, select stack frames, inspect values on hover, expand objects, evaluate expressions, and remove all breakpoints. |
+| File trees, path copying, file and directory search, tabs, syntax and occurrence highlighting, definitions, code folding, Python class relationships, and reading history. Conversation Markdown opens directly in the workbench reading preview, with a source view; images and ICNS icons preview directly. | Inspect working-tree changes, line diffs, commit graphs, and commit details. Follow a diff back to source and explicitly send selected lines to a new project conversation. | Launch or attach, set breakpoints, step, select stack frames, inspect values on hover, expand objects, evaluate expressions, and remove all breakpoints. |
 
 ## Demos
 
 These are real Harness screens using a fictional Sample Shop project. Select a screenshot to open its GIF.
 
 <table><tr><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/read-code.png" alt="Code and documents" /></a><br /><strong>Code and documents</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/review-changes.png" alt="Git diffs and history" /></a><br /><strong>Git diffs and history</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/debug-program.png" alt="Breakpoints and evaluation" /></a><br /><strong>Breakpoints and evaluation</strong></td></tr></table>
+
+### Read Python class relationships
+
+Read declared inheritance, abstract methods and Protocol bases directly from existing Python syntax trees, with compact UML nodes and source jumps. No project execution or extra project declarations are required.
+
+![Python class relationships](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-dark.png)
+
+<details>
+<summary>Light theme</summary>
+
+![Python class relationships in light theme](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-light.png)
+
+</details>
 
 ### Inspect paused values on hover
 
@@ -76,6 +89,8 @@ npm ci --omit=dev
 Start by opening a file. After configuring a debug adapter, set a breakpoint beside a line number and press F5, or attach through the source context menu. See the [user guide](USAGE.en.md) for shortcuts and language setup, and [debug configuration](DEBUGGING.en.md) for launch and attach arguments.
 
 ## Language support
+
+While debugging is paused, source variables offer a hover that stays open for expansion and copying, plus line-end values and adapter-provided types for the selected frame. See [debugging](DEBUGGING.en.md).
 
 All five languages support source reading and syntax folding; definitions and debugging use the services below.
 

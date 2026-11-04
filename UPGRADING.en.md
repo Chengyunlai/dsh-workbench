@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.3.0
+
+Update `@yunlai/dsh-workbench` to `1.3.0` in Harness plugin details, then reload or restart. This release adds Python class relationships from existing syntax trees, compact UML nodes with method signatures, and source navigation. It does not execute or import project code or require additional project declarations. It also improves navigation centering, paused-frame inline values and pointer interaction with debug hovers. Existing project configuration and layouts need no migration; see [class relationships](USAGE.en.md#python-class-relationships) and [debug inspection](DEBUGGING.en.md#hover-variable-inspection).
+
 ## 1.2.0
 
 For npm installations, select `1.2.0` in Harness plugin details and reload or restart when prompted. While paused, hover variables and dotted members to inspect values and types in the selected frame, with expandable objects. Stepping, resuming, or changing files or frames closes old popups. Hover inspection sends no expression evaluation requests, and slow variable reads do not block execution controls. Existing launch/attach configuration and layout need no migration; see [debug configuration](DEBUGGING.en.md#hover-variable-inspection).

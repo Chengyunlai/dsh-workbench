@@ -22,13 +22,26 @@ AI 给出改动后，你可以就在对话旁打开文件、沿着定义跳转�
 
 | 读懂代码 | 看清改动 | 检查真实执行 |
 | --- | --- | --- |
-| 文件树、路径复制、文件与目录查找、多标签、语法高亮、同名词高亮、定义跳转、代码折叠和阅读历史。对话中的 Markdown 可直接进入工作台阅读预览，也可切回源码；图片和 ICNS 图标可直接预览。 | 查看工作区变更、逐行 diff、提交图和提交详情；从差异跳回源码，手动把选中的 diff 交给项目新对话讨论。 | 启动或接入已有进程，设置断点、单步、切换调用栈、悬浮查看变量值、展开对象、计算表达式，并清理全部断点。 |
+| 文件树、路径复制、文件与目录查找、多标签、语法高亮、同名词高亮、定义跳转、代码折叠、Python 类关系图和阅读历史。对话中的 Markdown 可直接进入工作台阅读预览，也可切回源码；图片和 ICNS 图标可直接预览。 | 查看工作区变更、逐行 diff、提交图和提交详情；从差异跳回源码，手动把选中的 diff 交给项目新对话讨论。 | 启动或接入已有进程，设置断点、单步、切换调用栈、悬浮查看变量值、展开对象、计算表达式，并清理全部断点。 |
 
 ## 能力演示
 
 以下是真实 Harness 界面，使用虚构的 Sample Shop 项目。点击截图可查看对应 GIF。
 
 <table><tr><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/read-code.png" alt="代码与文档阅读" /></a><br /><strong>代码与文档阅读</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/review-changes.png" alt="Git 差异与历史" /></a><br /><strong>Git 差异与历史</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/debug-program.png" alt="断点与表达式求值" /></a><br /><strong>断点与表达式求值</strong></td></tr></table>
+
+### 用类关系图读懂 Python 工程
+
+直接从现有 Python 语法树查看声明的继承、抽象方法与 Protocol 基类，使用紧凑 UML 节点并跳转源码；无需运行项目，也无需为画图补充声明。
+
+![Python class relationships](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-dark.png)
+
+<details>
+<summary>查看浅色主题</summary>
+
+![Python class relationships in light theme](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-light.png)
+
+</details>
 
 ### 暂停后，悬浮就能看当前值
 
@@ -76,6 +89,8 @@ npm ci --omit=dev
 先打开一个文件开始阅读。配好调试适配器后，点击行号旁设置断点，按 F5 启动；需要接入已有进程时使用源码右键菜单。快捷键与语言配置见[使用指南](USAGE.md)，启动和接入参数见[调试配置](DEBUGGING.md)。
 
 ## 语言支持
+
+暂停调试时，源码变量支持可移入和复制的悬浮查看，并在选中栈帧的变量行末显示当前值与适配器提供的类型；详见[调试说明](DEBUGGING.md#悬浮查看变量)。
 
 五种语言均支持源码阅读与语法折叠；定义跳转和调试使用下表中的服务。
 
