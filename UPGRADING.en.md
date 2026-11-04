@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.2.0
+
+For npm installations, select `1.2.0` in Harness plugin details and reload or restart when prompted. While paused, hover variables and dotted members to inspect values and types in the selected frame, with expandable objects. Stepping, resuming, or changing files or frames closes old popups. Hover inspection sends no expression evaluation requests, and slow variable reads do not block execution controls. Existing launch/attach configuration and layout need no migration; see [debug configuration](DEBUGGING.en.md#hover-variable-inspection).
+
 ## 1.1.0
 
 For npm installations, select `1.1.0` in the Harness plugin details and reload or restart as prompted. This version adds workbench reading previews for conversation Markdown, shared bottom tool windows, and read-only tree menus, path copying, current-file location, and file/directory content search. Previously opened Git tabs display the development workbench title. Project-file and Git inspection remain read-only; terminals and debugging run with their respective execution permissions.
