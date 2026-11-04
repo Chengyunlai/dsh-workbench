@@ -1,3 +1,4 @@
+import { createPythonClassGraph } from './python-class-graph.js';
 import { navigationHandlers } from './navigation.js';
 import { createWorkspaceSearch } from './workspace-search.js';
 import { Config, installedServers, installedDebugAdapters, serverSpecifications } from './language-config.js';
@@ -473,6 +474,7 @@ function registerRoutes(ctx, config, languageServers) {
   route('/api/git.tree', ['GET'], navigation.tree);
   route('/api/git.source', ['GET'], navigation.source);
   route('/api/git.definition', ['GET'], navigation.definition);
+  route('/api/git.classes', ['GET'], createPythonClassGraph({ runGit, requireWorkspacePath, requireRelativePath, json, config }));
   route('/api/git.search', ['GET'], createWorkspaceSearch({ runGit, requireWorkspacePath, requireRelativePath, json, config }));
   route('/api/git.review', ['POST'], handleReview);
   route('/api/git.debug.configurations', ['GET'], (ctx, request) => debug.configurations(request));

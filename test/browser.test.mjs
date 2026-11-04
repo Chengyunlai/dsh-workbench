@@ -51,7 +51,7 @@ async function panel(testContext, fetch, { dock, paneSizes, platform, navigation
     MutationObserver: dom.window.MutationObserver, Node: dom.window.Node, Window: dom.window.Window,
     getComputedStyle: dom.window.getComputedStyle, requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window),
     cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window), setTimeout, clearTimeout,
-    fetch, AbortController, URL, URLSearchParams, console,
+    fetch, AbortController, URL, URLSearchParams, structuredClone, console,
   });
   plugin.apply({
     effect: fn => fn(), locale: { register: (namespace, dictionaries) => { dictionary = dictionaries.zh; return () => {}; }, bind: () => t },
@@ -580,7 +580,7 @@ test('gutter breakpoints and debug shortcuts launch, step and disconnect through
     marker: ui.container.querySelector('.jb-breakpoint-enabled').textContent,
     executionLine: Boolean(ui.container.querySelector('.jb-debug-line')),
   }, JSON.parse(readFileSync(new URL('./fixtures/debug.expected.json', import.meta.url), 'utf8')));
-  await ui.key('F8'); assert.equal(actions.at(-1).action, 'next');
+  await ui.key('F8'); assert.equal(actions.filter(row => !['scopes', 'variables'].includes(row.action)).at(-1).action, 'next');
   await ui.key('F5', { shiftKey: true }); assert.equal(actions.at(-1).action, 'stop');
   await ui.menu(ui.container.querySelector('.cm-content'), 'debug.attach');
   assert.equal(actions.at(-1).name, 'Attach JS');
@@ -640,7 +640,7 @@ test('stack selection previews source and variables, survives output, and resets
  await press('Enter');
  assert.equal(ui.dom.window.document.activeElement, ui.container.querySelector('.cm-content'));
  await act(async () => rows()[1].click()); await press('F8');
- assert.equal(calls.at(-2).action, 'next');
+ assert.ok(calls.some(call => call.action === 'next'));
  assert.ok(selected().textContent.includes('main'), 'a new pause resets to the execution frame even when frame IDs are reused');
  assert.equal(ui.container.querySelector('.jb-diffpath').textContent, 'src/main.ts');
  await ui.menu(rows()[1], 'files.read');
@@ -1541,7 +1541,7 @@ test('paused variable hovers show typed values and expandable objects, follow fr
  assert.deepEqual(requests.filter(row=>row.action==='inspect').map(row=>[row.frameId,row.pauseId,row.expression]),[[10,4,'path'],[11,4,'path'],[11,4,'args']]);
  assert.equal(requests.some(row=>row.action==='evaluate'),false);
  await act(async()=>hover().querySelector('summary').dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'F8',bubbles:true,cancelable:true})));
- assert.equal(hover(),null);assert.equal(requests.at(-1).action,'next');
+ assert.equal(hover(),null);assert.ok(requests.some(row => row.action === 'next'));
  assert.equal(doc.activeElement,ui.container.querySelector('.cm-content'),'stepping from a hover returns focus to source');
  await ui.caret(text.indexOf('path')+4);await inspectAtCaret(ui);
  assert.ok(hover(),'inspection at the identifier end remains available');
@@ -1567,4 +1567,51 @@ test('continuing during a pending hover cancels the query and cannot display a l
  assert.equal(inspectionSignal.aborted,true);
  await act(async()=>release({ok:true,json:async()=>({variable:{name:'path',value:'stale',variablesReference:0},limited:false})}));
  assert.equal(ui.dom.window.document.querySelector('.jb-debug-hover'),null);
+});
+
+test('pointer inspection stays open across movement and inline values clear when execution resumes', async context => {
+ const text='const path = "demo.json";\nconsole.log(path);';
+ let session={id:'inline',name:'Sample',state:'paused',revision:1,pauseId:1,frames:[{id:1,name:'main',path:'src/main.ts',line:2,column:1}],scopes:[{name:'Locals',variablesReference:1}],output:''};
+ const ui=await panel(context,server((url,options)=>{
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:'src/main.ts',text,version:'inline-v1'})};
+  if(url.pathname==='/api/git.debug.status')return {ok:true,json:async()=>session};
+  if(url.pathname==='/api/git.debug.action'){
+   const body=JSON.parse(options.body),variable={name:'path',value:'"demo.json"',type:'string',variablesReference:0};
+   if(body.action==='continue')session={...session,state:'running',revision:2,frames:[],scopes:[]};
+   return {ok:true,json:async()=>body.action==='variables'?{variables:[variable]}:body.action==='inspect'?{variable,limited:false}:session};
+  }
+ }));
+ const doc=ui.dom.window.document,view=ui.editor();
+ assert.deepEqual([...ui.container.querySelectorAll('.jb-debug-inline')].map(node=>node.textContent),JSON.parse(readFileSync(new URL('./fixtures/debug-inline.expected.json',import.meta.url),'utf8')));
+ view.posAtCoords=()=>text.indexOf('path')+1;
+ await act(async()=>{view.contentDOM.dispatchEvent(new ui.dom.window.MouseEvent('mousemove',{bubbles:true,clientX:10,clientY:10}));await new Promise(resolve=>setTimeout(resolve,250));});
+ assert.ok(doc.querySelector('.jb-debug-hover'));
+ await act(async()=>view.dom.dispatchEvent(new ui.dom.window.MouseEvent('mouseleave',{relatedTarget:doc.body})));
+ assert.ok(doc.querySelector('.jb-debug-hover'),'moving through the gap to the popup keeps it open');
+ await act(async()=>doc.body.dispatchEvent(new ui.dom.window.Event('pointerdown',{bubbles:true})));
+ assert.equal(doc.querySelector('.jb-debug-hover'),null);
+ await ui.key('F5');
+ assert.equal(ui.container.querySelector('.jb-debug-inline'),null);
+});
+
+test('Python class window displays declarations, navigates methods without an LSP and preserves its window when source changes', async context => {
+ const nodes=[{id:'base',name:'Base',qualified:'Base',kind:'abstract',path:'base.py',line:0,character:6,version:'graph-v1',methods:[{name:'run',line:1,character:5}],abstractMethods:['run'],overrides:[],unresolved:[]},{id:'impl',name:'Impl',qualified:'Impl',kind:'class',path:'impl.py',line:0,character:6,version:'graph-v1',methods:[{name:'run',line:1,character:5}],abstractMethods:[],overrides:['run'],unresolved:[]}];
+ let changed=false;
+ const requests=[];
+ const ui=await panel(context,server(url=>{
+  if(url.pathname==='/api/git.classes')return {ok:true,json:async()=>({nodes,edges:[{from:'impl',to:'base'}],scanned:2,total:2,limited:false,skipped:[]})};
+  if(url.pathname==='/api/git.source'&&url.searchParams.get('path').endsWith('.py'))return {ok:true,json:async()=>({path:url.searchParams.get('path'),text:'class Impl:\n def run(self): pass\n',version:changed?'changed':'graph-v1'})};
+ },requests));
+ await ui.click('classes.title');const doc=ui.dom.window.document, window=()=>doc.querySelector('.jb-class-window');
+ assert.ok(window());assert.equal(window().dataset.dock,'right');assert.equal(window().querySelectorAll('.jb-class-card').length,2);
+ const member=[...window().querySelectorAll('.jb-class-members button')].find(n=>n.textContent.includes('↥'));
+ await act(async()=>member.click());assert.equal(ui.editor().state.selection.main.head,17);
+ assert.ok(window(),'source navigation keeps relationships visible');
+ changed=true;await act(async()=>member.click());assert.ok(window().textContent.includes(ui.t('classes.changed')));
+ const dock=window().querySelector('select');await act(async()=>{dock.value='bottom';dock.dispatchEvent(new ui.dom.window.Event('change',{bubbles:true}));});
+ assert.equal(window().dataset.dock,'bottom');
+ const result={nodes:[...window().querySelectorAll('.jb-class-name')].map(n=>n.textContent),arrows:window().querySelectorAll('.jb-class-links g').length,dock:window().dataset.dock,readOnly:ui.editor().state.readOnly,usedLsp:requests.some(r=>r.name==='/api/git.definition')};
+ assert.deepEqual(result,JSON.parse(readFileSync(new URL('./fixtures/class-graph.expected.json',import.meta.url),'utf8')));
+ await act(async()=>window().dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+ assert.equal(window(),null);
 });

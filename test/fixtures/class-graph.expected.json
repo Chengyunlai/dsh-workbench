@@ -1,0 +1,7 @@
+{
+  "nodes": ["Base", "Impl"],
+  "arrows": 1,
+  "dock": "bottom",
+  "readOnly": true,
+  "usedLsp": false
+}
