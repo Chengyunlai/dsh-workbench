@@ -9,7 +9,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const source = { 'src/main.ts': "const emoji = '😀'; render();", 'src/lib.ts': 'export function render() {}' };
 
-async function panel(testContext, fetch, { dock, paneSizes, platform } = {}) {
+async function panel(testContext, fetch, { dock, paneSizes, platform, navigation } = {}) {
   let dictionary = {};
   const t = (key, vars = {}) => Object.entries(vars).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), dictionary[key] ?? key);
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true, url: 'https://harness.test/' });
@@ -31,6 +31,12 @@ async function panel(testContext, fetch, { dock, paneSizes, platform } = {}) {
     disconnect() { resizeObservers.delete(this); }
   };
   let plugin, Panel;
+  let onScreen = 'own', closeCount = 0;
+  const opened = [], originals = [];
+  const tabSignal = new AbortController();
+  const tabInfo = { tab: { id: 'resource-tab', visible: true, signal: tabSignal.signal, actions: {
+    openTab: (kind, options) => opened.push({ kind, options }), close: () => { closeCount++; },
+  } } };
   dom.window.__ModuleLoader__ = { load: spec => { plugin = spec.factory(name => name === 'react-dom' ? { createPortal } : React); } };
   vm.runInNewContext(readFileSync(new URL('../client.js', import.meta.url), 'utf8'), {
     window: dom.window, document: dom.window.document, navigator: dom.window.navigator,
@@ -42,13 +48,18 @@ async function panel(testContext, fetch, { dock, paneSizes, platform } = {}) {
   plugin.apply({
     effect: fn => fn(), locale: { register: (namespace, dictionaries) => { dictionary = dictionaries.zh; return () => {}; }, bind: () => t },
     uiWorkspace: { openSession() {} }, sidebarRightTabs: { register: () => () => {} },
+    sidebarRight: { mounted: { getSnapshot: () => onScreen }, openResource: (address, options) => originals.push({ address, options }) },
     slots: { inject: (name, fn) => fn(), register: (spec, component) => { if (spec.name === 'sidebar.right.pane.tab') Panel = component; return () => {}; } },
   });
   const items = [{ workspaceId: 'demo', path: '/demo', title: 'Demo' }];
   const byId = { own: { id: 'own', cwd: '/demo' } };
   const container = dom.window.document.getElementById('root');
   let renderer = createRoot(container);
-  const render = () => renderer.render(React.createElement(Panel, { sessionId: 'own', t, useWorkspaces: select => select({ items }), useSessions: select => select({ byId }) }));
+  const render = () => {
+    tabInfo.tab.navigation = navigation;
+    renderer.render(React.createElement(Panel, { sessionId: 'own', t, useWorkspaces: select => select({ items }), useSessions: select => select({ byId }),
+      useTabInfo: navigation ? () => tabInfo : undefined }));
+  };
   await act(async () => { render(); });
   const reopen = async () => { await act(async () => renderer.unmount()); renderer = createRoot(container); await act(async () => render()); };
   testContext.after(async () => { await act(async () => renderer.unmount()); dom.window.close(); delete globalThis.window; delete globalThis.document; });
@@ -63,7 +74,9 @@ async function panel(testContext, fetch, { dock, paneSizes, platform } = {}) {
     assert.ok(item, label); await act(async () => item.click());
   };
   const resize = async () => act(async () => { for (const observer of [...resizeObservers]) observer.callback([]); });
-  return { container, button, click, t, editor, caret, key, menu, dom, reopen, resize, resizeObservers };
+  const navigate = async next => { navigation = next; await act(async () => render()); };
+  return { container, button, click, t, editor, caret, key, menu, dom, reopen, resize, resizeObservers, navigate, opened, originals,
+    closeCount: () => closeCount, switchSession: id => { onScreen = id; } };
 }
 
 function server(override, requests = []) {
@@ -85,6 +98,69 @@ function server(override, requests = []) {
     return { ok: true, json: async () => data };
   };
 }
+
+test('conversation documents open as workbench reading previews, reuse file tabs and retain the original preview for code', async context => {
+  const requests = [];
+  const documentSource = { 'docs/guide.md': '# Guide\n\n**Read beside the conversation.**', 'docs/next.md': '# Next guide' };
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/git.tree') return { ok: true, json: async () => ({ files: Object.keys(documentSource) }) };
+    if (url.pathname === '/api/git.source') return { ok: true, json: async () => ({ path: url.searchParams.get('path'), text: documentSource[url.searchParams.get('path')], version: 'doc-v1' }) };
+    if (url.pathname === '/api/changes.summary') return { ok: true, json: async () => ({ files: [{ path: 'src/main.ts' }, { path: '/demo/docs/guide.md' }] }) };
+    if (url.pathname === '/api/changes.diff') return { ok: true, json: async () => ({ kind: 'text', after: true }) };
+  }, requests), { navigation: { address: 'dsh-resource://changes-review/session/own/42/2', params: { index: 1 }, revision: 1 } });
+  assert.equal(ui.opened.length, 1);
+  assert.equal(ui.opened[0].kind, 'git');
+  assert.equal(ui.opened[0].options.replaceTab, true);
+  assert.equal(ui.opened[0].options.params.documentPreview.target.path, 'docs/guide.md');
+  assert.equal(ui.closeCount(), 1);
+  await ui.navigate({ address: 'sidebar://git', params: ui.opened[0].options.params, revision: 1 });
+  assert.equal(ui.container.querySelector('.jb-document h1').textContent, 'Guide');
+  assert.equal(ui.container.querySelector('.jb-document strong').textContent, 'Read beside the conversation.');
+  await ui.navigate({ address: 'sidebar://git', params: { documentPreview: { ...ui.opened[0].options.params.documentPreview,
+    target: { path: 'docs/next.md', line: 0, character: 0, documentMode: 'preview' } } }, revision: 2 });
+  assert.equal(ui.container.querySelector('.jb-document h1').textContent, 'Next guide');
+  const snapshot = { heading: ui.container.querySelector('.jb-document h1').textContent,
+    tabs: [...ui.container.querySelectorAll('.jb-source-tabs [role=tab]')].map(node => node.getAttribute('aria-label')) };
+  assert.deepEqual(snapshot, JSON.parse(readFileSync(new URL('./fixtures/document-routing.expected.json', import.meta.url), 'utf8')));
+  await ui.navigate({ address: 'dsh-resource://changes-review/session/own/42/2', params: { index: 0 }, revision: 3 });
+  assert.equal(ui.originals.length, 1);
+  assert.equal(ui.originals[0].options.kind, 'changes-review');
+  assert.equal(ui.originals[0].options.params.index, 0);
+});
+
+test('file links decode their own session path and a stale review cannot redirect a newer session', async context => {
+  let release;
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/changes.summary') return new Promise(resolve => { release = resolve; });
+  }), { navigation: { address: 'dsh-resource://file/session/own/docs/hello%20world.md', params: undefined, revision: 1 } });
+  assert.equal(ui.opened[0].options.params.documentPreview.target.path, 'docs/hello world.md');
+  await ui.navigate({ address: 'dsh-resource://changes-review/session/own/1/1', params: { index: 0 }, revision: 2 });
+  ui.switchSession('other');
+  await act(async () => release({ ok: true, json: async () => ({ files: [{ path: 'main.ts' }] }) }));
+  assert.equal(ui.originals.length, 0);
+  assert.equal(ui.opened.length, 1);
+});
+
+test('a newer document cancels a pending summary, and summary failures offer retry or the original preview', async context => {
+  let release, fail = false;
+  const requests = [];
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/changes.summary') return fail
+      ? { ok: false, status: 410, json: async () => ({ error: 'summary expired' }) }
+      : new Promise(resolve => { release = resolve; });
+  }, requests), { navigation: { address: 'dsh-resource://changes-review/session/own/1/1', params: { index: 0 }, revision: 1 } });
+  await ui.navigate({ address: 'dsh-resource://file/session/own/README.md', params: undefined, revision: 2 });
+  assert.equal(requests.find(request => request.name === '/api/changes.summary').signal.aborted, true);
+  await act(async () => release({ ok: true, json: async () => ({ files: [{ path: 'main.ts' }] }) }));
+  assert.equal(ui.opened.length, 1); assert.equal(ui.originals.length, 0);
+  fail = true;
+  await ui.navigate({ address: 'dsh-resource://changes-review/session/own/2/1', params: { index: 0 }, revision: 3 });
+  assert.ok(ui.container.querySelector('[role=alert]').textContent.includes('summary expired'));
+  await ui.click('preview.retry');
+  assert.equal(requests.filter(request => request.name === '/api/changes.summary').length, 3);
+  await ui.click('preview.original');
+  assert.equal(ui.originals[0].options.kind, 'changes-review');
+});
 
 test('file tree, source/diff, exact symbol position, definition and history work together', async context => {
   const requests = [];

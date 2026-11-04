@@ -3,6 +3,7 @@ import { createDebugUI } from './debug-client.js';
 import { createSourceEditor } from './source-editor.js';
 import { createMarkdownReader } from './markdown-reader.js';
 import { createPaneLayout } from './pane-layout.js';
+import { parsePreviewAddress, resolveDocumentPreview } from './document-preview.js';
 
 /**
  * DSH Workbench — code, documents, Git inspection and debugging beside chat.
@@ -68,6 +69,8 @@ window.__ModuleLoader__.load({
 
     // ------------------------------------------------------------- i18n
     const en = {
+      'preview.original': 'Open original preview',
+      'preview.retry': 'Retry',
       "debug.clearBreakpoints": "Remove all breakpoints",
       "debug.evaluate": "Evaluate expression",
       "debug.inspection": "Inspection controls",
@@ -205,6 +208,8 @@ window.__ModuleLoader__.load({
       'status.untracked': 'Untracked',
     };
     const zh = {
+      'preview.original': '打开原预览',
+      'preview.retry': '重试',
       "debug.clearBreakpoints": "清理全部断点",
       "debug.evaluate": "计算表达式",
       "debug.inspection": "检查操作",
@@ -1586,9 +1591,16 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         setSelected(null);
         setDetail(null);
         setLogSelected(null);
-        setSourceTarget(null);
+        setSourceTarget(props.previewRequest?.workspaceId === targetWorkspaceId ? props.previewRequest.target : null);
         if (cwd !== null) reload();
       }, [cwd, reload]);
+
+      useEffect(() => {
+        if (!props.previewRequest) return;
+        setOverrideId(props.previewRequest.workspaceId);
+        setSourceTarget(props.previewRequest.target);
+        setTab('files');
+      }, [props.previewRequest]);
 
       useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -1835,7 +1847,45 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     // ------------------------------------------------------------- apply
-    const inject = { slots: { required: true }, locale: { required: true }, uiWorkspace: { required: true }, sidebarRightTabs: { required: true }, webTerminals: { required: false } };
+    function DocumentPreviewBridge({ resource, info, sessionId, useSessions, useWorkspaces, t, openOriginal, isCurrentSession }) {
+      const sessions = useSessions(state => state.byId ?? {});
+      const workspaces = useWorkspaces(state => state.items);
+      const cwd = sessions[resource.sessionId]?.cwd;
+      const { tab } = info;
+      const [error, setError] = useState(null), [retry, setRetry] = useState(0);
+      const originalKind = resource.kind === 'review' ? 'changes-review' : 'text';
+      const fallback = () => {
+        if (!isCurrentSession(sessionId)) return;
+        openOriginal(tab.navigation.address, originalKind, tab.navigation.params, tab.id);
+        tab.actions.close();
+      };
+      useEffect(() => {
+        if (!tab.visible || tab.signal.aborted) return;
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        tab.signal.addEventListener('abort', abort, { once: true });
+        setError(null);
+        const index = tab.navigation.params?.index ?? 0;
+        if (resource.sessionId !== sessionId || !Number.isSafeInteger(index) || index < 0) fallback();
+        else resolveDocumentPreview(resource, index, cwd, workspaces, path => api(path, { signal: controller.signal }))
+          .then(request => {
+            if (controller.signal.aborted || !isCurrentSession(sessionId)) return;
+            if (!request) { fallback(); return; }
+            tab.actions.openTab(PANEL_ID, { replaceTab: true, params: { documentPreview: request } });
+            tab.actions.close();
+          })
+          .catch(error => { if (!controller.signal.aborted) setError(error.message); });
+        return () => { controller.abort(); tab.signal.removeEventListener('abort', abort); };
+      }, [tab.visible, tab.navigation.revision, tab.navigation.address, cwd, workspaces, retry]);
+      return h('div', { className: 'jb-root' }, h('style', null, css),
+        h('div', { className: 'jb-empty', role: error ? 'alert' : 'status' }, error ? [
+          h('span', { key: 'error' }, t('error.load', { message: error })),
+          h('button', { key: 'retry', className: 'jb-btn', onClick: () => setRetry(value => value + 1) }, t('preview.retry')),
+          h('button', { key: 'original', className: 'jb-btn', onClick: fallback }, t('preview.original')),
+        ] : t('loading')));
+    }
+
+    const inject = { slots: { required: true }, locale: { required: true }, uiWorkspace: { required: true }, sidebarRightTabs: { required: true }, sidebarRight: { required: true }, webTerminals: { required: false } };
     function apply(ctx) {
       const openSession = (id) => ctx.uiWorkspace.openSession(id);
       const terminals = ctx.get?.('webTerminals') ?? ctx.webTerminals;
@@ -1848,6 +1898,16 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         activeTerminals.add(entry); return entry;
       };
       const Panel = (props) => h(WorkbenchPanel, { ...props, openSession, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
+      const SidebarPanel = props => {
+        const info = props.useTabInfo?.();
+        const navigation = info?.tab.navigation;
+        const request = useMemo(() => navigation?.params?.documentPreview, [navigation?.revision, navigation?.params]);
+        const resource = navigation && parsePreviewAddress(navigation.address);
+        return resource ? h(DocumentPreviewBridge, { ...props, resource, info,
+          isCurrentSession: sessionId => ctx.sidebarRight.mounted.getSnapshot() === sessionId,
+          openOriginal: (address, kind, params, replaceTab) => ctx.sidebarRight.openResource(address, { kind, params, replaceTab }) })
+          : h(WorkbenchPanel, { ...props, openSession, previewRequest: request, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
+      };
       ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'workbench: dictionaries');
       const t = ctx.locale.bind(NS);
       ctx.slots.inject('main', () => ctx.slots.register({
@@ -1855,11 +1915,14 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }, Panel));
       ctx.effect(() => ctx.sidebarRightTabs.register({
         id: TAB_ID, kind: PANEL_ID, title: () => t('panel'),
+        keepMounted: true,
+        patterns: ['*.md', '*.markdown', '*.mdown', 'dsh-resource://changes-review/session/**'],
+        canOpen: address => parsePreviewAddress(address) !== null,
         guide: [{ id: PANEL_ID, order: 40, title: () => t('panel'), description: () => t('guide.description'), icon: WorkbenchIcon }],
       }), 'workbench: right sidebar type');
       ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
         name: 'sidebar.right.pane.tab', key: TAB_ID, locale: NS,
-      }, Panel)), 'workbench: right sidebar body');
+      }, SidebarPanel)), 'workbench: right sidebar body');
     }
     return { inject, apply };
   },
