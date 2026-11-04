@@ -1,3 +1,4 @@
+import { createTerminalDock } from './terminal-client.js';
 import { createDebugUI } from './debug-client.js';
 import { createSourceEditor } from './source-editor.js';
 import { createMarkdownReader } from './markdown-reader.js';
@@ -12,12 +13,13 @@ import { createPaneLayout } from './pane-layout.js';
  * The client shares React and theme variables with the Harness host.
  */
 window.__ModuleLoader__.load({
-  id: '@local/dsh-git-control',
+  id: '@yunlai/dsh-workbench',
   factory(require) {
     const React = require('react');
     const { createPortal } = require('react-dom');
     const h = React.createElement;
     const { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } = React;
+    const TerminalDock = createTerminalDock(React, () => require.async('./client.terminal.js'));
     const MarkdownReader = createMarkdownReader(React);
     const { usePaneLayout, PaneDivider } = createPaneLayout(React);
 
@@ -148,6 +150,7 @@ window.__ModuleLoader__.load({
       'files.read': 'Read source',
       'files.tooLarge': 'Source is larger than 512 KiB.',
       'files.binary': 'This is a binary file; source preview is unavailable.',
+      'terminal.interrupt': 'Interrupt', 'terminal.title': 'Terminal', 'terminal.resize': 'Terminal height', 'terminal.close': 'Close terminal', 'terminal.failed': 'Terminal could not connect. Retry or reload the workbench.', 'terminal.retry': 'Retry', 'terminal.connecting': 'Connecting…', 'terminal.control': 'Take control', 'terminal.exited': 'Shell exited. Close this terminal to start another.', 'terminal.unavailable': 'Open the session workspace and enable the official terminal service to use the terminal.',
       'image.preview': 'Image preview', 'image.fit': 'Fit', 'image.actual': 'Actual size',
       'image.zoomIn': 'Zoom in', 'image.zoomOut': 'Zoom out', 'image.dimensions': '{width} × {height} px',
       'image.failed': 'Could not decode this image. Check its format and file contents.',
@@ -284,6 +287,7 @@ window.__ModuleLoader__.load({
       'files.read': '阅读源码',
       'files.tooLarge': '源码超过 512 KiB，无法在此预览。',
       'files.binary': '这是二进制文件，无法预览源码。',
+      'terminal.interrupt': '中断', 'terminal.title': '终端', 'terminal.resize': '终端高度', 'terminal.close': '关闭终端', 'terminal.failed': '终端连接失败，请重试或重新加载工作台', 'terminal.retry': '重试', 'terminal.connecting': '正在连接…', 'terminal.control': '接管输入', 'terminal.exited': 'Shell 已退出，关闭后可重新启动终端', 'terminal.unavailable': '请打开当前会话的工作区，并启用官方终端服务',
       'image.preview': '图片预览', 'image.fit': '适应窗口', 'image.actual': '原始大小',
       'image.zoomIn': '放大', 'image.zoomOut': '缩小', 'image.dimensions': '{width} × {height} 像素',
       'image.failed': '无法解码图片，请检查文件格式和内容',
@@ -435,6 +439,22 @@ window.__ModuleLoader__.load({
 @media(hover:hover){.jb-stack-frame:hover:not([aria-selected=true]){background:${C.hover}}}
 .jb-sourcebody{flex:1;min-height:0;overflow:hidden}
 .jb-sourcebody[hidden]{display:none}
+.jb-terminal{flex:none;min-height:34px;border-top:1px solid ${C.border};background:${C.bg};display:flex;flex-direction:column;min-width:0}
+.jb-terminal[data-open=true]{min-height:120px;max-height:60%}
+.jb-terminal-bar{display:flex;align-items:center;gap:10px;min-height:34px;padding:0 12px;background:${C.panel};flex:none}
+.jb-terminal-bar button,.jb-terminal-notice button{background:none;border:0;color:${C.textDim};font:inherit;padding:4px 6px;cursor:pointer;border-radius:4px}
+.jb-terminal-bar button:hover{background:${C.hover};color:${C.text}}
+.jb-terminal-bar button:focus-visible,.jb-terminal-divider:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
+.jb-terminal-bar button:disabled{opacity:.45;cursor:default}
+.jb-terminal-toggle{display:flex;gap:8px;align-items:center}
+.jb-terminal-toggle[aria-expanded=true]{color:${C.text};box-shadow:inset 0 -2px ${C.accent}}
+.jb-terminal-path{color:${C.textDim};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.jb-terminal-screen{flex:1;min-height:0;min-width:0;padding:8px 12px;background:${C.bg};color:${C.text};overflow:hidden}
+.jb-terminal-screen[hidden]{display:none}
+.jb-terminal-emulator{height:100%;width:100%}
+.jb-terminal-notice{padding:4px 12px;color:${C.textDim};font:inherit;background:${C.panel};flex:none}
+.jb-terminal-divider{height:5px;flex:none;cursor:ns-resize;touch-action:none;background:${C.border}}
+.jb-terminal-divider:hover{background:${C.accent}}
 .jb-image-reader{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}
 .jb-image-reader>.jb-document-toolbar{flex-wrap:wrap}
 .jb-image-stage{flex:1;min-height:0;min-width:0;overflow:auto;outline:none;background:${C.bg}}
@@ -1800,7 +1820,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('div', { className: 'jb-content' },
           status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat', style: { display: tab === 'files' ? 'flex' : 'none' } },
             h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, t })) : null,
-          content));
+          content),
+        h(TerminalDock, { key: currentSession?.id ?? 'none', sessionId: currentSession?.id, cwd: currentSession?.cwd, available: Boolean(props.terminalAvailable && currentSession?.id && cwd === currentSession.cwd), create: props.createTerminal, release: props.releaseTerminal, t }));
     }
 
     // ------------------------------------------------------------- icon
@@ -1814,11 +1835,20 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     // ------------------------------------------------------------- apply
-    const inject = ['slots', 'locale', 'uiWorkspace', 'sidebarRightTabs'];
+    const inject = { slots: { required: true }, locale: { required: true }, uiWorkspace: { required: true }, sidebarRightTabs: { required: true }, webTerminals: { required: false } };
     function apply(ctx) {
       const openSession = (id) => ctx.uiWorkspace.openSession(id);
-      const Panel = (props) => h(WorkbenchPanel, { ...props, openSession });
-      ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'git-control: dictionaries');
+      const terminals = ctx.get?.('webTerminals') ?? ctx.webTerminals;
+      const activeTerminals = new Set();
+      const releaseTerminal = entry => { if (!activeTerminals.delete(entry)) return; terminals.close(entry.sessionId, entry.key, entry.key); };
+      ctx.effect(() => () => { for (const entry of [...activeTerminals]) releaseTerminal(entry); }, 'workbench: embedded terminals');
+      const createTerminal = sessionId => {
+        const key = 'dsh-workbench-terminal:' + window.crypto.randomUUID();
+        const entry = { sessionId, key, model: terminals.view(sessionId, key, key) };
+        activeTerminals.add(entry); return entry;
+      };
+      const Panel = (props) => h(WorkbenchPanel, { ...props, openSession, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
+      ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'workbench: dictionaries');
       const t = ctx.locale.bind(NS);
       ctx.slots.inject('main', () => ctx.slots.register({
         name: 'main', key: PANEL_ID, locale: NS,
@@ -1826,10 +1856,10 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       ctx.effect(() => ctx.sidebarRightTabs.register({
         id: TAB_ID, kind: PANEL_ID, title: () => t('panel'),
         guide: [{ id: PANEL_ID, order: 40, title: () => t('panel'), description: () => t('guide.description'), icon: WorkbenchIcon }],
-      }), 'git-control: right sidebar type');
+      }), 'workbench: right sidebar type');
       ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
         name: 'sidebar.right.pane.tab', key: TAB_ID, locale: NS,
-      }, Panel)), 'git-control: right sidebar body');
+      }, Panel)), 'workbench: right sidebar body');
     }
     return { inject, apply };
   },

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "开发工作台",
-    "description": "DeepSeek Harness 对话旁的开发工作台：整合文件树、代码跳转、文档预览、Git 差异与历史，以及断点调试和表达式求值。"
+    "description": "DeepSeek Harness 对话旁的开发工作台：整合文件与图片预览、代码跳转、Git 差异与历史、断点调试、表达式求值和底部终端。"
   }
 }

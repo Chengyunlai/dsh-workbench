@@ -141,7 +141,7 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
       session.state = 'unknown'; session.frames = []; session.scopes = []; session.error = error.message; changed(session);
     });
     session.peers.push(peer);
-    const capabilities = await peer.request('initialize', { clientID: 'dsh-git-control', adapterID: session.language, pathFormat: 'path', linesStartAt1: true, columnsStartAt1: true,
+    const capabilities = await peer.request('initialize', { clientID: 'dsh-workbench', adapterID: session.language, pathFormat: 'path', linesStartAt1: true, columnsStartAt1: true,
       supportsVariableType: true, supportsStartDebuggingRequest: true, supportsRunInTerminalRequest: false });
     const launched = peer.request(request, args); launched.catch(() => {});
     await Promise.race([initialized.promise, launched.then(() => { throw fail('adapter did not initialize the debug session'); })]);

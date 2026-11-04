@@ -29,7 +29,7 @@ Keep each PR focused on one problem and describe its result, actual validation, 
 
 Edit `client.source.js` and its imported modules, then regenerate `client.js` with `npm run build`; do not edit generated output directly. Use host theme variables and en/zh dictionaries. Update the corresponding English and Chinese documentation for user-visible changes and preserve aligned paragraph positions.
 
-Preserve compatibility for `@local/dsh-git-control`, panel identifiers, `/api/git.*` routes, and existing preference keys. Discuss necessary changes first and provide migration steps. Git inspection and source reading remain read-only; launch, attach, and evaluation require explicit user actions.
+Use package name `@yunlai/dsh-workbench` and plugin entry `workbench`; preserve internal panel identifiers, `/api/git.*` routes, and existing preference keys. Discuss necessary changes first and provide migration steps. Git inspection and source reading remain read-only; launch, attach, and evaluation require explicit user actions.
 
 Owners must release subprocesses, language servers, sockets, polling, and listeners and await exit. Async results must not overwrite a newer file, frame, or pause. Tests use independent temporary directories and OS-assigned ports, with observable readiness conditions.
 

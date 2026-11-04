@@ -56,7 +56,8 @@ test('workbench branding preserves installed dock identifiers and leaves the con
       register: (spec, component) => { registrations.push({ spec, component }); return () => registrations.pop(); },
     },
   });
-  assert.ok(plugin.inject.includes('sidebarRightTabs'));
+  assert.equal(plugin.inject.sidebarRightTabs.required, true);
+  assert.equal(plugin.inject.webTerminals.required, false);
   assert.equal(types.length, 1);
   assert.equal(types[0].kind, 'git');
   assert.equal(types[0].id, '@local/dsh-git-control');

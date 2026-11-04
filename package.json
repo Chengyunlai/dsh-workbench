@@ -1,7 +1,6 @@
 {
-  "name": "@local/dsh-git-control",
+  "name": "@yunlai/dsh-workbench",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "scripts": {
     "build": "node build-client.mjs",
@@ -11,7 +10,7 @@
     "setup:debuggers": "node scripts/configure-debuggers.mjs",
     "test:debug": "node --test test/debug.e2e.mjs",
     "check": "node scripts/repository-checks.mjs",
-    "check:generated": "git ls-files --error-unmatch client.js && git diff --exit-code -- client.js",
+    "check:generated": "git ls-files --error-unmatch client.js client.terminal.js && git diff --exit-code -- client.js client.terminal.js",
     "test:package": "node scripts/package-smoke.mjs",
     "verify": "npm test && npm run check && npm run check:generated",
     "setup:ci-tools": "node scripts/setup-ci-tools.mjs"
@@ -21,11 +20,13 @@
     ".": "./index.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
-    "./icon": "./icon.svg"
+    "./icon": "./icon.svg",
+    "./client.terminal.js": "./client.terminal.js"
   },
   "files": [
     "index.js",
     "client.js",
+    "client.terminal.js",
     "navigation.js",
     "image-preview.js",
     "language-config.js",
@@ -50,7 +51,9 @@
     "SECURITY.md",
     "SECURITY.en.md",
     "AUTOMATION.md",
-    "AUTOMATION.en.md"
+    "AUTOMATION.en.md",
+    "UPGRADING.md",
+    "UPGRADING.en.md"
   ],
   "dsh": {
     "bundle": {
@@ -63,7 +66,8 @@
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-sidebar-right",
-        "@deepseek-ai/dsh-client-ui-workspace"
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-api-terminal-controller"
       ]
     }
   },
@@ -88,6 +92,8 @@
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.15",
     "@lezer/highlight": "1.2.5",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
     "codemirror-lang-makefile": "0.1.1",
     "dompurify": "3.4.17",
     "esbuild": "0.28.2",
@@ -114,5 +120,14 @@
     "debugger",
     "lsp",
     "code-navigation"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.14.0",
+    "dsh": ">=0.2.1-rc.5"
+  }
 }

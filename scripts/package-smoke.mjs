@@ -22,9 +22,11 @@ import { Worker } from 'node:worker_threads';
 import { once } from 'node:events';
 import vm from 'node:vm';
 const host = await import('./index.js'); assert.equal(typeof host.apply, 'function'); assert.ok(host.Config);
-for (const file of ['icon.svg','cordis.patch.yml','typescript-worker.js','locale/en.json','locale/zh.json']) await access(file);
+for (const file of ['client.terminal.js','icon.svg','cordis.patch.yml','typescript-worker.js','locale/en.json','locale/zh.json']) await access(file);
 let definition; vm.runInNewContext(await readFile('client.js','utf8'),{window:{__ModuleLoader__:{load:value=>{definition=value;}}}});
-assert.equal(typeof definition.factory,'function'); assert.ok(definition.id);
+assert.equal(typeof definition.factory,'function'); assert.equal(definition.id, JSON.parse(await readFile('package.json','utf8')).name);
+let terminalChunk; vm.runInNewContext(await readFile('client.terminal.js','utf8'),{window:{__ModuleLoader__:{load:value=>{terminalChunk=value;}}}});
+assert.equal(terminalChunk.id,definition.id); assert.equal(terminalChunk.chunk,'client.terminal.js'); assert.equal(typeof terminalChunk.factory,'function');
 const project = await mkdtemp(join(tmpdir(), 'dsh-installed-navigation-'));
 let worker;
 try {
@@ -44,7 +46,7 @@ try {
   const install = join(scratch, 'consumer'); await mkdir(install);
   await writeFile(join(install, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
   await run(npm, ['install', '--omit=dev', '--no-audit', '--no-fund', join(scratch, packed.filename)], install);
-  const installed = join(install, 'node_modules', '@local', 'dsh-git-control');
+  const installed = join(install, 'node_modules', '@yunlai', 'dsh-workbench');
   await run(process.execPath, ['--input-type=module', '--eval', probe], installed);
   const unpacked = join(scratch, 'unpacked'); await mkdir(unpacked);
   await run('tar', ['-xzf', join(scratch, packed.filename), '-C', unpacked], scratch);
