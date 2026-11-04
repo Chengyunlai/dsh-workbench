@@ -96,6 +96,9 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
@@ -108,11 +111,5 @@ jobs:
         env:
           VERSION: ${{ needs.build.outputs.version }}
         run: |
-          cd assets
-          sha256sum --check SHA256SUMS
-          if [[ "$VERSION" == *-* ]]; then
-            DIST_TAG=beta
-          else
-            DIST_TAG=latest
-          fi
-          npm publish "./dsh-workbench-$VERSION.tgz" --access public --tag "$DIST_TAG" --registry=https://registry.npmjs.org --provenance
+          (cd assets && sha256sum --check SHA256SUMS)
+          node scripts/npm-publish.mjs

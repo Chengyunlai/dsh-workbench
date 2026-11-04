@@ -34,7 +34,7 @@ npm run test:debug
 
 正式发布时，先通过 PR 更新 `package.json`、锁文件版本和变更说明，合并到 main。给该提交创建与包版本完全相同的 `v<version>` 标签并推送，例如包版本 `1.0.0` 对应 `v1.0.0`。发布检查拒绝版本不符或不在 main 历史中的标签。
 
-标签触发测试、干净安装验收、ZIP／tarball 与校验和生成，再由独立任务创建 Draft Release。预发布版本自动标为 prerelease。维护者检查后公开 Release，`release.published` 事件再次验证该标签位于 main 历史并通过全部发布检查，随后用 OIDC 发布已验收的 tarball 到 npm；稳定版使用 `latest`，含预发布后缀的版本使用 `beta`。手动构建演练和草稿均不发布 npm。
+标签触发测试、干净安装验收、ZIP／tarball 与校验和生成，再由独立任务创建 Draft Release。预发布版本自动标为 prerelease。维护者检查后公开 Release，`release.published` 事件再次验证该标签位于 main 历史并通过全部发布检查，随后用 OIDC 发布已验收的 tarball 到 npm；稳定版使用 `latest`，含预发布后缀的版本使用 `beta`。手动构建演练和草稿均不发布 npm。若首次手动发布的版本已存在，只有 npm 的 SHA-512 integrity 与验收 tarball 完全相同才跳过发布；版本相同但内容不同会报错，必须发布新版本。
 
 ZIP 用户解压后按附带的 `INSTALL.txt` 运行 `npm ci --omit=dev`，再由 Harness 插件管理器安装解压目录。npm tarball 可用 npm 安装；它不包含锁文件。正式包为公开的 `@yunlai/dsh-workbench`，兼容要求由 `engines.dsh` 声明。
 
