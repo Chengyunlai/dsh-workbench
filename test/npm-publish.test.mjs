@@ -13,6 +13,10 @@ test('bootstrap publication skips only byte-identical npm versions and rejects n
   let calls = 0;
   assert.equal(await publishArtifact('1.0.0', dir, async () => { calls++; return { stdout: JSON.stringify(integrity) }; }), 'already-published');
   assert.equal(calls, 1);
+  assert.equal(await publishArtifact('1.0.0', dir, async () => ({ stdout: JSON.stringify([integrity]) })), 'already-published');
+  for (const response of [[], [integrity, integrity], [null], { integrity }, null]) {
+    await assert.rejects(publishArtifact('1.0.0', dir, async () => ({ stdout: JSON.stringify(response) })), /exactly one string/);
+  }
   await assert.rejects(publishArtifact('1.0.0', dir, async () => ({ stdout: JSON.stringify('sha512-other') })), /different package bytes/);
   const network = Object.assign(new Error('network'), { stdout: JSON.stringify({ error: { code: 'ENETUNREACH' } }) });
   await assert.rejects(publishArtifact('1.0.0', dir, async () => { throw network; }), error => error === network);
