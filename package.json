@@ -1,6 +1,6 @@
 {
   "name": "@yunlai/dsh-workbench",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "build": "node build-client.mjs",
@@ -8,7 +8,7 @@
     "test:languages": "node --test test/languages.e2e.mjs",
     "setup:languages": "node scripts/configure-languages.mjs",
     "setup:debuggers": "node scripts/configure-debuggers.mjs",
-    "test:debug": "node --test test/debug.e2e.mjs",
+    "test:debug": "node --test test/debug.e2e.mjs test/debug-hover.e2e.mjs",
     "check": "node scripts/repository-checks.mjs",
     "check:generated": "git ls-files --error-unmatch client.js client.terminal.js && git diff --exit-code -- client.js client.terminal.js",
     "test:package": "node scripts/package-smoke.mjs",
@@ -40,6 +40,7 @@
     "README.md",
     "README.en.md",
     "debug-dap.js",
+    "debug-inspection.js",
     "debug-service.js",
     "debug-targets.js",
     "scripts/configure-debuggers.mjs",

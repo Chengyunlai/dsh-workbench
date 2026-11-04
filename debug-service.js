@@ -4,6 +4,7 @@ import { realpath } from 'node:fs/promises';
 import { relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import ts from 'typescript';
+import { inspectDebugVariable, readDebugVariables } from './debug-inspection.js';
 import { dapPeer } from './debug-dap.js';
 import { readWorkspaceSource } from './navigation.js';
 import { currentFileTarget, attachTarget } from './debug-targets.js';
@@ -13,6 +14,7 @@ const deferred = () => { let resolve; const promise = new Promise(done => { reso
 /**
  * Register project configuration and session actions behind the plugin's authenticated routes.
  * Evaluation requires a frame from the supplied pause generation, uses DAP repl context, and never retries.
+ * Hover inspection reads scopes/variables outside the execution-action queue and expires with its pause; it never sends evaluate.
  * Failed or stale evaluation may have changed the target; callers must not infer rollback.
  * @param ctx - Scoped host with filesystem and managed subprocess services.
  * @param config - Validated plugin adapter commands and timeouts.
@@ -244,10 +246,12 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
       return json({ configurations: rows.map(({ name, language, request, currentFile }) => ({ name, language, request, currentFile })), launchError });
     },
     async status(request) { const query = new URL(request.url).searchParams; const cwd = query.get('cwd'); await local(cwd); const session = query.get('id') ? find(cwd, query.get('id')) : [...sessions.values()].find(item => item.cwd === cwd && item.state !== 'ended'); return json(session ? snapshot(session) : { id: null, state: 'idle' }); },
-    async action(request) {
+    async action(request, signal = request.signal) {
       const body = await request.json(); if (!body || typeof body.cwd !== 'string') throw fail('missing workspace'); await local(body.cwd);
       if (body.action === 'start') return json(await start(body.cwd, body));
       const session = find(body.cwd, body.id);
+      if (body.action === 'inspect') return json(await inspectDebugVariable(session, session.activePeer ?? session.peers[0], body, signal, config.debugInspectMaxVariables));
+      if (body.action === 'variables') return json(await readDebugVariables(session, session.activePeer ?? session.peers[0], body, signal));
       const task = (session.actions ?? Promise.resolve()).then(async () => {
       const peer = session.activePeer ?? session.peers[0];
       if (body.action === 'stop') { await close(session); return json(snapshot(session)); }
@@ -281,9 +285,7 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
         if (session.state !== 'paused' || epoch !== (session.stopEpoch ?? 0)) throw fail('program changed while evaluating; the expression may have executed', 409, 'DEBUG_EVALUATION_STALE');
         if (typeof result.result !== 'string' || !Number.isSafeInteger(result.variablesReference) || result.variablesReference < 0) throw fail('invalid evaluation response; the expression may have executed', 502, 'DEBUG_EVALUATION_FAILED');
         return json({ result: result.result, type: typeof result.type === 'string' ? result.type : undefined, variablesReference: result.variablesReference });
-      } else if (body.action === 'variables') {
-        if ((body.pauseId !== undefined && body.pauseId !== (session.stopEpoch ?? 0)) || session.state !== 'paused' || !Number.isSafeInteger(body.reference) || body.reference <= 0) throw fail('invalid variable reference');
-        return json(await peer.request('variables', { variablesReference: body.reference, start: 0, count: 100 }));
+
       } else throw fail('unsupported debug action');
       return json(snapshot(session));
       });

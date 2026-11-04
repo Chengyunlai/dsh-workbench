@@ -198,6 +198,44 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
       ? h(VariableTree, { debug, reference: item.variablesReference, title: h(VariableValue, { item }), t })
       : h('div', { className: 'jb-variable-leaf' }, h(VariableValue, { item })))));
   }
+  function debugKeyDown(debug, event) {
+    if (event.metaKey || event.ctrlKey || event.isComposing) return;
+    if (event.key === 'F8' && event.altKey && !event.shiftKey) { event.preventDefault(); event.stopPropagation(); debug.openEvaluation(); return; }
+    const action = event.key === 'F5' ? event.shiftKey ? 'stop' : event.altKey ? 'pause' : 'continue'
+      : event.key === 'F8' && !event.altKey ? event.shiftKey ? 'stepOut' : 'next' : event.key === 'F7' && !event.shiftKey && !event.altKey ? 'stepIn' : null;
+    if (!action) return;
+    event.preventDefault(); event.stopPropagation();
+    if (action === 'continue' && !debug.busy && !active(debug.session)) { debug.run(); return; }
+    if (!debug.busy && debug.session?.id && (action === 'stop' ? debug.session.state !== 'ended' : action === 'pause' ? debug.session.state === 'running' : debug.session.state === 'paused')) debug.action(action);
+  }
+  /** Values are scoped to the selected pause/frame; the editor owns the hover's position and lifetime. */
+  function DebugHover({ debug, expression, t, onClose }) {
+    const [value, setValue] = useState(null), [error, setError] = useState(null), [loading, setLoading] = useState(true);
+    const session = debug.session, frame = session.frames.find(frame => frame.id === debug.selectedFrameId);
+    useEffect(() => {
+      const controller = new AbortController();
+      setLoading(true); setValue(null); setError(null);
+      api('/api/git.debug.action', { method: 'POST', signal: controller.signal, body: { cwd: debug.cwd, id: session.id,
+        action: 'inspect', expression, frameId: frame.id, pauseId: session.pauseId } })
+        .then(data => {
+          if (controller.signal.aborted) return;
+          if (!data || typeof data.limited !== 'boolean' || (data.variable !== null && (!data.variable || typeof data.variable.name !== 'string'
+            || typeof data.variable.value !== 'string' || !Number.isSafeInteger(data.variable.variablesReference) || data.variable.variablesReference < 0))) throw new Error(t('debug.hoverInvalid'));
+          setValue(data);
+        })
+        .catch(error => { if (!controller.signal.aborted) error.code === 'DEBUG_INSPECTION_STALE' ? onClose() : setError(t('debug.hoverFailed', { message: error.message })); })
+        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      return () => controller.abort();
+    }, [debug.cwd, session.id, session.pauseId, frame.id, debug.variablesVersion, expression]);
+    return h('section', { role: 'dialog', 'aria-label': t('debug.inspect'), className: 'jb-debug-hover-body',
+      onKeyDown: event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(true); } else { debugKeyDown(debug, event); if (event.defaultPrevented) onClose(true); } } },
+      h('div', { className: 'jb-debug-hover-frame', title: frame.path }, frame.name + ' · ' + (frame.path?.split('/').at(-1) ?? t('debug.external')) + ':' + frame.line),
+      loading ? h('div', { className: 'jb-debug-placeholder', role: 'status' }, t('loading')) : null,
+      error ? h('div', { role: 'alert' }, error) : null,
+      value?.variable ? h('div', { className: 'jb-debug-hover-value' }, value.variable.variablesReference > 0
+        ? h(VariableTree, { debug, reference: value.variable.variablesReference, title: h(VariableValue, { item: value.variable }), t })
+        : h(VariableValue, { item: value.variable })) : value ? h('div', { className: 'jb-debug-placeholder', role: 'status' }, h('code', null, expression), ' · ', t(value.limited ? 'debug.hoverLimited' : 'debug.hoverMissing')) : null);
+  }
   function EvaluationDialog({ debug, t, onClose }) {
     const ref = useRef(null), input = useRef(null), pending = useRef(false), sequence = useRef(0);
     const [expression, setExpression] = useState(debug.evaluation.expression), [result, setResult] = useState(null), [error, setError] = useState(null), [busy, setBusy] = useState(false);
@@ -278,14 +316,7 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
     const selectedScopes = frameId === session?.frames?.[0]?.id ? { scopes: session.scopes }
       : frameScopes?.sessionId === session?.id && frameScopes?.frameId === frameId && frameScopes.pauseId === session?.pauseId ? frameScopes : null;
     return h('section', { className: 'jb-debug-pane', 'aria-label': t('debug.title'), onKeyDown: event => {
-      if (event.metaKey || event.ctrlKey || event.isComposing) return;
-      if (event.key === 'F8' && event.altKey && !event.shiftKey) { event.preventDefault(); event.stopPropagation(); debug.openEvaluation(); return; }
-      const action = event.key === 'F5' ? event.shiftKey ? 'stop' : event.altKey ? 'pause' : 'continue'
-        : event.key === 'F8' && !event.altKey ? event.shiftKey ? 'stepOut' : 'next' : event.key === 'F7' && !event.shiftKey && !event.altKey ? 'stepIn' : null;
-      if (!action) return;
-      event.preventDefault(); event.stopPropagation();
-      if (action === 'continue' && !debug.busy && !active(session)) { debug.run(); return; }
-      if (!debug.busy && session?.id && (action === 'stop' ? session.state !== 'ended' : action === 'pause' ? session.state === 'running' : session.state === 'paused')) debug.action(action);
+      debugKeyDown(debug, event);
     } },
       h(DebugToolbar, { debug, t }),
       debug.error || session?.error ? h('div', { role: 'alert' }, debug.error ?? session.error) : null,
@@ -304,5 +335,5 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
             ...(selectedScopes?.scopes ?? []).map((scope, index) => h(VariableTree, { key: scope.variablesReference, debug, reference: scope.variablesReference, title: scope.name, defaultOpen: index === 0, t }))))) : null,
       session?.output ? h('details', { open: true, className: 'jb-debug-section jb-debug-output' }, h('summary', null, t('debug.output')), h('pre', null, session.output)) : null));
   }
-  return { useDebugger, DebugPane, EvaluationDialog, controlItems };
+  return { useDebugger, DebugPane, EvaluationDialog, DebugHover, controlItems };
 }

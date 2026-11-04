@@ -9,14 +9,14 @@ import { StreamMessageReader, StreamMessageWriter } from 'vscode-jsonrpc/node';
  * @param onReverse - Reverse request handler, or a rejected request when unsupported.
  * @param timeoutMs - Maximum request duration.
  * @param onFailure - Reports transport/protocol failures while no request is pending.
- * @returns Requests and an idempotent disposer rejecting all outstanding work.
+ * @returns Requests with optional AbortSignals and an idempotent disposer rejecting outstanding work; abort stops waiting without promising adapter cancellation.
  */
 export function dapPeer(input, output, onEvent, onReverse, timeoutMs, onFailure) {
   const reader = new StreamMessageReader(input), writer = new StreamMessageWriter(output);
   // Request deadlines own liveness; partial-message notices have no consumer and retain timers after disposal.
   reader.partialMessageTimeout = 0;
   const pending = new Map(); let sequence = 0, closed = false, disposed = false;
-  const fail = error => { for (const entry of pending.values()) { clearTimeout(entry.timer); entry.reject(error); } pending.clear(); if (!disposed) onFailure(error); };
+  const fail = error => { for (const entry of pending.values()) { entry.cleanup(); entry.reject(error); } pending.clear(); if (!disposed) onFailure(error); };
   const send = message => writer.write({ ...message, seq: ++sequence });
   reader.onError(error => { closed = true; fail(error); }); writer.onError(([error]) => { closed = true; fail(error); });
   reader.onClose(() => { closed = true; fail(new Error('debug adapter connection closed')); });
@@ -26,7 +26,7 @@ export function dapPeer(input, output, onEvent, onReverse, timeoutMs, onFailure)
     if (message.type === 'response') {
       const entry = pending.get(message.request_seq);
       if (!entry) return;
-      pending.delete(message.request_seq); clearTimeout(entry.timer);
+      pending.delete(message.request_seq); entry.cleanup();
       if (message.success) entry.resolve(message.body ?? {});
       else entry.reject(new Error(message.message ?? 'debug adapter rejected request'));
     } else if (message.type === 'event' && typeof message.event === 'string') {
@@ -41,13 +41,17 @@ export function dapPeer(input, output, onEvent, onReverse, timeoutMs, onFailure)
     }
   });
   return {
-    request(command, args = {}) {
+    request(command, args = {}, signal) {
+      if (signal?.aborted) return Promise.reject(signal.reason);
       if (closed) return Promise.reject(new Error('debug adapter is disconnected'));
       const seq = ++sequence;
       return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => { pending.delete(seq); reject(new Error(`debug request timed out: ${command}`)); }, timeoutMs);
-        pending.set(seq, { resolve, reject, timer });
-        writer.write({ seq, type: 'request', command, arguments: args }).catch(error => { pending.delete(seq); clearTimeout(timer); reject(error); });
+        const timer = setTimeout(() => { pending.delete(seq); cleanup(); reject(new Error(`debug request timed out: ${command}`)); }, timeoutMs);
+        const abort = () => { pending.delete(seq); cleanup(); reject(signal.reason); };
+        const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); };
+        pending.set(seq, { resolve, reject, cleanup });
+        signal?.addEventListener('abort', abort, { once: true });
+        writer.write({ seq, type: 'request', command, arguments: args }).catch(error => { pending.delete(seq); cleanup(); reject(error); });
       });
     },
     dispose() { if (disposed) return; disposed = true; closed = true; fail(new Error('debug adapter disconnected')); subscription.dispose(); reader.dispose(); writer.dispose(); },

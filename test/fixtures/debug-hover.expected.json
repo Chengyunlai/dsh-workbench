@@ -1,0 +1,8 @@
+{
+  "label": "查看变量值",
+  "frame": "caller · main.ts:1",
+  "expression": "args",
+  "value": "Namespace(config=\"demo.json\")",
+  "child": "\"demo.json\"",
+  "readOnly": true
+}

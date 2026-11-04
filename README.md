@@ -22,13 +22,19 @@ AI 给出改动后，你可以就在对话旁打开文件、沿着定义跳转�
 
 | 读懂代码 | 看清改动 | 检查真实执行 |
 | --- | --- | --- |
-| 文件树、路径复制、文件与目录查找、多标签、语法高亮、同名词高亮、定义跳转、代码折叠和阅读历史。对话中的 Markdown 可直接进入工作台阅读预览，也可切回源码；图片和 ICNS 图标可直接预览。 | 查看工作区变更、逐行 diff、提交图和提交详情；从差异跳回源码，手动把选中的 diff 交给项目新对话讨论。 | 启动或接入已有进程，设置断点、单步、切换调用栈、展开变量、计算表达式，并清理全部断点。 |
+| 文件树、路径复制、文件与目录查找、多标签、语法高亮、同名词高亮、定义跳转、代码折叠和阅读历史。对话中的 Markdown 可直接进入工作台阅读预览，也可切回源码；图片和 ICNS 图标可直接预览。 | 查看工作区变更、逐行 diff、提交图和提交详情；从差异跳回源码，手动把选中的 diff 交给项目新对话讨论。 | 启动或接入已有进程，设置断点、单步、切换调用栈、悬浮查看变量值、展开对象、计算表达式，并清理全部断点。 |
 
 ## 能力演示
 
 以下是真实 Harness 界面，使用虚构的 Sample Shop 项目。点击截图可查看对应 GIF。
 
 <table><tr><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/read-code.png" alt="代码与文档阅读" /></a><br /><strong>代码与文档阅读</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/review-changes.png" alt="Git 差异与历史" /></a><br /><strong>Git 差异与历史</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/debug-program.png" alt="断点与表达式求值" /></a><br /><strong>断点与表达式求值</strong></td></tr></table>
+
+### 暂停后，悬浮就能看当前值
+
+鼠标停在变量或点分成员上，即可查看所选栈帧的值和类型，展开对象后还能继续单步。以下使用虚拟项目和真实 Python 调试器；四张实录画面按阅读时长停留，不代表响应耗时。[录制说明](https://github.com/Chengyunlai/dsh-workbench/blob/demo-assets/demos/2026-11-04-dc2b2e3/RECORDING.md)。
+
+![Python 暂停变量悬浮、对象字段与单步](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-dc2b2e3/debug-hover.gif)
 
 <details>
 <summary><strong>播放：断点、变量与 Evaluate Expression</strong></summary>

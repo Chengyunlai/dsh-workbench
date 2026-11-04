@@ -1,9 +1,9 @@
 /** Continuous, read-only source editor with JetBrains-style pointer and keyboard navigation. */
 import { EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
-import { EditorView, Decoration, gutter, GutterMarker, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from '@codemirror/view';
+import { EditorView, Decoration, gutter, GutterMarker, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, hoverTooltip, tooltips, closeHoverTooltips, hasHoverTooltips, activateHover } from '@codemirror/view';
 import { defaultKeymap } from '@codemirror/commands';
 import { highlightSelectionMatches, search, searchKeymap, openSearchPanel } from '@codemirror/search';
-import { LanguageSupport, StreamLanguage, syntaxHighlighting, bracketMatching, foldGutter, foldKeymap, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language';
+import { LanguageSupport, StreamLanguage, syntaxTree, syntaxHighlighting, bracketMatching, foldGutter, foldKeymap, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language';
 import { javascript } from '@codemirror/lang-javascript';
 import { go } from '@codemirror/lang-go';
 import { java } from '@codemirror/lang-java';
@@ -150,6 +150,26 @@ function wordAt(state, position) {
   return null;
 }
 
+/** Resolve the variable/member path ending at the hovered identifier, excluding literals, comments and computed receivers.
+ * @param state - Parsed source document.
+ * @param position - UTF-16 source position.
+ * @param side - Pointer side at a token edge.
+ * @returns The source range and literal dotted lookup path, or null outside supported identifiers.
+ */
+export function debugHoverAt(state, position, side = 1) {
+  const word = wordAt(state, position);
+  if (!word || (position === word.from && side < 0) || (position === word.to && side > 0)) return null;
+  const node = syntaxTree(state).resolveInner(word.from + Math.min(1, word.to - word.from), -1);
+  if (!/^(?:VariableName|VariableDefinition|DefName|Definition|Identifier|PropertyName|FieldName|TypeName|self|this)$/.test(node.name)) return null;
+  const line = state.doc.lineAt(word.from), prefix = state.sliceDoc(line.from, word.to);
+  const name = '[$\\p{ID_Start}][$\\u200c\\u200d\\p{ID_Continue}]*';
+  const match = new RegExp(name + '(?:\\s*(?:\\?\\.|\\.)\\s*' + name + ')*$', 'u').exec(prefix);
+  if (!match || /[.\p{ID_Continue}\])?]$/u.test(prefix.slice(0, match.index))) return null;
+  const expression = match[0].split(/\s*(?:\?\.|\.)\s*/u).join('.');
+  if (expression.length > 512 || expression.split('.').length > 16 || (/^(PropertyName|FieldName)$/.test(node.name) && !expression.includes('.'))) return null;
+  return { from: line.from + match.index, to: word.to, expression };
+}
+
 /**
  * Mount a source reader; callers own its returned disposer.
  * @param parent - Empty editor container.
@@ -157,7 +177,20 @@ function wordAt(state, position) {
  * @returns Focus, caret/viewport/fold snapshots, reveal, host-source replacement and disposal actions; user edits remain disabled.
  */
 export function createSourceEditor(parent, options) {
-  let sourceVersion = options.version;
+  let sourceVersion = options.version, inspectionKey = null;
+  const inspection = hoverTooltip((view, position, side) => {
+    if (!inspectionKey || view.state.field(linkField).size) return null;
+    const target = debugHoverAt(view.state, position, side);
+    if (!target) return null;
+    const key = inspectionKey;
+    return { pos: target.from, end: target.to, above: false,
+      create() {
+        const dom = document.createElement('div'); dom.className = 'jb-debug-hover';
+        return { dom, offset: { x: 0, y: 6 },
+          mount: () => options.onHoverMount({ dom, key, expression: target.expression }),
+          destroy: () => options.onHoverUnmount(dom) };
+      } };
+  }, { hideOnChange: true });
   const positionAt = (view, offset = view.state.selection.main.head) => {
     const line = view.state.doc.lineAt(offset);
     return { line: line.number - 1, character: offset - line.from };
@@ -180,7 +213,7 @@ export function createSourceEditor(parent, options) {
     EditorState.phrases.of(options.foldPhrases),
     EditorState.phrases.of(options.searchPhrases ?? {}),
     EditorView.contentAttributes.of({ tabindex: '0', 'aria-label': options.label, 'aria-readonly': 'true' }),
-    debugField, executionLine,
+    debugField, executionLine, inspection, tooltips({ parent: document.body, position: 'fixed' }),
     gutter({ class: 'jb-breakpoints', lineMarker: (view, line) => { const number = view.state.doc.lineAt(line.from).number, value = view.state.field(debugField); const point = value.breakpoints.find(item => item.line === number); return new BreakpointMarker(Boolean(point), point?.verified === true, value.currentLine === number, options.breakpointLabel); }, lineMarkerChange: update => update.transactions.some(transaction => transaction.effects.some(effect => effect.is(debugEffect))), domEventHandlers: { mousedown: (view, line, event) => { event.preventDefault(); options.onToggleBreakpoint(view.state.doc.lineAt(line.from).number); return true; } } }),
     lineNumbers(), foldGutter(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(), bracketMatching(),
     highlightSelectionMatches({ highlightWordAroundCursor: true, wholeWords: true }),
@@ -189,6 +222,7 @@ export function createSourceEditor(parent, options) {
     syntaxHighlighting(sourceHighlighting), sourceLanguage(path),
     linkField,
     Prec.highest(keymap.of([
+      { key: 'Escape', run: view => { if (!hasHoverTooltips(view.state)) return false; view.dispatch({ effects: closeHoverTooltips }); return true; }, stopPropagation: true },
       { key: 'Mod-b', run: define, stopPropagation: true },
       { key: 'F9', run: view => { options.onToggleBreakpoint(positionAt(view).line + 1); return true; }, stopPropagation: true },
       ...[['F5', 'run'], ['Shift-F5', 'stop'], ['F8', 'next'], ['F7', 'stepIn'], ['Shift-F8', 'stepOut'], ['Alt-F5', 'pause'], ['Alt-F8', 'evaluate']].map(([key, action]) => ({ key, run: () => { options.onDebug(action); return true; }, stopPropagation: true })),
@@ -290,6 +324,9 @@ export function createSourceEditor(parent, options) {
   reveal(options.position, true);
   if (options.takeFocus) view.focus();
   return {
+    setInspection: key => { if (key !== inspectionKey) { inspectionKey = key; view.dispatch({ effects: closeHoverTooltips }); } },
+    inspect: () => { const head = view.state.selection.main.head; if (inspectionKey) activateHover(view, head, wordAt(view.state, head)?.to === head ? -1 : 1, { tooltip: inspection, until: transaction => transaction.selection !== undefined }); },
+    closeInspection: () => view.dispatch({ effects: closeHoverTooltips }),
     setDebug: value => {
       const previous = view.state.field(debugField), effects = [debugEffect.of(value)];
       for (const key of ['currentLine', 'selectedLine']) {

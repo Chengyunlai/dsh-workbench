@@ -82,6 +82,12 @@ The paused view shows stack frames, variables, and output under separate section
 
 F5/F7/F8/Shift+F8/Alt+F5/Shift+F5 also work while the stack or variables have focus. Right-click a frame or press Shift+F10 for source navigation, resume, step, pause, and end actions. Output/status updates preserve frame selection and variable expansion; the next pause selects the execution frame again. Late variable responses after selection changes or resuming cannot overwrite the current selection. External frames can show variables without reading external source.
 
+### Hover variable inspection
+
+While paused, hover a source variable or dotted member (such as `path` or `args.config`) to see its value and type in the selected stack frame. Expand objects to load children; select and copy long values. Alternatively, press Shift+F10 at the variable and choose Inspect variable value. Esc dismisses the popup. Changing files or frames, stepping, resuming, or ending closes the old popup and cancels pending queries.
+
+Inspection looks up adapter scopes/variables without sending evaluate requests and skips scopes marked expensive. Use Evaluate expression for calls, indexed expressions, or members the adapter does not expose. Each query reads at most `debugInspectMaxVariables` variable rows across scopes and member levels: 1000 by default, configurable from 1–10000 in plugin settings. Reaching the limit shows a hint. Values and types come from the debug adapter.
+
 ### Remove breakpoints and evaluate expressions
 
 The toolbar trash icon and source context menu offer Remove all breakpoints. Before launch, this clears every file’s panel breakpoints. During an active session, it also sends clearing requests to every connected adapter and removes markers after confirmation. A failure reports unverified adapter state and retains local markers for reapplication.
@@ -96,4 +102,4 @@ Launch owns its created program: ending or unloading requests termination and aw
 
 ## Verification
 
-`npm test` covers input validation, ownership, concurrent starts, gutter/keyboard interactions, navigation, and themes. After configuring real adapters, `npm run test:debug` exercises dedicated programs in temporary workspaces, leaving the current project unexecuted. Set `DSH_DEBUG_GO=/absolute/path/to/go` when Go is outside PATH. These environment-dependent cases live in `test/debug.e2e.mjs`, outside the default suite.
+`npm test` covers input validation, ownership, concurrent starts, gutter/keyboard interactions, navigation, and themes. After configuring real adapters, `npm run test:debug` exercises dedicated programs in temporary workspaces, leaving the current project unexecuted. Set `DSH_DEBUG_GO=/absolute/path/to/go` when Go is outside PATH. These environment-dependent cases live in `test/debug.e2e.mjs` and `test/debug-hover.e2e.mjs`, outside the default suite. To verify Python hover inspection alone, run `DSH_HOVER_PYTHON=/absolute/path/to/python node --test test/debug-hover.e2e.mjs`.
