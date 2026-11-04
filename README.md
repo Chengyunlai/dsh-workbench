@@ -57,7 +57,7 @@ AI 给出改动后，你可以就在对话旁打开文件、沿着定义跳转�
 
 ## 安装
 
-**1. 在线安装。** 在 Harness 插件管理器的“安装插件”中输入 `@yunlai/dsh-workbench`。首次 npm 发布后可安装，后续从插件详情检查并选择新版本；按提示重载或重启。需要本地开发时也可使用以下源码安装方式：
+**1. 在线安装。** 在 Harness 插件管理器的“安装插件”中输入 `@yunlai/dsh-workbench`。从插件详情检查并选择新版本；按提示重载或重启。需要本地开发时也可使用以下源码安装方式：
 
 ```sh
 git clone https://github.com/Chengyunlai/dsh-workbench.git

@@ -57,7 +57,7 @@ The cover is a concept illustration; product screenshots and GIFs come from isol
 
 ## Install
 
-**1. Install online.** Enter `@yunlai/dsh-workbench` in the Harness plugin manager. Installation becomes available after the first npm publication; check and select newer versions in plugin details, then reload or restart when prompted. For local development, use the source installation below:
+**1. Install online.** Enter `@yunlai/dsh-workbench` in the Harness plugin manager. Check and select newer versions in plugin details, then reload or restart when prompted. For local development, use the source installation below:
 
 ```sh
 git clone https://github.com/Chengyunlai/dsh-workbench.git

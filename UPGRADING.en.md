@@ -1,5 +1,11 @@
 # Upgrade the development workbench
 
+## 1.1.0
+
+For npm installations, select `1.1.0` in the Harness plugin details and reload or restart as prompted. This version adds workbench reading previews for conversation Markdown, shared bottom tool windows, and read-only tree menus, path copying, current-file location, and file/directory content search. Previously opened Git tabs display the development workbench title. Project-file and Git inspection remain read-only; terminals and debugging run with their respective execution permissions.
+
+No manual project-file migration or layout-data cleanup is required. Changes, History, Debugger and Terminal share the bottom window, with a new Find entry. Previous debugger dock preferences are unused, and file-tree sizes are retained. Earlier package-name migration and switching from local installations are documented below.
+
 ## Change
 
 The package changes from `@local/dsh-git-control` (interim name `@local/dsh-workbench`) to `@yunlai/dsh-workbench`, and its bundle entry changes from `git-control` to `workbench`. Older configuration must update package references. Sidebar and layout preferences retain their internal keys; do not clear user data.
@@ -16,8 +22,8 @@ The package changes from `@local/dsh-git-control` (interim name `@local/dsh-work
 
 ## Switch to online installation
 
-For installations from a local directory, `link:`, or a Git address, remove the old installation reference through the Harness plugin manager and install `@yunlai/dsh-workbench` from npm. This becomes available after the first npm publication. Do not enable local and npm copies together; keep layout preferences and local projects. Subsequent updates use version selection in plugin details, followed by reload or restart when prompted. Request previews explicitly with `@yunlai/dsh-workbench@beta`.
+For installations from a local directory, `link:`, or a Git address, remove the old installation reference through the Harness plugin manager and install `@yunlai/dsh-workbench` from npm. Do not enable local and npm copies together; keep layout preferences and local projects. Subsequent updates use version selection in plugin details, followed by reload or restart when prompted. Request previews explicitly with `@yunlai/dsh-workbench@beta`.
 
 ## Bottom tool window
 
-Changes, History, Debugger, and Terminal now switch through bottom icons in one resizable tool window. The top Changes/History tabs and separate debugger Dock selector are removed. Previous debugger sizes and docking preferences are no longer used and require no manual cleanup. File-tree sizes remain; the shared tool height is saved separately. Hiding or switching tools retains the terminal process; closing its owning workbench or unloading the plugin requests termination.
+Find, Changes, History, Debugger, and Terminal now switch through bottom icons in one resizable tool window. The top Changes/History tabs and separate debugger Dock selector are removed. Previous debugger sizes and docking preferences are no longer used and require no manual cleanup. File-tree sizes remain; the shared tool height is saved separately. Hiding or switching tools retains the terminal process; closing its owning workbench or unloading the plugin requests termination.
