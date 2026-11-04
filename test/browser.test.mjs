@@ -181,7 +181,7 @@ test('bottom icons switch one shared window, preserve terminal output and select
   }), { terminal: true });
   const editor = ui.editor();
   assert.ok(editor);
-  assert.deepEqual([...ui.container.querySelectorAll('.jb-tools-bar button')].map(button => button.getAttribute('aria-label')), ['变更', '历史', '调试', '终端']);
+  assert.deepEqual([...ui.container.querySelectorAll('.jb-tools-bar button')].map(button => button.getAttribute('aria-label')), ['查找', '变更', '历史', '调试', '终端']);
   assert.equal(ui.container.querySelector('.jb-tool-toggle[aria-pressed=true]').dataset.tool, 'debug');
   await ui.click('terminal.title');
   const screen = ui.container.querySelector('.jb-terminal-screen');
@@ -1418,4 +1418,86 @@ test('decode failures are visible, a new file clears them, and untracked image d
   assert.ok(ui.container.querySelector('.jb-image-stage img'));
   await ui.menu([...ui.container.querySelectorAll('.jb-filebutton')].find(node => node.textContent.includes('broken.png')), 'files.diff');
   assert.ok(ui.container.querySelector('.jb-diffempty').textContent.includes(ui.t('diff.binary')));
+});
+
+test('file and directory menus copy paths, support keyboard access and locate the current source', async context => {
+ const ui = await panel(context, server(url => url.pathname === '/api/git.tree' ? { ok: true, json: async () => ({ files: [...Object.keys(source), 'src/nested/helper.py'] }) } : undefined));
+ const doc = ui.dom.window.document, copied = [];
+ Object.defineProperty(ui.dom.window.navigator, 'clipboard', { configurable: true, value: { writeText: async value => copied.push(value) } });
+ await ui.menu(ui.button('src'), 'tree.expand');
+ assert.ok(ui.container.querySelector('.jb-tree [data-file-path="src/nested/helper.py"]'));
+ await ui.click('main.ts');
+ for (const key of ['tree.copyName','tree.copyRelative','tree.copyAbsolute']) await ui.menu(ui.button('main.ts'), key);
+ assert.deepEqual(copied, ['main.ts','src/main.ts','/demo/src/main.ts']);
+ await ui.menu(ui.button('src'), 'tree.collapse');
+ assert.equal(ui.container.querySelector('.jb-tree [data-file-path="src/main.ts"]'), null);
+ await ui.click('tree.locate');
+ assert.equal(doc.activeElement.dataset.filePath, 'src/main.ts');
+ const folder = ui.button('src'); folder.focus();
+ await act(async () => folder.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true })));
+ assert.ok(doc.querySelector('[role=menu]'));
+ assert.ok([...doc.querySelectorAll('[role=menuitem]')].some(row => row.textContent.includes(ui.t('tree.findDirectory'))));
+ await act(async () => doc.activeElement.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+ await ui.menu(ui.button('src'), 'tree.findName');
+ const filter = ui.container.querySelector('[aria-label="按文件名查找"]');
+ assert.equal(filter.value, 'src/'); assert.equal(doc.activeElement, filter);
+ await ui.click('tree.locate'); assert.equal(filter.value, ''); assert.equal(doc.activeElement.dataset.filePath, 'src/main.ts');
+ Object.defineProperty(ui.dom.window.navigator, 'clipboard', { value: { writeText: async () => { throw new Error('denied'); } } });
+ await ui.menu(ui.button('main.ts'), 'tree.copyAbsolute');
+ const dialog = doc.querySelector('[role=dialog]'), manual = dialog.querySelector('input');
+ assert.equal(manual.readOnly, true); assert.equal(manual.value, '/demo/src/main.ts');
+ assert.equal(manual.selectionEnd - manual.selectionStart, manual.value.length);
+ await act(async () => manual.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+ assert.equal(doc.querySelector('[role=dialog]'), null);
+});
+
+test('file Find uses a localized read-only search panel and directory Find opens scoped results in the shared bottom window', async context => {
+ const requests = [];
+ const ui = await panel(context, server(url => {
+  if (url.pathname === '/api/git.search') return { ok: true, json: async () => ({ matches: [{ path: 'src/lib.ts', line: 1, character: 16, text: source['src/lib.ts'] }], limited: false, skipped: 0 }) };
+ }, requests));
+ await ui.click('src');
+ await ui.menu(ui.button('main.ts'), 'tree.findFile');
+ const search = ui.container.querySelector('.cm-search');
+ assert.ok(search); assert.equal(search.querySelector('input[name=search]').getAttribute('placeholder'), '查找');
+ assert.equal(search.querySelector('input[name=replace]'), null);
+ assert.equal(ui.editor().state.readOnly, true);
+ await ui.key('Escape');
+ await ui.menu(ui.button('src'), 'tree.findDirectory');
+ assert.equal(ui.container.querySelector('.jb-tool-toggle[aria-pressed=true]').dataset.tool, 'find');
+ const input = ui.container.querySelector('.jb-search-form input[type=search]');
+ const setter = Object.getOwnPropertyDescriptor(ui.dom.window.HTMLInputElement.prototype, 'value').set;
+ await act(async () => { setter.call(input, 'render'); input.dispatchEvent(new ui.dom.window.Event('input', { bubbles: true })); });
+ await act(async () => input.form.dispatchEvent(new ui.dom.window.Event('submit', { bubbles: true, cancelable: true })));
+ assert.equal(requests.find(row => row.name === '/api/git.search').params.get('scope'), 'src');
+ await act(async () => ui.container.querySelector('.jb-search-result').click());
+ assert.equal(ui.container.querySelector('.jb-diffpath').textContent, 'src/lib.ts');
+ assert.equal(ui.editor().state.selection.main.head, 16);
+ assert.equal(ui.editor().state.readOnly, true);
+ const output = { scope: ui.container.querySelector('.jb-search-summary>span').textContent,
+  result: ui.container.querySelector('.jb-search-location').textContent,
+  source: ui.container.querySelector('.jb-diffpath').textContent, position: ui.container.querySelector('.jb-editor-status').textContent,
+  readOnly: ui.editor().state.readOnly, visiblePanels: ui.container.querySelectorAll('.jb-tool-panel:not([hidden])').length,
+  selectedTool: ui.container.querySelector('.jb-tool-toggle[aria-pressed=true]').dataset.tool };
+ assert.deepEqual(output, JSON.parse(readFileSync(new URL('./fixtures/tree-search.expected.json', import.meta.url), 'utf8')));
+});
+
+test('editing a pending content search cancels it and ignores its eventual response', async context => {
+ let release;
+ const requests = [];
+ const ui = await panel(context, server(url => {
+  if (url.pathname === '/api/git.search') return new Promise(resolve => { release = resolve; });
+ }, requests));
+ await ui.click('tree.findDirectory');
+ const input = ui.container.querySelector('.jb-search-form input[type=search]');
+ const edit = async value => act(async () => {
+  Object.getOwnPropertyDescriptor(ui.dom.window.HTMLInputElement.prototype, 'value').set.call(input, value);
+  input.dispatchEvent(new ui.dom.window.Event('input', { bubbles: true }));
+ });
+ await edit('render');
+ await act(async () => input.form.dispatchEvent(new ui.dom.window.Event('submit', { bubbles: true, cancelable: true })));
+ await edit('changed');
+ assert.equal(requests.find(row => row.name === '/api/git.search').signal.aborted, true);
+ await act(async () => release({ ok: true, json: async () => ({ matches: [{ path: 'src/lib.ts', line: 1, character: 0, text: 'stale' }], limited: false, skipped: 0 }) }));
+ assert.equal(ui.container.querySelector('.jb-search-result'), null);
 });

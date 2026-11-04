@@ -57,7 +57,7 @@ export async function fixture(t, lsp, options = {}) {
           killTimer = setTimeout(() => signalGroup('SIGKILL'), spec.graceMs);
         };
         t.after(async () => { terminate(); await done.catch(() => {}); });
-        return { done, stdin: child.stdin, stdout: child.stdout, collected: { stdout: { readFrom: () => ({ text: stdout, lossy: false }) }, stderr: { readFrom: () => ({ text: stderr, lossy: false }) } }, terminate, waitForExit: () => done.catch(() => {}) };
+        return { done, stdin: child.stdin, stdout: child.stdout, collected: { stdout: { readFrom: () => ({ text: stdout, lossy: Buffer.byteLength(stdout) > (spec.stdio.stdout.maxBytes ?? Infinity) }) }, stderr: { readFrom: () => ({ text: stderr, lossy: Buffer.byteLength(stderr) > (spec.stdio.stderr.maxBytes ?? Infinity) }) } }, terminate, waitForExit: () => done.catch(() => {}) };
       },
     },
     connection: { fetch: { register: route => routes.set(route.path, route.fetch) } },

@@ -1,0 +1,9 @@
+{
+  "scope": "范围：src",
+  "result": "src/lib.ts:1",
+  "source": "src/lib.ts",
+  "position": "行 1，列 17只读 · UTF-8",
+  "readOnly": true,
+  "visiblePanels": 1,
+  "selectedTool": "find"
+}
