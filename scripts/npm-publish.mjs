@@ -19,7 +19,9 @@ export async function publishArtifact(version, directory, run = promisify(execFi
   let existing;
   try {
     const result = await run('npm', ['view', `@yunlai/dsh-workbench@${version}`, 'dist.integrity', '--json', '--registry=https://registry.npmjs.org'], { timeout: 120000 });
-    existing = JSON.parse(result.stdout);
+    const response = JSON.parse(result.stdout);
+    existing = Array.isArray(response) && response.length === 1 ? response[0] : response;
+    if (typeof existing !== 'string') throw new Error('npm integrity query must return exactly one string');
   } catch (error) {
     let response;
     try { response = JSON.parse(error.stdout ?? '{}'); }
