@@ -71,6 +71,11 @@ test('workbench branding preserves installed dock identifiers and leaves the con
   }, JSON.parse(readFileSync(new URL('./fixtures/workbench-registration.expected.json', import.meta.url), 'utf8')));
   assert.equal(typeof types[0].guide[0].icon, 'function');
   assert.ok(registrations.some(x => x.spec.name === 'sidebar.right.pane.tab' && x.spec.key === types[0].id));
+  const title = registrations.find(x => x.spec.name === 'sidebar.right.pane.tab.title' && x.spec.key === types[0].id);
+  assert.ok(title);
+  const restoredTab = { tab: { title: 'Git' } };
+  assert.equal(title.component({ useTabInfo: () => restoredTab, t: key => dictionaries.zh[key] }), '开发工作台');
+  assert.equal(title.component({ useTabInfo: () => restoredTab, t: key => dictionaries.en[key] }), 'Development workbench');
   assert.ok(!registrations.some(x => x.spec.name === 'sidebar.panellist'));
   for (const cleanup of cleanups.reverse()) cleanup?.();
   assert.equal(types.length, 0);

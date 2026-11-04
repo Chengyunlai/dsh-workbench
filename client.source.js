@@ -1837,6 +1837,11 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     // ------------------------------------------------------------- icon
+    /** Localized titles also replace labels captured by previously opened tabs. */
+    function WorkbenchTabTitle({ t }) {
+      return t('panel');
+    }
+
     /** Fixed-palette artwork matching the official guide canvas and blue palette. */
     function WorkbenchIcon({ size = 36, className }) {
       return h('svg', { viewBox: '0 0 36 36', width: size, height: size, className, 'aria-hidden': true, fill: 'none', xmlns: 'http://www.w3.org/2000/svg' },
@@ -1923,6 +1928,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
         name: 'sidebar.right.pane.tab', key: TAB_ID, locale: NS,
       }, SidebarPanel)), 'workbench: right sidebar body');
+      ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
+        name: 'sidebar.right.pane.tab.title', key: TAB_ID, locale: NS,
+      }, WorkbenchTabTitle)), 'workbench: right sidebar title');
     }
     return { inject, apply };
   },

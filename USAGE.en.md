@@ -4,7 +4,7 @@
 
 ## Use
 
-Expand a conversation's right sidebar and choose **Development workbench** from Start or More tools. The tab follows its own conversation's project; the repository selector can inspect other registered workspaces.
+Expand a conversation's right sidebar and choose **Development workbench** from Start or More tools. The tab follows its own conversation's project; the repository selector can inspect other registered workspaces. Previously opened Git tabs also show the workbench name in the current language without clearing the layout.
 
 | View | Actions and results |
 | --- | --- |
