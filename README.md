@@ -52,6 +52,15 @@ Python 类图基于静态源码分析。定义跳转可打开语言服务返回�
 
 底部「记忆卡片」按归档目录分组，可组合搜索标题、摘要、标签、来源与路径。卡片是项目中的 Markdown 文件，默认存放在 `.dsh/cards/`。关联文件的卡片按源码最近两级目录归档，未关联源码的归入 `general/`，已有卡片也可按来源在索引里归组。[卡片使用指南](USAGE.md#记忆卡片)
 
+![记忆卡片的 YAML 元数据、问题概括、示例与回忆题](screenshots/readme-v1.4.1/memory-card-preview.png)
+
+<details>
+<summary>查看卡片分组索引</summary>
+
+![记忆卡片按通用和 src/transport 分组，可搜索问题、标签与来源](screenshots/readme-v1.4.1/memory-card-index.png)
+
+</details>
+
 ## 能力演示
 
 下方录制使用虚构项目。点击截图可查看对应 GIF。
@@ -60,12 +69,12 @@ Python 类图基于静态源码分析。定义跳转可打开语言服务返回�
 
 ### Python 类关系
 
-![Python 类关系图实录](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-dark.png)
+![Python 源码和右侧类关系图，显示 EventReader 的两个实现](screenshots/readme-v1.4.1/python-class-diagram.png)
 
 <details>
-<summary>查看浅色主题</summary>
+<summary>查看同一组类的层级树</summary>
 
-![浅色主题下的 Python 类关系图](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-light.png)
+![Python 源码和右侧层级树，按基类展开实现与方法](screenshots/readme-v1.4.1/python-class-hierarchy.png)
 
 </details>
 
@@ -78,7 +87,7 @@ Python 类图基于静态源码分析。定义跳转可打开语言服务返回�
 
 [代码折叠和标签恢复](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-03-beecb54/code-folding.gif) · [调试悬浮录制说明](https://github.com/Chengyunlai/dsh-workbench/blob/demo-assets/demos/2026-11-04-dc2b2e3/RECORDING.md)
 
-主视觉是概念插画。截图与 GIF 来自较早版本在 macOS 上的独立 Harness Web 实例，使用虚构源码和提交记录。GIF 按步骤调整了画面停留时长。
+主视觉是概念插画。类关系和记忆卡片截图取自 `1.4.1` 工作台的真实 Harness Web 界面，使用虚构的 Beacon Stream 项目和样例卡片。其他演示来自较早版本的独立实例，GIF 按步骤调整了画面停留时长。
 
 </details>
 
