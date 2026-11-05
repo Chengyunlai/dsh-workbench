@@ -5,15 +5,23 @@ const children = node => { const result = []; for (let n = node?.firstChild; n; 
 const fail = (message, code, status = 400) => Object.assign(new Error(message), { code, status });
 const moduleName = path => path.replace(/\.pyi?$/, '').replace(/(?:^|\/)__init__$/, '').split('/').filter(Boolean).join('.');
 
-/** Parse class declarations, methods and module imports from one Python syntax tree.
+/** Parse class declarations, methods, imports and annotated factory returns from one Python syntax tree.
  * @param path - Workspace-relative Python filename.
  * @param text - UTF-8 source decoded by the workspace reader.
  * @param version - Content version used to guard later source jumps.
  * @returns Declarations and import bindings; syntax errors reject the complete file.
  */
 export function parsePythonClasses(path, text, version) {
-  const tree = parser.parse(text), bindings = new Map(), classes = [];
-  const cursor = tree.cursor(); do { if (cursor.type.isError) throw fail('Python syntax is incomplete or unsupported', 'CLASS_GRAPH_SYNTAX'); } while (cursor.next());
+  const tree = parser.parse(text), bindings = new Map(), classes = [], factories = [];
+  const cursor = tree.cursor();
+  do {
+    if (!cursor.type.isError) continue;
+    // Lezer 1.1.19 requires an expression after yield; Python also permits the bare statement.
+    const parts = children(cursor.node.parent);
+    const bareYield = cursor.node.parent?.name === 'YieldStatement' && cursor.from === cursor.to
+      && parts.length === 2 && parts[0].name === 'yield' && parts[0].to === cursor.from;
+    if (!bareYield) throw fail('Python syntax is incomplete or unsupported', 'CLASS_GRAPH_SYNTAX');
+  } while (cursor.next());
   const slice = n => text.slice(n.from, n.to);
   const starts = [0]; for (let i = 0; i < text.length; i++) if (text[i] === '\n') starts.push(i + 1);
   const location = n => { let lo = 0, hi = starts.length; while (lo + 1 < hi) { const mid = (lo + hi) >> 1; if (starts[mid] <= n.from) lo = mid; else hi = mid; } return { line: lo, character: n.from - starts[lo] }; };
@@ -26,22 +34,61 @@ export function parsePythonClasses(path, text, version) {
     if (list[1]?.name === '.') { const a = dotted(list[0]), b = dotted(list[2]); return a && b ? a + '.' + b : null; }
     return null;
   };
-  const bind = (name, value) => bindings.set(name, bindings.has(name) ? null : value);
+  const bind = (name, value, target = bindings) => target.set(name, target.has(name) ? null : value);
   const groupImports = list => {
     const groups = [[]];
     for (const n of list) { if (n.name === ',') groups.push([]); else if (!['(', ')'].includes(n.name)) groups.at(-1).push(n); }
     return groups.filter(group => group.length);
   };
-  const importBinding = node => {
+  const importBinding = (node, target = bindings) => {
     const ns = children(node), at = ns.findIndex(n => n.name === 'import');
     const from = ns[0].name === 'from' ? ns.slice(1, at).map(slice).join('') : null;
     for (const group of groupImports(ns.slice(at + 1))) {
       const as = group.findIndex(n => n.name === 'as'), names = as < 0 ? group : group.slice(0, as);
       const name = names.map(slice).join('');
-      if (name === '*') { bindings.set('*', null); continue; }
+      if (name === '*') { target.set('*', null); continue; }
       const alias = as < 0 ? (from === null ? name.split('.')[0] : name) : slice(group[as + 1]);
-      bind(alias, { from, name: from === null && as < 0 ? name.split('.')[0] : name });
+      bind(alias, { from, name: from === null && as < 0 ? name.split('.')[0] : name }, target);
     }
+  };
+  const factoryDeclaration = fn => {
+    const list = children(fn), annotation = list.find(n => n.name === 'TypeDef');
+    const returns = dotted(annotation?.firstChild);
+    if (!returns || list.some(n => n.name === 'async')) return;
+    const locals = new Map(), calls = []; let unsupported = false;
+    const shadow = node => {
+      if (node.name === 'VariableName') bind(slice(node), null, locals);
+      else if (['TupleExpression', 'ArrayExpression', 'StarredExpression'].includes(node.name)) children(node).forEach(shadow);
+    };
+    const params = list.find(n => n.name === 'ParamList');
+    for (const group of groupImports(children(params))) {
+      const name = group.find(n => n.name === 'VariableName'); if (name) shadow(name);
+    }
+    const visit = node => {
+      const ns = children(node);
+      if (['FunctionDefinition', 'ClassDefinition', 'LambdaExpression'].includes(node.name)) {
+        const name = ns.find(n => n.name === 'VariableName'); if (name && node.name !== 'LambdaExpression') shadow(name);
+        return;
+      }
+      if (node.name === 'ImportStatement') { importBinding(node, locals); return; }
+      if (['YieldStatement', 'YieldExpression', 'ScopeStatement'].includes(node.name)) unsupported = true;
+      if (['AssignStatement', 'UpdateStatement', 'NamedExpression'].includes(node.name)) {
+        const last = ns.findLastIndex(n => n.name === 'AssignOp' || n.name === 'UpdateOp');
+        ns.slice(0, Math.max(0, last)).forEach(shadow);
+        if (node.name === 'AssignStatement' && ns[1]?.name === 'TypeDef') shadow(ns[0]);
+      }
+      if (node.name === 'CapturePattern') ns.forEach(shadow);
+      if (node.name === 'ForStatement') for (const target of ns.slice(1, ns.findIndex(n => n.name === 'in'))) shadow(target);
+      if (node.name === 'DeleteStatement') ns.slice(1).forEach(shadow);
+      for (let i = 0; i < ns.length; i++) if (ns[i].name === 'as') shadow(ns[i + 1]);
+      if (node.name === 'ReturnStatement' && ns.length === 2 && ns[1].name === 'CallExpression') {
+        const callee = ns[1].firstChild, name = dotted(callee);
+        if (name) calls.push({ name, ...location(callee) });
+      }
+      ns.forEach(visit);
+    };
+    visit(list.find(n => n.name === 'Body'));
+    if (!unsupported && calls.length) factories.push({ name: slice(list.find(n => n.name === 'VariableName')), returns, bindings: locals, calls });
   };
   const walk = (body, parents = [], moduleLevel = true) => {
     for (const original of children(body)) {
@@ -52,7 +99,10 @@ export function parsePythonClasses(path, text, version) {
       if (moduleLevel && ['AssignStatement', 'UpdateStatement'].includes(node.name)) {
         const first = node.firstChild; if (first?.name === 'VariableName') bind(slice(first), null);
       }
-      if (moduleLevel && node.name === 'FunctionDefinition') { const name = children(node).find(n => n.name === 'VariableName'); if (name) bind(slice(name), null); }
+      if (moduleLevel && node.name === 'FunctionDefinition') {
+        const name = children(node).find(n => n.name === 'VariableName'); if (name) bind(slice(name), null);
+        if (!decorated) factoryDeclaration(node);
+      }
       if (node.name === 'ClassDefinition') {
         const list = children(node), nameNode = list.find(n => n.name === 'VariableName'), name = slice(nameNode), qualified = [...parents, name].join('.');
         if (moduleLevel && bindings.has(name)) bindings.set(name, null);
@@ -74,7 +124,7 @@ export function parsePythonClasses(path, text, version) {
           const returns = fs.find(n => n.name === 'TypeDef');
           methods.push({ name: slice(token), parameters, returns: returns ? slice(returns).replace(/^->\s*/, '').replace(/\s+/g, ' ').slice(0, 120) : '', ...location(token), decorators: decorated ? parts.filter(n => n.name === 'Decorator').map(n => dotted(children(n)[1])).filter(Boolean) : [] });
         }
-        classes.push({ id: path + ':' + nameNode.from, path, version, name, qualified, ...location(nameNode), bases, methods, decorated });
+        classes.push({ id: path + ':' + nameNode.from, path, version, name, qualified, ...location(nameNode), endLine: location({ from: node.to - 1 }).line, bases, methods, decorated });
         walk(body, [...parents, name], false);
       } else if (node.name !== 'FunctionDefinition') {
         // Classes nested in control flow are recorded as declarations, without treating conditional imports as unconditional bindings.
@@ -83,12 +133,12 @@ export function parsePythonClasses(path, text, version) {
     }
   };
   walk(tree.topNode);
-  return { path, module: moduleName(path), package: path.endsWith('/__init__.py') ? moduleName(path) : moduleName(path).split('.').slice(0, -1).join('.'), bindings, classes };
+  return { path, version, module: moduleName(path), package: path.endsWith('/__init__.py') ? moduleName(path) : moduleName(path).split('.').slice(0, -1).join('.'), bindings, classes, factories };
 }
 
 /** Resolve explicit base declarations and inherited abstract methods without guessing implicit Protocol implementations.
  * @param modules - Parsed workspace files.
- * @returns Serializable nodes and directed child-to-base relationships, including unresolved base labels.
+ * @returns Class nodes, inheritance edges and separately labeled annotated factory returns; no structural type check is implied.
  */
 export function linkPythonClasses(modules) {
   const symbols = new Map(), moduleMap = new Map(), owner = new Map();
@@ -177,6 +227,23 @@ export function linkPythonClasses(modules) {
     node.overrides = node.methods.filter(method => linear.slice(1).some(parent => parent.methods.some(inherited => inherited.name === method.name))).map(method => method.name);
     if (node.kind !== 'protocol' && node.abstractMethods.length) node.kind = 'abstract';
   }
+  for (const mod of modules) for (const factory of mod.factories ?? []) {
+    if (mod.bindings.has('*')) continue;
+    const result = resolveSymbol(canonical(mod, factory.returns)) ?? resolveSymbol(mod.module + '.' + factory.returns);
+    if (!result || byId.get(result.id).kind !== 'protocol') continue;
+    for (const call of factory.calls) {
+      const [first, ...rest] = call.name.split('.');
+      const binding = factory.bindings.get(first);
+      const name = factory.bindings.has(first) ? binding && [absolute(mod, binding), ...rest].filter(Boolean).join('.') : canonical(mod, call.name);
+      const target = name && (resolveSymbol(name) ?? (!mod.bindings.has(first) && !factory.bindings.has(first) ? resolveSymbol(mod.module + '.' + name) : null));
+      if (!target || target.id === result.id || byId.get(target.id).kind === 'protocol') continue;
+      const existing = edges.find(edge => edge.from === target.id && edge.to === result.id);
+      if (existing && existing.kind !== 'factory') continue;
+      const edge = existing ?? { from: target.id, to: result.id, kind: 'factory', evidence: [] };
+      edge.evidence.push({ path: mod.path, version: mod.version, function: factory.name, line: call.line, character: call.character });
+      if (!existing) edges.push(edge);
+    }
+  }
   return { nodes, edges };
 }
 
@@ -189,7 +256,7 @@ export function createPythonClassGraph({ runGit, requireWorkspacePath, requireRe
     const cwd = new URL(request.url).searchParams.get('cwd'); await requireWorkspacePath(ctx, cwd, signal);
     const listed = await runGit(ctx, cwd, ['ls-files', '--cached', '--others', '--exclude-standard', '--full-name', '-z'], { signal });
     const prefix = (await runGit(ctx, cwd, ['rev-parse', '--show-prefix'], { signal })).stdout.replace(/\r?\n$/, '');
-    const paths = [...new Set(listed.stdout.split('\0').filter(p => p.startsWith(prefix)).map(p => p.slice(prefix.length)))].filter(p => p.endsWith('.py') && !p.split('/').some(part => part === '.git' || config.classGraphExcludedDirectories.includes(part))).sort();
+    const paths = [...new Set(listed.stdout.split('\0').filter(p => p.startsWith(prefix)).map(p => p.slice(prefix.length)))].filter(p => /\.pyi?$/i.test(p) && !p.split('/').some(part => part === '.git' || config.classGraphExcludedDirectories.includes(part))).sort();
     const modules = [], skipped = []; let bytes = 0, count = 0, scanned = 0, limited = false;
     for (const path of paths) {
       signal.throwIfAborted();

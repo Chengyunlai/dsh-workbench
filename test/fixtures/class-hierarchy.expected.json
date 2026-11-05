@@ -1,0 +1,10 @@
+{
+  "rows": [
+    { "label": "Port", "level": "1" },
+    { "label": "Client", "level": "2" },
+    { "label": "run()", "level": "3" },
+    { "label": "run()", "level": "2" }
+  ],
+  "factory": "工厂关联",
+  "editorRetained": true
+}

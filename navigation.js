@@ -1,5 +1,5 @@
-/** Bounded source reads and semantic navigation for the Git workspace browser. */
-import { createHash } from 'node:crypto';
+/** Bounded source reads and semantic navigation with scoped references for installed library files. */
+import { createHash, randomUUID } from 'node:crypto';
 import { realpath } from 'node:fs/promises';
 import { Worker } from 'node:worker_threads';
 import { imageMime, readImagePreview } from './image-preview.js';
@@ -7,6 +7,8 @@ import { serverLanguage } from './language-servers.js';
 
 const MAX_SOURCE_BYTES = 512 * 1024;
 const TYPESCRIPT_EXT = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
+const LIBRARY_SOURCE = /\.(?:pyi?|go|java|[cm]?[jt]sx?)$/i;
+const LIBRARY_PREFIX = 'dsh-library://';
 const failure = (message, code, status = 400) => Object.assign(new Error(message), { code, status });
 const versionOf = text => createHash('sha256').update(text).digest('hex');
 
@@ -22,6 +24,10 @@ export async function readWorkspaceSource(ctx, cwd, path, signal) {
   const root = await ctx.fs.resolve(cwd, { signal });
   const file = await ctx.fs.resolve(path, { cwd, signal });
   if (!ctx.fs.contains(root, file)) throw failure('file is outside the workspace', 'SOURCE_OUTSIDE_WORKSPACE', 403);
+  return readSourceFile(ctx, root, file, signal);
+}
+
+async function readSourceFile(ctx, root, file, signal) {
   const stat = await ctx.fs.stat(file, signal);
   if (stat?.type !== 'file') throw failure('source file does not exist or is not regular', 'SOURCE_NOT_FILE', 404);
   if (stat.size > MAX_SOURCE_BYTES) throw failure('source exceeds 512 KiB', 'SOURCE_TOO_LARGE', 413);
@@ -61,9 +67,36 @@ export async function typescriptDefinitions(data, signal) {
 /**
  * Create authenticated route handlers using the plugin's workspace and Git validation.
  * @param dependencies - Shared Git runner, registered-workspace/path validators, and JSON response writer.
- * @returns Tree, source/image preview, and definition handlers with bounded workspace reads.
+ * @returns Tree, source/image and definition handlers, plus disposal of workspace-scoped library references.
  */
-export function navigationHandlers({ runGit, requireWorkspacePath, requireRelativePath, json, languageServers, imagePreviewMaxBytes }) {
+export function navigationHandlers({ runGit, requireWorkspacePath, requireRelativePath, json, languageServers, imagePreviewMaxBytes, navigationMaxLibrarySources }) {
+  const libraries = new Map(); let disposed = false;
+  const readSource = async (ctx, cwd, path, signal) => {
+    if (!path?.startsWith(LIBRARY_PREFIX)) return readWorkspaceSource(ctx, cwd, requireRelativePath(path), signal);
+    const entry = libraries.get(path);
+    if (!entry || entry.cwd !== cwd) throw failure('library reference expired; navigate from project source again', 'LIBRARY_SOURCE_EXPIRED', 410);
+    const root = await ctx.fs.resolve(cwd, { signal }), file = await ctx.fs.resolve(entry.displayPath, { signal });
+    if (ctx.fs.fileUrl(file) !== entry.uri) throw failure('library target changed; navigate from project source again', 'SOURCE_CHANGED', 409);
+    return { ...await readSourceFile(ctx, root, file, signal), external: true, displayPath: entry.displayPath };
+  };
+  const libraryTarget = async (ctx, cwd, rootUrl, url, signal) => {
+    if (url.protocol !== 'file:' || url.protocol !== rootUrl.protocol || url.host !== rootUrl.host || url.search || url.hash || !LIBRARY_SOURCE.test(url.pathname)) return null;
+    const decoded = url.pathname.split('/').map(decodeURIComponent).join('/');
+    const path = url.host ? '//' + url.host + decoded : /^\/[a-z]:\//i.test(decoded) ? decoded.slice(1) : decoded;
+    if (/[\u0000-\u001f\u007f]/.test(path)) return null;
+    const file = await ctx.fs.resolve(path, { signal });
+    const stat = await ctx.fs.stat(file, signal);
+    if (stat?.type !== 'file' || stat.size > MAX_SOURCE_BYTES) return null;
+    const uri = ctx.fs.fileUrl(file), displayPath = file.displayPath;
+    const previous = [...libraries].find(([, entry]) => entry.cwd === cwd && entry.uri === uri);
+    if (previous) { libraries.delete(previous[0]); libraries.set(...previous); return { path: previous[0], external: true, displayPath }; }
+    signal.throwIfAborted();
+    if (disposed) throw failure('navigation is disposed', 'NAVIGATION_UNAVAILABLE', 503);
+    const key = LIBRARY_PREFIX + randomUUID() + '/' + displayPath.split(/[\\/]/).at(-1);
+    if (libraries.size >= navigationMaxLibrarySources) libraries.delete(libraries.keys().next().value);
+    libraries.set(key, { cwd, displayPath, uri });
+    return { path: key, external: true, displayPath };
+  };
   const readQuery = async (ctx, request, signal) => {
     const query = new URL(request.url).searchParams;
     const cwd = query.get('cwd') ?? '';
@@ -71,6 +104,7 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
     return { query, cwd };
   };
   return {
+    dispose: () => { disposed = true; libraries.clear(); },
     tree: async (ctx, request, signal) => {
       const { cwd } = await readQuery(ctx, request, signal);
       const result = await runGit(ctx, cwd, ['ls-files', '--cached', '--others', '--exclude-standard', '--full-name', '-z'], { signal });
@@ -80,15 +114,20 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
     },
     source: async (ctx, request, signal) => {
       const { query, cwd } = await readQuery(ctx, request, signal);
-      const path = requireRelativePath(query.get('path'));
+      const path = query.get('path');
+      if (path?.startsWith(LIBRARY_PREFIX)) {
+        const source = await readSource(ctx, cwd, path, signal);
+        return json({ path, text: source.text, version: source.version, external: true, displayPath: source.displayPath });
+      }
+      requireRelativePath(path);
       if (imageMime(path)) return json(await readImagePreview(ctx, cwd, path, signal, imagePreviewMaxBytes));
       const source = await readWorkspaceSource(ctx, cwd, path, signal);
       return json({ path, text: source.text, version: source.version });
     },
     definition: async (ctx, request, signal) => {
       const { query, cwd } = await readQuery(ctx, request, signal);
-      const path = requireRelativePath(query.get('path'));
-      const source = await readWorkspaceSource(ctx, cwd, path, signal);
+      const path = query.get('path');
+      const source = await readSource(ctx, cwd, path, signal);
       if (query.get('version') !== source.version) throw failure('source changed; reopen it before navigating', 'SOURCE_CHANGED', 409);
       const lineText = query.get('line'), characterText = query.get('character');
       if (!/^\d+$/.test(lineText ?? '') || !/^\d+$/.test(characterText ?? '')) throw failure('invalid source position', 'INVALID_POSITION');
@@ -100,7 +139,7 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
       let engine = 'lsp';
       if (lsp) {
         try {
-          const result = await lsp.query({ operation: 'goToDefinition', filePath: path, position: { line, character }, workspaceRoot: cwd }, signal);
+          const result = await lsp.query({ operation: 'goToDefinition', filePath: source.external ? source.displayPath : path, position: { line, character }, workspaceRoot: cwd }, signal);
           if (result.kind !== 'locations') throw failure('unexpected language-service response', 'NAVIGATION_FAILED', 502);
           locations = result.locations;
         } catch (error) {
@@ -108,8 +147,8 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
         }
       }
       if (locations === undefined) {
-        const language = serverLanguage(path);
-        if (!language && !TYPESCRIPT_EXT.test(path)) throw failure('no language service is configured for this file', 'NAVIGATION_UNAVAILABLE', 503);
+        const sourcePath = source.external ? source.displayPath : path, language = serverLanguage(sourcePath);
+        if (!language && !TYPESCRIPT_EXT.test(sourcePath)) throw failure('no language service is configured for this file', 'NAVIGATION_UNAVAILABLE', 503);
         const mappedRoot = ctx.fs.processPathFromHostPath?.(cwd);
         if (!mappedRoot || await realpath(mappedRoot) !== ctx.fs.processPath(source.root)) throw failure('built-in navigation requires a local filesystem; configure an LSP provider for this workspace', 'NAVIGATION_UNAVAILABLE', 503);
         if (language) {
@@ -126,7 +165,15 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
       let external = 0;
       for (const location of locations) {
         const url = new URL(location.uri);
-        if (url.protocol !== rootUrl.protocol || url.host !== rootUrl.host || !url.pathname.startsWith(prefix)) { external++; continue; }
+        if (url.protocol !== rootUrl.protocol || url.host !== rootUrl.host || !url.pathname.startsWith(prefix)) {
+          if (targets.filter(item => item.external).length >= navigationMaxLibrarySources) { external++; continue; }
+          const library = await libraryTarget(ctx, cwd, rootUrl, url, signal);
+          if (library) {
+            const entry = { ...library, line: location.range.start.line, character: location.range.start.character };
+            if (!targets.some(item => item.path === entry.path && item.line === entry.line && item.character === entry.character)) targets.push(entry);
+          } else external++;
+          continue;
+        }
         const relative = requireRelativePath(url.pathname.slice(prefix.length).split('/').map(decodeURIComponent).join('/'));
         const target = await ctx.fs.resolve(relative, { cwd, signal });
         if (!ctx.fs.contains(source.root, target)) { external++; continue; }
@@ -135,7 +182,8 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
       }
       signal.throwIfAborted();
       // The source can change while the language service is working; stale positions must not open a target.
-      if ((await readWorkspaceSource(ctx, cwd, path, signal)).version !== source.version) throw failure('source changed; reopen it before navigating', 'SOURCE_CHANGED', 409);
+      const fresh = source.external ? await readSourceFile(ctx, source.root, await ctx.fs.resolve(source.displayPath, { signal }), signal) : await readSource(ctx, cwd, path, signal);
+      if (fresh.version !== source.version || ctx.fs.fileUrl(fresh.file) !== ctx.fs.fileUrl(source.file)) throw failure('source changed; reopen it before navigating', 'SOURCE_CHANGED', 409);
       return json({ targets, external, engine });
     },
   };

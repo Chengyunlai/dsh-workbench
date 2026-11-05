@@ -71,6 +71,73 @@ test('LSP results are used without compiler fallback; external and escaping targ
   assert.deepEqual(result.targets, [{ path: 'src/shapes.ts', line: 0, character: 17 }]);
 });
 
+test('library definitions open through workspace-scoped references and support further navigation without arbitrary path reads', async t => {
+ let h, next;
+ const lsp={query:async request=>{
+  if(request.filePath.startsWith('/'))assert.equal(request.filePath,join(h.base,'library.pyi'));
+  return {kind:'locations',locations:[{uri:next,range:{start:{line:0,character:6}}}]};
+ }};
+ h=await fixture(t,lsp);
+ const library=join(h.base,'library.pyi');await fs.writeFile(library,'class Client: ...\n');next=pathToFileURL(library).href;
+ const result=await h.definition('src/main.ts',1,'Shape');
+ assert.equal(result.external,0);assert.equal(result.targets.length,1);
+ const target=result.targets[0];assert.equal(target.external,true);assert.equal(target.displayPath,library);assert.match(target.path,/^dsh-library:\/\//);
+ const source=await h.call('source',{path:target.path});assert.equal(source.text,'class Client: ...\n');assert.equal(source.external,true);
+ assert.equal((await h.call('source',{path:library})).status,400);
+ assert.equal((await h.call('source',{path:'dsh-library://unknown/library.pyi'})).code,'LIBRARY_SOURCE_EXPIRED');
+ assert.equal((await h.call('source',{cwd:join(h.root,'src'),path:target.path})).code,'LIBRARY_SOURCE_EXPIRED');
+ next=pathToFileURL(join(h.root,'src/shapes.ts')).href;
+ const nested=await h.call('definition',{path:target.path,version:source.version,line:'0',character:'7'});
+ assert.equal(nested.status,200);assert.equal(nested.targets[0].path,'src/shapes.ts');
+ await h.dispose();assert.equal((await h.call('source',{path:target.path})).status,408);
+});
+
+test('library previews preserve size/encoding checks, reject changed symlinks and leave virtual or missing sources unavailable', async t => {
+ let h,locations=[];
+ h=await fixture(t,{query:async()=>({kind:'locations',locations})});
+ const locate=path=>({uri:pathToFileURL(path).href,range:{start:{line:0,character:0}}});
+ const first=join(h.base,'first.py'),second=join(h.base,'second.py'),link=join(h.base,'alias.py');
+ await fs.writeFile(first,'class First: pass\n');await fs.writeFile(second,'class Second: pass\n');await fs.symlink(first,link);
+ locations=[locate(link)];const result=await h.definition('src/main.ts',1,'Shape');
+ await fs.unlink(link);await fs.symlink(second,link);
+ assert.equal((await h.call('source',{path:result.targets[0].path})).code,'SOURCE_CHANGED');
+ await fs.symlink(first,join(h.root,'escape.py'));locations=[locate(join(h.root,'escape.py'))];
+ const escaped=await h.definition('src/main.ts',1,'Shape');assert.equal(escaped.targets.length,0);assert.equal(escaped.external,1);
+ for(const [name,bytes,code] of [['binary.py',Buffer.from([0]),'SOURCE_BINARY'],['encoding.pyi',Buffer.from([255]),'SOURCE_ENCODING']]){
+  const path=join(h.base,name);await fs.writeFile(path,bytes);locations=[locate(path)];
+  const preview=await h.definition('src/main.ts',1,'Shape');assert.equal((await h.call('source',{path:preview.targets[0].path})).code,code);
+ }
+ const large=join(h.base,'large.py');await fs.writeFile(large,'x'.repeat(512*1024+1));
+ locations=[locate(large),locate(join(h.base,'missing.py')),locate(join(h.base,'.env')),{uri:'jdt://contents/library/Client.class',range:{start:{line:0,character:0}}},{uri:'https://example.invalid/client.py',range:{start:{line:0,character:0}}}];
+ const unavailable=await h.definition('src/main.ts',1,'Shape');assert.equal(unavailable.targets.length,0);assert.equal(unavailable.external,5);
+});
+
+test('library reference budgets evict old previews, reuse current targets and reject stale library queries', async t => {
+ let locations=[],edit=false,h;
+ h=await fixture(t,{query:async()=>{
+  if(edit)await fs.appendFile(join(h.base,'a.py'),'# changed\n');
+  return {kind:'locations',locations};
+ }},{navigationMaxLibrarySources:1});
+ const a=join(h.base,'a.py'),b=join(h.base,'b.py');await fs.writeFile(a,'class A: pass\n');await fs.writeFile(b,'class B: pass\n');
+ const locate=path=>({uri:pathToFileURL(path).href,range:{start:{line:0,character:6}}});
+ locations=[locate(a)];const first=await h.definition('src/main.ts',1,'Shape');
+ const repeat=await h.definition('src/main.ts',1,'Shape');assert.equal(first.targets[0].path,repeat.targets[0].path);
+ const source=await h.call('source',{path:first.targets[0].path});
+ locations=[locate(b)];edit=true;
+ const stale=await h.call('definition',{path:first.targets[0].path,version:source.version,line:'0',character:'6'});assert.equal(stale.code,'SOURCE_CHANGED');
+ assert.equal((await h.call('source',{path:first.targets[0].path})).code,'LIBRARY_SOURCE_EXPIRED');
+ edit=false;locations=[locate(a),locate(b)];const limited=await h.definition('src/main.ts',1,'Shape');
+ assert.equal(limited.targets.length,1);assert.equal(limited.external,1);assert.equal((await h.call('source',{path:limited.targets[0].path})).status,200);
+});
+
+test('real TypeScript compiler opens standard-library declarations outside the project', async t => {
+ const h=await fixture(t);await fs.writeFile(join(h.root,'array.ts'),"const values: Array<string> = [];\nvalues.push('x');\n");
+ const result=await h.definition('array.ts',1,'push');
+ assert.equal(result.status,200);assert.equal(result.external,0);assert.ok(result.targets.some(target=>target.external));
+ const source=await h.call('source',{path:result.targets.find(target=>target.external).path});
+ assert.equal(source.status,200);assert.ok(source.text.includes('interface Array<T>'));
+});
+
 test('plugin disposal cancels navigation and awaits the provider before completing', async t => {
   let enter, cancel, release;
   const entered = new Promise(resolve => { enter = resolve; });

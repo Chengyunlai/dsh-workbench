@@ -22,7 +22,7 @@ Interactions take cues from JetBrains: file tabs, code folding, modifier-click d
 
 | Read the code | Review the changes | Inspect execution |
 | --- | --- | --- |
-| File trees, path copying, file and directory search, tabs, syntax and occurrence highlighting, definitions, code folding, Python class relationships, and reading history. Conversation Markdown opens directly in the workbench reading preview, with a source view; images and ICNS icons preview directly. | Inspect working-tree changes, line diffs, commit graphs, and commit details. Follow a diff back to source and explicitly send selected lines to a new project conversation. | Launch or attach, set breakpoints, step, select stack frames, inspect values on hover, expand objects, evaluate expressions, and remove all breakpoints. |
+| File trees, path copying, file and directory search, tabs, syntax and occurrence highlighting, definitions, code folding, Python class relationships, and reading history. Conversation Markdown opens directly in the workbench reading preview, with a source view; images and ICNS icons preview directly. | Inspect working-tree changes, line diffs, commit graphs, and commit details. Follow a diff back to source, assign selected diff lines as a change task to a new conversation, or ask a new conversation to explain them and save memory cards. | Launch or attach, set breakpoints, step, select stack frames, inspect values on hover, expand objects, evaluate expressions, and remove all breakpoints. |
 
 ## Demos
 
@@ -30,7 +30,7 @@ These are real Harness screens using a fictional Sample Shop project. Select a s
 
 <table><tr><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/read-code.png" alt="Code and documents" /></a><br /><strong>Code and documents</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/review-changes.png" alt="Git diffs and history" /></a><br /><strong>Git diffs and history</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/debug-program.png" alt="Breakpoints and evaluation" /></a><br /><strong>Breakpoints and evaluation</strong></td></tr></table>
 
-### Read Python class relationships
+### Read Python class relationships (Beta)
 
 Read declared inheritance, abstract methods and Protocol bases directly from existing Python syntax trees, with compact UML nodes and source jumps. No project execution or extra project declarations are required.
 

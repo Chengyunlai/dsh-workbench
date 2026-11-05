@@ -22,6 +22,8 @@ export const Config = Schema.object({
   classGraphMaxClasses: Schema.number().step(1).min(1).max(2000).default(800),
   classGraphMaxBytes: Schema.number().step(1).min(1024).max(32 * 1024 * 1024).default(4 * 1024 * 1024),
   classGraphExcludedDirectories: Schema.array(Schema.string()).default(['.venv', 'venv', '__pycache__', 'node_modules']),
+  /** Workspace-relative directory holding explanation memory cards (Markdown files). */
+  cardsDir: Schema.string().default('.dsh/cards'),
   debugAdapters: Schema.dict(Schema.object({
     command: Schema.string().required(), args: Schema.array(Schema.string()).default([]),
     env: Schema.dict(Schema.string()).default({}), transport: Schema.union(['stdio', 'tcp']).default('stdio'),
@@ -33,6 +35,7 @@ export const Config = Schema.object({
   languageServers: Schema.dict(ServerConfig).default({}),
   useInstalledServers: Schema.boolean().default(true),
   navigationTimeoutMs: Schema.number().step(1).min(1000).max(2147483647).default(120000),
+  navigationMaxLibrarySources: Schema.number().step(1).min(1).max(4096).default(256),
   serverKillGraceMs: Schema.number().step(1).min(1).max(2147483647).default(1500),
 });
 

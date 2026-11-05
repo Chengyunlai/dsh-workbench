@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import React, { act } from 'react';
 import { EditorView } from '@codemirror/view';
 import { JSDOM } from 'jsdom';
+import { parsePythonClasses, linkPythonClasses } from '../python-class-graph.js';
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const source = { 'src/main.ts': "const emoji = '😀'; render();", 'src/lib.ts': 'export function render() {}' };
@@ -27,7 +28,7 @@ async function panel(testContext, fetch, { dock, paneSizes, platform, navigation
   const resizeObservers = new Set();
   dom.window.ResizeObserver = class {
     constructor(callback) { this.callback = callback; }
-    observe() { resizeObservers.add(this); }
+    observe(element) { assert.ok(element instanceof dom.window.Element, 'ResizeObserver receives a mounted DOM element'); resizeObservers.add(this); }
     disconnect() { resizeObservers.delete(this); }
   };
   let plugin, Panel;
@@ -181,7 +182,7 @@ test('bottom icons switch one shared window, preserve terminal output and select
   }), { terminal: true });
   const editor = ui.editor();
   assert.ok(editor);
-  assert.deepEqual([...ui.container.querySelectorAll('.jb-tools-bar button')].map(button => button.getAttribute('aria-label')), ['查找', '变更', '历史', '调试', '终端']);
+  assert.deepEqual([...ui.container.querySelectorAll('.jb-tools-bar button')].map(button => button.getAttribute('aria-label')), ['查找', '变更', '历史', '记忆卡片', '调试', '终端']);
   assert.equal(ui.container.querySelector('.jb-tool-toggle[aria-pressed=true]').dataset.tool, 'debug');
   await ui.click('terminal.title');
   const screen = ui.container.querySelector('.jb-terminal-screen');
@@ -309,6 +310,37 @@ test('file tab keyboard navigation and closing a pending tab cancel its late rea
  assert.equal(ui.dom.window.document.activeElement, tabs()[0]);
  await act(async () => tabs()[0].dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true })));
  assert.equal(tabs().length, 1); assert.equal(tabs()[0].getAttribute('aria-label'), 'src/lib.ts');
+});
+
+test('file tab menus close the clicked tab, keep it when closing others, and clear all previews', async context => {
+ const ui = await panel(context, server());
+ await ui.click('src'); await ui.click('main.ts'); await ui.caret(6); await ui.click('lib.ts');
+ const tabs = () => [...ui.container.querySelectorAll('.jb-source-tabs [role=tab]')];
+ const tab = path => tabs().find(node => node.getAttribute('aria-label') === path);
+ const active = () => tabs().find(node => node.getAttribute('aria-selected') === 'true');
+ await ui.menu(tab('src/main.ts'), 'files.tabCloseOthers');
+ assert.deepEqual(tabs().map(node => node.getAttribute('aria-label')), ['src/main.ts']);
+ assert.equal(ui.editor().state.selection.main.head, 6);
+ assert.equal(ui.dom.window.document.activeElement, active());
+ await act(async () => active().dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true })));
+ const menu = ui.dom.window.document.querySelector('[role=menu]');
+ assert.ok(menu);
+ const items = [...menu.querySelectorAll('[role=menuitem]')];
+ assert.deepEqual(items.map(node => node.querySelector('span').textContent), ['关闭', '关闭其他标签', '关闭全部标签']);
+ assert.equal(items[1].disabled, true);
+ await act(async () => items[0].dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+ assert.equal(ui.dom.window.document.querySelector('[role=menu]'), null);
+ assert.equal(ui.dom.window.document.activeElement, active());
+ await ui.click('lib.ts');
+ await ui.menu(tab('src/main.ts'), 'files.tabClose');
+ assert.equal(active().getAttribute('aria-label'), 'src/lib.ts');
+ await ui.click('main.ts');
+ await ui.menu(tab('src/lib.ts'), 'files.tabCloseAll');
+ assert.equal(tabs().length, 0);
+ assert.equal(ui.container.querySelector('.cm-content'), null);
+ assert.equal(ui.dom.window.document.activeElement, ui.container.querySelector('.jb-detail'));
+ await ui.click('main.ts');
+ assert.equal(ui.editor().state.selection.main.head, 0);
 });
 
 test('repeated same-file definition jumps reuse the source read and editor instance', async context => {
@@ -838,8 +870,9 @@ test('shared tool height remains usable when storage is unavailable and old debu
  assert.equal(ui.editor(), editor);
 });
 
-test('Markdown previews render structure and fenced syntax, retain source mode and document reading positions', async context => {
- const markdown = '# 项目说明\n\n**重点** 与 *说明*，以及 `value`。\n\n> 注意配置\n\n- [x] 已完成\n- [ ] 待处理\n\n| 文件 | 用途 |\n| --- | --- |\n| main.ts | 入口 |\n\n[阅读代码](src/main.ts) · [子文档](docs/guide.md#章节) · [章节](#项目说明)\n\n```python\ndef render():\n    return "ready"\n```\n\n```unknown\n<script>literal</script>\n```';
+test('Markdown previews render metadata, document structure and fenced syntax while retaining the original source', async context => {
+ const metadata = '---\r\ntitle: 示例项目\r\ntags: [Python, SSE]\r\nkind: concept\r\nsource: src/main.ts:2\r\nnote: "<img src=x>"\r\n---\r\n\r\n';
+ const markdown = metadata + '# 项目说明\n\n**重点** 与 *说明*，以及 `value`。\n\n> 注意配置\n\n- [x] 已完成\n- [ ] 待处理\n\n| 文件 | 用途 |\n| --- | --- |\n| main.ts | 入口 |\n\n[阅读代码](src/main.ts) · [子文档](docs/guide.md#章节) · [章节](#项目说明)\n\n```python\ndef render():\n    return "ready"\n```\n\n```unknown\n<script>literal</script>\n```';
  const requests = [];
  const ui = await panel(context, server(url => {
   if (url.pathname === '/api/git.tree') return Promise.resolve({ ok: true, json: async () => ({ files: ['README.md', 'docs/guide.md', ...Object.keys(source)] }) });
@@ -850,10 +883,16 @@ test('Markdown previews render structure and fenced syntax, retain source mode a
  const view = ui.editor();
  assert.equal(ui.container.querySelector('.jb-sourcebody').hidden, true);
  assert.equal(ui.dom.window.document.activeElement, article());
+ const header = article().querySelector('.jb-document-metadata');
+ assert.equal(header.querySelector('h1').textContent, '示例项目');
+ assert.deepEqual([...header.querySelectorAll('.jb-card-tag')].map(node => node.textContent), ['Python', 'SSE']);
+ assert.deepEqual([...header.querySelectorAll('dt,dd')].map(node => node.textContent), ['类型', 'concept', '来源', 'src/main.ts:2', 'note', '<img src=x>']);
+ assert.equal(header.querySelector('img'), null);
+ assert.ok(view.state.doc.toString().startsWith(metadata.replaceAll('\r\n', '\n')));
  assert.equal(article().querySelector('pre .jb-syntax-keyword').textContent, 'def');
  assert.equal(article().querySelector('pre .jb-syntax-function').textContent, 'render');
  assert.equal(article().querySelectorAll('pre')[1].textContent, '<script>literal</script>');
- const snapshot = { heading: article().querySelector('h1').textContent, strong: article().querySelector('strong').textContent, emphasis: article().querySelector('em').textContent,
+ const snapshot = { heading: article().querySelector('.jb-document-body h1').textContent, strong: article().querySelector('strong').textContent, emphasis: article().querySelector('em').textContent,
   inlineCode: article().querySelector('p code').textContent, quote: article().querySelector('blockquote').textContent.trim(),
   tasks: [...article().querySelectorAll('.jb-document-checkbox')].map(node => node.textContent), table: [...article().querySelectorAll('th,td')].map(node => node.textContent),
   code: { keyword: article().querySelector('.jb-syntax-keyword').textContent, color: ui.dom.window.getComputedStyle(article().querySelector('.jb-syntax-keyword')).color },
@@ -1600,9 +1639,10 @@ test('Python class window displays declarations, navigates methods without an LS
  const requests=[];
  const ui=await panel(context,server(url=>{
   if(url.pathname==='/api/git.classes')return {ok:true,json:async()=>({nodes,edges:[{from:'impl',to:'base'}],scanned:2,total:2,limited:false,skipped:[]})};
+  if(url.pathname==='/api/git.tree')return {ok:true,json:async()=>({files:['base.py','impl.py']})};
   if(url.pathname==='/api/git.source'&&url.searchParams.get('path').endsWith('.py'))return {ok:true,json:async()=>({path:url.searchParams.get('path'),text:'class Impl:\n def run(self): pass\n',version:changed?'changed':'graph-v1'})};
  },requests));
- await ui.click('classes.title');const doc=ui.dom.window.document, window=()=>doc.querySelector('.jb-class-window');
+ await ui.click('impl.py');await ui.click('classes.title');const doc=ui.dom.window.document, window=()=>doc.querySelector('.jb-class-window');
  assert.ok(window());assert.equal(window().dataset.dock,'right');assert.equal(window().querySelectorAll('.jb-class-card').length,2);
  const member=[...window().querySelectorAll('.jb-class-members button')].find(n=>n.textContent.includes('↥'));
  await act(async()=>member.click());assert.equal(ui.editor().state.selection.main.head,17);
@@ -1614,4 +1654,213 @@ test('Python class window displays declarations, navigates methods without an LS
  assert.deepEqual(result,JSON.parse(readFileSync(new URL('./fixtures/class-graph.expected.json',import.meta.url),'utf8')));
  await act(async()=>window().dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
  assert.equal(window(),null);
+});
+
+test('class window opens the public client, distinguishes factory associations and navigates their source with version checks', async context => {
+ const files={
+  'client.py':'"""Clients."""\nclass _Helper:\n def redirect(self): pass\n\nclass Client:\n def generate(self): pass\n',
+  'contracts.py':'from typing import Protocol\nclass Port(Protocol):\n def generate(self): ...\n',
+  'factory.py':'from contracts import Port\ndef create() -> Port:\n from client import Client\n return Client()\n',
+ };
+ const graph={...linkPythonClasses(Object.entries(files).map(([path,text])=>parsePythonClasses(path,text,'graph-v2'))),scanned:3,total:3,limited:false,skipped:[]};
+ let changed=false;
+ const requests=[];
+ const ui=await panel(context,server(url=>{
+  if(url.pathname==='/api/git.classes')return {ok:true,json:async()=>graph};
+  if(url.pathname==='/api/git.tree')return {ok:true,json:async()=>({files:Object.keys(files)})};
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:url.searchParams.get('path'),text:files[url.searchParams.get('path')]??'',version:changed?'changed':'graph-v2'})};
+ },requests));
+ await ui.click('client.py');await ui.click('classes.title');
+ const doc=ui.dom.window.document,graphWindow=()=>doc.querySelector('.jb-class-window');
+ assert.deepEqual([...graphWindow().querySelectorAll('.jb-class-name')].map(n=>n.textContent),['Client','Port']);
+ assert.equal(graphWindow().querySelector('[data-selected=true]').getAttribute('aria-label'),'Client');
+ assert.equal(graphWindow().querySelectorAll('g[data-factory=true]').length,1);
+ const canvas=graphWindow().querySelector('.jb-class-viewport'),port=[...graphWindow().querySelectorAll('.jb-class-name')].find(node=>node.textContent==='Port');
+ canvas.scrollLeft=35;canvas.scrollTop=17;
+ await act(async()=>port.click());
+ assert.equal(canvas.scrollLeft,35);assert.equal(canvas.scrollTop,17,'a visible card remains under the pointer for its second click');
+ await act(async()=>graphWindow().querySelector('.jb-class-evidence summary').click());
+ const evidence=graphWindow().querySelector('.jb-class-evidence button');
+ assert.ok(evidence.textContent.includes('factory.py:4'));assert.ok(graphWindow().textContent.includes(ui.t('classes.factoryHint')));
+ await act(async()=>evidence.click());
+ assert.equal(ui.editor().state.doc.toString(),files['factory.py']);
+ assert.equal(ui.editor().state.selection.main.head,files['factory.py'].lastIndexOf('Client()'));
+ const result={nodes:[...graphWindow().querySelectorAll('.jb-class-name')].map(n=>n.textContent),factoryEdges:graphWindow().querySelectorAll('g[data-factory=true]').length,evidence:evidence.textContent,source:ui.editor().state.doc.lineAt(ui.editor().state.selection.main.head).number,usedLsp:requests.some(r=>r.name==='/api/git.definition')};
+ assert.deepEqual(result,JSON.parse(readFileSync(new URL('./fixtures/class-factory.expected.json',import.meta.url),'utf8')));
+ changed=true;await act(async()=>evidence.click());assert.ok(graphWindow().textContent.includes(ui.t('classes.changed')));
+ await act(async()=>graphWindow().dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+ changed=false;await ui.click('classes.title');
+ assert.equal(graphWindow().querySelector('[data-selected=true]').getAttribute('aria-label'),'Port','factory files focus their annotated protocol');
+ await act(async()=>graphWindow().dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+ await ui.click('client.py');await ui.caret(files['client.py'].indexOf('redirect'));
+ await ui.click('classes.title');
+ assert.equal(graphWindow().querySelector('[data-selected=true]').getAttribute('aria-label'),'_Helper','toolbar uses the live caret rather than the original file target');
+});
+
+test('docked class diagrams share space with source, retain independent sizes and cancel drags on orientation changes', async context => {
+ const text='"""Clients."""\nclass Client:\n def generate(self): pass\n';
+ const graph={...linkPythonClasses([parsePythonClasses('client.py',text,'dock-v1')]),scanned:1,total:1,limited:false,skipped:[]};
+ const ui=await panel(context,server(url=>{
+  if(url.pathname==='/api/git.classes')return {ok:true,json:async()=>graph};
+  if(url.pathname==='/api/git.tree')return {ok:true,json:async()=>({files:['client.py']})};
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:'client.py',text,version:'dock-v1'})};
+ }));
+ paneGeometry(ui);
+ const prototype=ui.dom.window.HTMLElement.prototype,original=prototype.getBoundingClientRect;
+ let availableHeight=700;
+ prototype.getBoundingClientRect=function(){
+  const parent=ui.container.querySelector('.jb-reader-workspace'),vertical=parent&&ui.dom.window.getComputedStyle(parent).flexDirection!=='column';
+  const root=ui.container.querySelector('.jb-code-browser'),size=(key,fallback)=>parseFloat(root.style.getPropertyValue('--jb-class-'+key))||fallback;
+  let width=900,height=availableHeight;
+  if(this.classList.contains('jb-class-window')){
+   width=vertical?Math.min(size('width',360),614):900;
+   height=vertical?availableHeight:Math.max(Math.min(160,availableHeight*.45),Math.min(size('height',300),availableHeight-Math.min(160,availableHeight*.6)-6));
+  }else if(this.dataset.pane==='classes'){width=vertical?6:900;height=vertical?availableHeight:6;}
+  else if(!this.classList.contains('jb-reader-workspace'))return original.call(this);
+  return {x:0,y:0,left:0,top:0,right:width,bottom:height,width,height,toJSON(){}};
+ };
+ await ui.click('client.py');await ui.caret(text.indexOf('generate'));
+ const editor=ui.editor();
+ await ui.click('classes.title');await ui.resize();
+ const pane=()=>ui.container.querySelector('.jb-class-window'),divider=()=>ui.container.querySelector('[data-pane=classes]'),root=()=>ui.container.querySelector('.jb-code-browser');
+ const stored=()=>JSON.parse(ui.dom.window.localStorage.getItem('dsh.git-control.paneSizes')??'{}');
+ const fire=async(type,x,y=0)=>act(async()=>divider().dispatchEvent(new ui.dom.window.PointerEvent(type,{pointerId:1,isPrimary:true,button:0,clientX:x,clientY:y,bubbles:true,cancelable:true})));
+ assert.ok(pane().parentElement.contains(ui.container.querySelector('.jb-detail')),'source and diagram belong to the same split container');
+ assert.equal(divider().getAttribute('aria-orientation'),'vertical');
+ await fire('pointerdown',500);await fire('pointermove',400);
+ assert.equal(root().style.getPropertyValue('--jb-class-width'),'460px');assert.equal(stored().classWidth,undefined);
+ await fire('pointerup',400);assert.equal(stored().classWidth,460);
+ await fire('pointerdown',500);await fire('pointermove',400);
+ const dock=pane().querySelector('select');
+ await act(async()=>{dock.value='bottom';dock.dispatchEvent(new ui.dom.window.Event('change',{bubbles:true}));});await ui.resize();
+ assert.equal(root().style.getPropertyValue('--jb-class-width'),'460px','changing orientation cancels an unfinished drag');
+ assert.equal(divider().getAttribute('aria-orientation'),'horizontal');
+ await fire('pointerdown',0,300);await fire('pointermove',0,200);await fire('pointerup',0,200);
+ assert.equal(stored().classHeight,400);assert.equal(stored().classWidth,460);
+ availableHeight=240;await ui.resize();
+ assert.equal(divider().getAttribute('aria-valuenow'),'108','a shorter host clamps the live height without overwriting the saved preference');
+ assert.equal(stored().classHeight,400);
+ assert.equal(ui.editor(),editor);assert.equal(editor.state.selection.main.head,text.indexOf('generate'));
+ await act(async()=>pane().dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+ assert.equal(pane(),null);assert.equal(divider(),null);assert.equal(ui.editor(),editor);
+ await ui.click('classes.title');await ui.resize();
+ await act(async()=>divider().dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true})));
+ assert.equal(stored().classHeight,undefined);assert.equal(stored().classWidth,460);
+});
+
+test('class diagram fitting tracks available space while manual zoom retains its scale and bounded stage', async context => {
+ const text='class Client: pass\n';
+ const graph={...linkPythonClasses([parsePythonClasses('client.py',text,'fit-v1')]),scanned:1,total:1,limited:false,skipped:[]};
+ const ui=await panel(context,server(url=>{
+  if(url.pathname==='/api/git.classes')return {ok:true,json:async()=>graph};
+  if(url.pathname==='/api/git.tree')return {ok:true,json:async()=>({files:['client.py']})};
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:'client.py',text,version:'fit-v1'})};
+ }));
+ let width=320,height=200;
+ for(const [key,value] of [['clientWidth',()=>width],['clientHeight',()=>height]]){
+  const descriptor=Object.getOwnPropertyDescriptor(ui.dom.window.Element.prototype,key);
+  Object.defineProperty(ui.dom.window.Element.prototype,key,{configurable:true,get(){return this.classList.contains('jb-class-viewport')?value():descriptor.get.call(this);}});
+ }
+ await ui.click('client.py');await ui.click('classes.title');
+ const pane=()=>ui.container.querySelector('.jb-class-window'),stage=()=>pane().querySelector('.jb-class-stage');
+ const press=label=>act(async()=>pane().querySelector('[aria-label="'+ui.t(label)+'"]').click());
+ assert.equal(pane().querySelector('[aria-label="'+ui.t('classes.zoomReset')+'"]').textContent,'80%','opening preserves readable card text rather than shrinking a large graph into tiny labels');
+ await press('classes.fit');assert.ok(parseFloat(stage().style.width)<=width);assert.ok(parseFloat(stage().style.height)<=height);
+ await press('classes.zoomReset');assert.equal(pane().querySelector('[aria-label="'+ui.t('classes.zoomReset')+'"]').textContent,'100%');
+ width=280;height=140;await ui.resize();
+ assert.equal(pane().querySelector('[aria-label="'+ui.t('classes.zoomReset')+'"]').textContent,'100%','a resize does not override manual zoom');
+ await press('classes.fit');assert.ok(parseFloat(stage().style.width)<=width);assert.ok(parseFloat(stage().style.height)<=height);
+ assert.equal(pane().querySelector('[aria-label="'+ui.t('classes.fit')+'"]').getAttribute('aria-pressed'),'true');
+});
+
+test('editor height is restricted to the editor rather than its page-level tooltip host', async context => {
+ const ui=await panel(context,server());
+ await ui.click('src');await ui.click('main.ts');
+ const view=ui.editor(),doc=ui.dom.window.document;
+ const tooltipHost=[...doc.body.children].find(node=>node!==ui.container&&node.classList.contains(view.themeClasses.split(' ')[0]));
+ assert.ok(tooltipHost,'external tooltips retain the editor theme');
+ assert.equal(ui.dom.window.getComputedStyle(view.dom).height,'100%');
+ assert.notEqual(ui.dom.window.getComputedStyle(tooltipHost).height,'100%','an empty tooltip container must not add a full page of height');
+ await ui.reopen();assert.equal(tooltipHost.isConnected,false,'unmount removes the external tooltip container');
+});
+
+test('class hierarchy toggles with the diagram, expands methods and navigates by keyboard without remounting source', async context => {
+ const files={'port.py':'from typing import Protocol\nclass Port(Protocol):\n def run(self): ...\n','client.py':'class Client:\n def run(self): pass\n','factory.py':'from port import Port\nfrom client import Client\ndef create() -> Port:\n return Client()\n'};
+ const graph={...linkPythonClasses(Object.entries(files).map(([path,text])=>parsePythonClasses(path,text,'tree-v1'))),scanned:3,total:3,limited:false,skipped:[]},requests=[];
+ const ui=await panel(context,server(url=>{
+  if(url.pathname==='/api/git.classes')return {ok:true,json:async()=>graph};
+  if(url.pathname==='/api/git.tree')return {ok:true,json:async()=>({files:Object.keys(files)})};
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:url.searchParams.get('path'),text:files[url.searchParams.get('path')]??'',version:'tree-v1'})};
+ },requests));
+ await ui.click('client.py');const editor=ui.editor();await ui.click('classes.title');
+ const pane=()=>ui.container.querySelector('.jb-class-window');
+ const mode=async value=>act(async()=>[...pane().querySelectorAll('.jb-class-mode button')].find(node=>node.textContent===ui.t('classes.'+value)).click());
+ await mode('tree');assert.equal(pane().querySelector('.jb-class-stage'),null);assert.equal(pane().querySelector('[role=treeitem][aria-label=Client]').getAttribute('aria-expanded'),'false');
+ assert.ok(pane().querySelector('.jb-class-tree-badge').textContent.includes(ui.t('classes.factoryShort')));
+ const tree=pane().querySelector('[role=tree]');
+ const press=key=>act(async()=>tree.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key,bubbles:true,cancelable:true})));
+ await press('ArrowRight');assert.equal(pane().querySelector('[role=treeitem][aria-label=Client]').getAttribute('aria-expanded'),'true');
+ await press('ArrowDown');await press('Enter');assert.equal(ui.editor().state.selection.main.head,files['client.py'].indexOf('run'));
+ const snapshot={rows:[...pane().querySelectorAll('[role=treeitem]')].map(row=>({label:row.getAttribute('aria-label'),level:row.getAttribute('aria-level')})),factory:pane().querySelector('.jb-class-tree-badge').textContent,editorRetained:ui.editor()===editor};
+ assert.deepEqual(snapshot,JSON.parse(readFileSync(new URL('./fixtures/class-hierarchy.expected.json',import.meta.url),'utf8')));
+ await mode('graph');assert.ok(pane().querySelector('.jb-class-stage'));await mode('tree');assert.equal(pane().querySelector('[aria-label=Client][role=treeitem]').getAttribute('aria-expanded'),'true');
+ assert.equal(requests.filter(row=>row.name==='/api/git.classes').length,1,'switching presentations reuses the static index');
+ await act(async()=>pane().dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await ui.click('classes.title');
+ assert.ok(pane().querySelector('[role=tree]'),'the preferred presentation survives reopening');
+});
+
+test('library source tabs remain read-only, support further definitions and history, and explain expired references', async context => {
+ const path='dsh-library://reference/client.pyi',displayPath='/environment/site-packages/example/client.pyi',text='class Client:\n def run(self): ...\n';
+ let expired=false;
+ const requests=[];
+ const ui=await panel(context,server(url=>{
+  if(url.pathname==='/api/git.definition')return {ok:true,json:async()=>({targets:[url.searchParams.get('path')===path?{path:'src/main.ts',line:0,character:0}:{path,displayPath,external:true,line:0,character:6}],external:0})};
+  if(url.pathname==='/api/git.source'&&url.searchParams.get('path')===path)return expired?{ok:false,status:410,json:async()=>({code:'LIBRARY_SOURCE_EXPIRED',error:'expired'})}:{ok:true,json:async()=>({path,displayPath,external:true,text,version:'library-v1'})};
+ },requests));
+ await ui.click('src');await ui.click('main.ts');const editor=ui.editor();await ui.caret(6);await ui.key('F12');
+ assert.equal(ui.editor(),editor);assert.equal(editor.state.readOnly,true);assert.equal(editor.state.doc.toString(),text);
+ assert.ok(ui.container.querySelector('.jb-editor-status').textContent.includes(ui.t('files.library')));
+ assert.equal(ui.container.querySelector('.jb-source-tab [aria-selected=true]').getAttribute('aria-label'),displayPath);
+ const before=requests.length;await ui.key('F9');await ui.key('F5');
+ assert.equal(requests.slice(before).some(row=>row.name.startsWith('/api/git.debug.')),false,'library browsing does not launch or set breakpoints');
+ await ui.key('F12');assert.equal(ui.editor().state.doc.toString(),source['src/main.ts']);
+ await ui.key('[',{ctrlKey:true});assert.equal(ui.editor().state.doc.toString(),text);
+ await ui.key('[',{ctrlKey:true});expired=true;
+ await act(async()=>ui.container.querySelector('[role=tab][aria-label="'+displayPath+'"]').click());
+ assert.ok(ui.container.querySelector('[role=alert]').textContent.includes(ui.t('files.libraryExpired')));
+});
+
+test('class panel follows current file types, marks Python Beta and skips Python queries for unsupported files', async context => {
+ const files={'index.js':'export const value = 1;\n','main.py':'class Client: pass\n','types.pyi':'class ProtocolType: ...\n'};
+ const graph={...linkPythonClasses([parsePythonClasses('main.py',files['main.py'],'language-v1')]),scanned:1,total:1,limited:false,skipped:[]},requests=[];
+ const ui=await panel(context,server(url=>{
+  if(url.pathname==='/api/git.tree')return {ok:true,json:async()=>({files:Object.keys(files)})};
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:url.searchParams.get('path'),text:files[url.searchParams.get('path')],version:'language-v1'})};
+  if(url.pathname==='/api/git.classes')return {ok:true,json:async()=>graph};
+ },requests));
+ const pane=()=>ui.container.querySelector('.jb-class-window'),count=()=>requests.filter(row=>row.name==='/api/git.classes').length;
+ await ui.click('classes.title');assert.ok(pane().textContent.includes(ui.t('classes.mixedUnsupported')));assert.equal(count(),0);
+ await ui.click('index.js');
+ const javascript={title:pane().querySelector('header strong').textContent,message:pane().querySelector('[role=status]').textContent,scanCalls:count()};
+ assert.equal(pane().querySelector('.jb-class-controls'),null);
+ await ui.click('main.py');assert.equal(count(),1);assert.ok(pane().querySelector('.jb-class-card'));
+ const python={title:pane().querySelector('header strong').textContent,beta:pane().querySelector('.jb-class-beta').textContent,scanCalls:count()};
+ await ui.click('index.js');assert.equal(count(),1);assert.equal(pane().querySelector('.jb-class-card'),null);
+ assert.deepEqual({javascript,python},JSON.parse(readFileSync(new URL('./fixtures/class-language.expected.json',import.meta.url),'utf8')));
+ await ui.click('types.pyi');assert.equal(count(),2);assert.ok(pane().querySelector('.jb-class-beta'));
+});
+
+test('switching from Python to JavaScript cancels a pending class scan and ignores its late result', async context => {
+ const text='class Client: pass\n',graph={...linkPythonClasses([parsePythonClasses('main.py',text,'late-v1')]),limited:false,skipped:[]};
+ let complete;
+ const requests=[];
+ const ui=await panel(context,server(url=>{
+  if(url.pathname==='/api/git.tree')return {ok:true,json:async()=>({files:['main.py','index.js']})};
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:url.searchParams.get('path'),text:url.searchParams.get('path')==='main.py'?text:'const value = 1;',version:'late-v1'})};
+  if(url.pathname==='/api/git.classes')return {ok:true,json:()=>new Promise(resolve=>{complete=resolve;})};
+ },requests));
+ await ui.click('main.py');await ui.click('classes.title');const request=requests.find(row=>row.name==='/api/git.classes');assert.ok(request);
+ await ui.click('index.js');assert.equal(request.signal.aborted,true);
+ await act(async()=>complete(graph));
+ const pane=ui.container.querySelector('.jb-class-window');assert.equal(pane.querySelector('.jb-class-card'),null);assert.equal(pane.querySelector('header strong').textContent,'JavaScript 类关系');
 });

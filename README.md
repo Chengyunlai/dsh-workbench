@@ -22,7 +22,7 @@ AI 给出改动后，你可以就在对话旁打开文件、沿着定义跳转�
 
 | 读懂代码 | 看清改动 | 检查真实执行 |
 | --- | --- | --- |
-| 文件树、路径复制、文件与目录查找、多标签、语法高亮、同名词高亮、定义跳转、代码折叠、Python 类关系图和阅读历史。对话中的 Markdown 可直接进入工作台阅读预览，也可切回源码；图片和 ICNS 图标可直接预览。 | 查看工作区变更、逐行 diff、提交图和提交详情；从差异跳回源码，手动把选中的 diff 交给项目新对话讨论。 | 启动或接入已有进程，设置断点、单步、切换调用栈、悬浮查看变量值、展开对象、计算表达式，并清理全部断点。 |
+| 文件树、路径复制、文件与目录查找、多标签、语法高亮、同名词高亮、定义跳转、代码折叠、Python 类关系图和阅读历史。对话中的 Markdown 可直接进入工作台阅读预览，也可切回源码；图片和 ICNS 图标可直接预览。 | 查看工作区变更、逐行 diff、提交图和提交详情；从差异跳回源码，可把选中的 diff 作为修改任务交给新对话，或让新对话深入讲解并沉淀记忆卡片。 | 启动或接入已有进程，设置断点、单步、切换调用栈、悬浮查看变量值、展开对象、计算表达式，并清理全部断点。 |
 
 ## 能力演示
 
@@ -30,7 +30,7 @@ AI 给出改动后，你可以就在对话旁打开文件、沿着定义跳转�
 
 <table><tr><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/read-code.png" alt="代码与文档阅读" /></a><br /><strong>代码与文档阅读</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/review-changes.png" alt="Git 差异与历史" /></a><br /><strong>Git 差异与历史</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/debug-program.png" alt="断点与表达式求值" /></a><br /><strong>断点与表达式求值</strong></td></tr></table>
 
-### 用类关系图读懂 Python 工程
+### 用类关系图读懂 Python 工程（Beta）
 
 直接从现有 Python 语法树查看声明的继承、抽象方法与 Protocol 基类，使用紧凑 UML 节点并跳转源码；无需运行项目，也无需为画图补充声明。
 
