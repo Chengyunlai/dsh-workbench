@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.4.1
+
+This release updates the English and Chinese README with a quick start, memory card workflow, language support, and debugging requirements. The updated introduction is available on GitHub and npm.
+
 ## 1.4.0
 
 Select `1.4.0` in Harness plugin details, then reload or restart. Python class relationships offer a hierarchy tree and a docked diagram, with language availability following the active file. Supported library sources returned by language services open in read-only tabs. File tabs have a close menu, and the Markdown preview displays YAML metadata separately.

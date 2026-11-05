@@ -2,81 +2,28 @@
 
 <h1 align="center">dsh-workbench</h1>
 
-<p align="center"><strong>Keep the conversation. Follow the code.</strong><br />A development workbench beside DeepSeek Harness conversations.</p>
+<p align="center"><strong>Keep the conversation. Follow the code.</strong><br />A right-side workbench in DeepSeek Harness for reading source, reviewing changes, debugging programs, and keeping explanations.</p>
 
-<p align="center"><a href="https://github.com/Chengyunlai/dsh-workbench/actions/workflows/ci.yml"><img src="https://github.com/Chengyunlai/dsh-workbench/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a> <a href="LICENSE"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/badge-license.svg" alt="MIT license" /></a> <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/badge-harness.svg" alt="DeepSeek Harness community plugin" /></a> <a href="#language-support"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/badge-languages.svg" alt="Navigation for five languages" /></a></p>
+<p align="center"><a href="https://www.npmjs.com/package/@yunlai/dsh-workbench"><img src="https://img.shields.io/npm/v/@yunlai/dsh-workbench" alt="npm version" /></a> <a href="https://github.com/Chengyunlai/dsh-workbench/actions/workflows/ci.yml"><img src="https://github.com/Chengyunlai/dsh-workbench/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a> <a href="LICENSE"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/badge-license.svg" alt="MIT license" /></a> <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/badge-harness.svg" alt="DeepSeek Harness community plugin" /></a></p>
 
-<p align="center"><a href="README.md">中文</a> · English　|　<a href="#demos">Demos</a> · <a href="#install">Get started</a> · <a href="USAGE.en.md">User guide</a> · <a href="https://github.com/Chengyunlai/dsh-workbench/issues">Report an issue</a></p>
+<p align="center"><a href="README.md">中文</a> · English　|　<a href="#quick-start">Install</a> · <a href="#what-the-workbench-does">Features</a> · <a href="#demos">Demos</a> · <a href="https://github.com/Chengyunlai/dsh-workbench/releases/latest">Latest release</a></p>
 
-![A conversation beside a development workbench: concept illustration](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/cover.png)
+![Concept illustration of a conversation beside a development workbench](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/cover.png)
 
-## Summary
+After the agent changes code, open the diff on the right, jump from a changed line to the source, and follow definitions to the implementation. Send a question to an explanation conversation when you want to understand a piece of code, then revisit its card in the workbench. Resize the file tree, editor, and bottom tool window while keeping your conversation in view.
 
-After an AI suggests changes, open the files beside the conversation, follow definitions, inspect the diff, and use a breakpoint to see what actually runs. Files, source, documents, Git, and debugging share one workbench while the conversation stays visible.
+## Quick start
 
-Interactions take cues from JetBrains: file tabs, code folding, modifier-click definitions, Back/Forward, and stack frames linked to source. Resize the tree and tool window while following the host’s light/dark theme. Bottom icons switch Find, Changes, History, Debugger, and Terminal in one shared window while code stays visible. The terminal loads on demand to run project commands.
+1. In the DeepSeek Harness plugin manager, install `@yunlai/dsh-workbench` and enable Development workbench.
+2. Open a conversation for a registered Git project. Expand the right sidebar and choose Development workbench from Start or More tools.
+3. Open a file from the tree. Press `F12` in supported source files to jump to a definition, or open Changes at the bottom to inspect a diff.
 
-## Capabilities
-
-![Code reading, Git inspection, and debugging beside the conversation](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/workflow.en.svg)
-
-| Read the code | Review the changes | Inspect execution |
-| --- | --- | --- |
-| File trees, path copying, file and directory search, tabs, syntax and occurrence highlighting, definitions, code folding, Python class relationships, and reading history. Conversation Markdown opens directly in the workbench reading preview, with a source view; images and ICNS icons preview directly. | Inspect working-tree changes, line diffs, commit graphs, and commit details. Follow a diff back to source, assign selected diff lines as a change task to a new conversation, or ask a new conversation to explain them and save memory cards. | Launch or attach, set breakpoints, step, select stack frames, inspect values on hover, expand objects, evaluate expressions, and remove all breakpoints. |
-
-## Demos
-
-These are real Harness screens using a fictional Sample Shop project. Select a screenshot to open its GIF.
-
-<table><tr><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/read-code.png" alt="Code and documents" /></a><br /><strong>Code and documents</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/review-changes.png" alt="Git diffs and history" /></a><br /><strong>Git diffs and history</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/debug-program.png" alt="Breakpoints and evaluation" /></a><br /><strong>Breakpoints and evaluation</strong></td></tr></table>
-
-### Read Python class relationships (Beta)
-
-Read declared inheritance, abstract methods and Protocol bases directly from existing Python syntax trees, with compact UML nodes and source jumps. No project execution or extra project declarations are required.
-
-![Python class relationships](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-dark.png)
+For online installs, check for updates in plugin details, then reload or restart Harness. The current package requires Harness `0.2.1-rc.5` or newer and Node.js `22.14.0` or newer. [Download ZIP](https://github.com/Chengyunlai/dsh-workbench/releases/latest) · [Upgrade guide](UPGRADING.en.md)
 
 <details>
-<summary>Light theme</summary>
+<summary>Install from a ZIP or source directory</summary>
 
-![Python class relationships in light theme](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-light.png)
-
-</details>
-
-### Inspect paused values on hover
-
-Hover variables or dotted members while paused to see values and types in the selected frame. Expand objects, then step to close old values. This real Python debugger demo uses a fictional project; its four screenshots have reading holds rather than measured response timing. [Recording details](https://github.com/Chengyunlai/dsh-workbench/blob/demo-assets/demos/2026-11-04-dc2b2e3/RECORDING.md).
-
-![Paused Python variable hover, object fields, and stepping](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-dc2b2e3/debug-hover.gif)
-
-<details>
-<summary><strong>Play: breakpoints, variables, and Evaluate Expression</strong></summary>
-
-Hit a Python breakpoint, step into a function, inspect variables, evaluate and expand an object, then remove breakpoints and resume.
-
-![Python breakpoints, stepping, and expression evaluation](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif)
-
-</details>
-
-<details>
-<summary><strong>Play: code folding retained across file tabs</strong></summary>
-
-Fold a method and its class, switch to a document, and return. Unfolding the class keeps the inner fold; select the ellipsis to expand it. Navigation and debug locations reveal hidden destinations.
-
-![Nested folding, tab restoration, and unfolding](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-03-beecb54/code-folding.gif)
-
-</details>
-
-<details>
-<summary>Recording and privacy notes</summary>
-
-The cover is a concept illustration; product screenshots and GIFs come from isolated Harness Web 0.2.1-rc.5 instances on macOS. Code, commit authors, and business data are fictional; account and absolute-path areas are excluded. GIFs combine verified screenshots with edited reading holds, not response-time measurements. Navigation, Git, and debugging use real Git, Pyright, and debugpy without model calls. The folding run’s model request returned AUTH without a completed response; folding itself does not call a model.
-
-</details>
-
-## Install
-
-**1. Install online.** Enter `@yunlai/dsh-workbench` in the Harness plugin manager. Check and select newer versions in plugin details, then reload or restart when prompted. For local development, use the source installation below:
+Extract the ZIP from the release, install dependencies as described in `INSTALL.txt`, and select the extracted directory in the Harness plugin manager. You can also clone and install the source directory.
 
 ```sh
 git clone https://github.com/Chengyunlai/dsh-workbench.git
@@ -84,50 +31,85 @@ cd dsh-workbench
 npm ci --omit=dev
 ```
 
-**2. Install this local directory through the Harness plugin manager and enable Development workbench.** In a project conversation, expand the right sidebar and open it from Start or More tools.
+</details>
 
-Start by opening a file. After configuring a debug adapter, set a breakpoint beside a line number and press F5, or attach through the source context menu. See the [user guide](USAGE.en.md) for shortcuts and language setup, and [debug configuration](DEBUGGING.en.md) for launch and attach arguments.
+## What the workbench does
+
+| Task | How to do it in the workbench |
+| --- | --- |
+| **Read source** | Find code with the file tree and content search. Tabs retain reading positions and support highlighting, folding, occurrence highlighting, definitions, and Back/Forward. Right-click a tab to close it, the other tabs, or all tabs. |
+| **Explore Python class relationships** | Open a hierarchy tree or docked diagram from the file-tree toolbar or Python source menu. Inspect inheritance, abstract classes, declared Protocol bases, and factory return associations grounded in source. Open source from class and method nodes. Class relationships are currently Python-only and in beta. |
+| **Read documents and images** | Open Markdown from a conversation in a reading preview or switch to source. The preview shows YAML titles, tags, and fields, highlighted code blocks, and file links. Tabs also preview images and icons such as PNG, SVG, and ICNS. |
+| **Review Git changes** | Browse staged, working-tree, and untracked changes, line diffs, commit graphs, and commit details. Double-click a diff line to open current source. Send selected diff lines to a new conversation as a change task or an explanation. |
+| **Inspect execution** | Launch or attach, set breakpoints, step, and select stack frames. While paused, inspect values on hover, expand objects, see inline values, or evaluate an expression. Clear all breakpoints in one action. |
+| **Run project commands** | Open the bottom terminal to run commands in the current conversation’s workspace using the Harness terminal service. The editor stays visible while you switch among Find, Changes, History, Memory cards, and Debugger. |
+
+Python diagrams use static source analysis. Definition results can open supported library sources and declaration files in read-only library tabs. [Class relationships](USAGE.en.md#python-class-relationships) · [Navigation limits](USAGE.en.md#navigation-behavior-and-limits)
+
+## Explanations and memory cards
+
+Suppose you are reading a `stream()` method and want to know where SSE bytes become frames and then model events. Right-click the file, select Explain it to me, and enter the question. The new conversation is prompted to trace the source with a concrete input and save the full explanation in one card. The card opens with a question recap and ends with a prompt to recall the mechanism or predict an edge case.
+
+The Memory cards tool groups cards by archive folder and searches titles, summaries, tags, sources, and paths in combination. Cards are Markdown files in the project and default to `.dsh/cards/`. Linked cards use the nearest two source directories, questions without linked source go under `general/`, and existing cards can be grouped in the index by their source metadata. [Memory cards guide](USAGE.en.md#memory-cards)
+
+## Demos
+
+These recordings use fictional projects. Select a screenshot to open its GIF.
+
+<table><tr><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/code-navigation.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/read-code.png" alt="Code and documents" /></a><br /><strong>Code and documents</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/git-inspection.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/review-changes.png" alt="Git diffs and history" /></a><br /><strong>Git diffs and history</strong></td><td width="33%" align="center"><a href="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-02-c0f7910/debugger-evaluate.gif"><img src="https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/readme/2026-11-03-v1/debug-program.png" alt="Breakpoints and expression evaluation" /></a><br /><strong>Breakpoints and expression evaluation</strong></td></tr></table>
+
+### Python class relationships
+
+![Python class diagram in the workbench](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-dark.png)
+
+<details>
+<summary>View the light theme</summary>
+
+![Python class diagram in the light theme](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-light.png)
+
+</details>
+
+### Inspect values on hover while paused
+
+![Python breakpoint, variable hover, and stepping](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-dc2b2e3/debug-hover.gif)
+
+<details>
+<summary>More demos and recording notes</summary>
+
+[Code folding and tab restoration](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-03-beecb54/code-folding.gif) · [Debugger hover recording notes](https://github.com/Chengyunlai/dsh-workbench/blob/demo-assets/demos/2026-11-04-dc2b2e3/RECORDING.md)
+
+The cover is a concept illustration. Screenshots and GIFs come from earlier versions in isolated Harness Web instances on macOS with fictional source and commit history. The GIFs use edited holds between steps.
+
+</details>
 
 ## Language support
 
-While debugging is paused, source variables offer a hover that stays open for expansion and copying, plus line-end values and adapter-provided types for the selected frame. See [debugging](DEBUGGING.en.md).
+The table separates definition navigation from debugging. All five languages support read-only browsing, syntax highlighting, and folding. Go and Java require local language-server setup. Python and JS/TS navigation dependencies ship with the package.
 
-All five languages support source reading and syntax folding; definitions and debugging use the services below.
-
-| Language | Definitions | Launch / attach |
+| Language | Definitions | Launch and attach |
 | --- | --- | --- |
 | Python | Pyright | debugpy |
 | Go | gopls | Delve |
 | Java | Eclipse JDT LS | Unavailable |
 | JavaScript | TypeScript language service | vscode-js-debug (Node.js) |
-| TypeScript | TypeScript language service | vscode-js-debug (requires JS and source maps) |
+| TypeScript | TypeScript language service | vscode-js-debug (requires emitted JS and source maps) |
 
-JS/TS and Python navigation dependencies ship with the installation; Go and Java require local language servers. Debugging needs separately configured local adapters; TypeScript needs generated JS and source maps. See [language setup](USAGE.en.md#five-language-support-and-configuration) and [debug adapter setup](DEBUGGING.en.md#adapters).
+Configure a debug adapter separately. Then set a breakpoint and press `F5` in source, or attach through the context menu. For custom launch arguments, use `.dsh/debug.json`. [Language setup](USAGE.en.md#five-language-support-and-configuration) · [Debug setup](DEBUGGING.en.md#adapters)
 
 ## Scope
 
-- Works with registered Git projects in Harness. Source and Git inspection are read-only, without source editing, staging, commits, resets, or branch switching.
-- Launching a debugger runs a real program that can write files or access external services. `.dsh/debug.json` is only needed for custom project arguments.
-- File tabs, reading history, folds, and breakpoints live in panel memory; closing it does not retain durable project state.
-- Java debugging, conditional breakpoints, and automatic builds are unavailable. Markdown images display their descriptions.
+- File reading, search, and Git inspection are read-only. Make source changes through the agent in your conversation or in your editor.
+- Terminal and debugging execute real commands or programs. The explanation conversation writes cards into the project, where workspace permissions and Git rules apply.
+- CI covers Linux and macOS core checks, package installation, and real language servers and debuggers. Desktop interaction has been tested on macOS. Windows and Linux desktop interaction remain unverified.
 
 ## Documentation and contributions
 
-| Your task | Start here |
+| Task | Guide |
 | --- | --- |
-| Read code, configure languages, and resize layouts | [User guide](USAGE.en.md) |
-| Configure debuggers, launch, or attach | [Debug configuration](DEBUGGING.en.md) |
+| Use the workbench, configure languages, and resize panels | [User guide](USAGE.en.md) |
+| Set up debuggers, launch, and attach | [Debug guide](DEBUGGING.en.md) |
+| Read version changes or migrate an installation | [Upgrade guide](UPGRADING.en.md) |
 | Report a problem or submit a PR | [Contribution guide](CONTRIBUTING.en.md) · [Issues](https://github.com/Chengyunlai/dsh-workbench/issues) |
-| Understand CI and releases | [Automation and releases](AUTOMATION.en.md) |
-| Privately report a vulnerability | [Security reporting](SECURITY.en.md) |
+| Understand CI, releases, and security reporting | [Automation and releases](AUTOMATION.en.md) · [Security reporting](SECURITY.en.md) |
 
-macOS desktop checks cover reading, navigation, folding, themes, and layout. CI runs core tests on Linux/macOS and package installation checks on Linux, with separate real language-server and debugger integration tests. Windows/Linux desktop interaction is not verified. Sanitized minimal reproductions are welcome.
-
-<details>
-<summary>Development and existing installations</summary>
-
-For development tests, use Node.js 24.15.0 or a newer 24.x release and run `npm ci`, `npm run verify`, and `npm run test:package`. The package is `@yunlai/dsh-workbench` and the plugin entry is `workbench`; update older installations using the [upgrade guide](UPGRADING.en.md). Right-side tab, preference, and `/api/git.*` identifiers retain their internal values to restore existing layouts.
-
-</details>
-
-Code is licensed under [MIT](LICENSE). The editor uses CodeMirror (MIT), UI icons use Lucide (ISC), and file icons come from vscode-icons (MIT); bundled dependency license notices remain in the client.
+The project is [MIT](LICENSE) licensed. The editor uses CodeMirror, interface icons are from Lucide, and file icons are from vscode-icons. [Dependency notices](THIRD_PARTY_NOTICES.txt)
