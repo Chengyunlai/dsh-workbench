@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
-const { root, file, text, line, character } = workerData;
+const { root, file, text, line, character, typeDefinition } = workerData;
 let service;
 try {
   const configPath = ts.findConfigFile(dirname(file), ts.sys.fileExists, 'tsconfig.json')
@@ -34,7 +34,7 @@ try {
   const source = service.getProgram()?.getSourceFile(file);
   if (!source) throw new Error('source is not in the language-service program');
   const position = source.getPositionOfLineAndCharacter(line, character);
-  const definitions = service.getDefinitionAtPosition(file, position) ?? [];
+  const definitions = (typeDefinition ? service.getTypeDefinitionAtPosition(file, position) : service.getDefinitionAtPosition(file, position)) ?? [];
   const locations = definitions.map(definition => {
     const target = service.getProgram()?.getSourceFile(definition.fileName);
     if (!target) throw new Error('definition source is unavailable');

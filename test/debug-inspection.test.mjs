@@ -92,8 +92,11 @@ test('inline values use nearest bindings, skip literals and nested functions, an
  const { debugInlineValues } = await import('../source-editor.js');
  const text='function run() {\n const path = "path"; // path\n function nested() { return path; }\n console.log(path);\n return path;\n}';
  const state=EditorState.create({doc:text,extensions:[javascript()]});
- assert.deepEqual(debugInlineValues(state,4,[{name:'path',value:'"local"',type:'string'},{name:'path',value:'"outer"',type:'string'}]),[
-  {line:2,text:'  path: string = "local"'}, {line:4,text:'  path: string = "local"'}
- ]);
+ const variable={name:'path',value:'"local"',type:'string',variablesReference:7};
+ const annotations=debugInlineValues(state,4,[variable,{name:'path',value:'"outer"',type:'string'}]);
+ assert.deepEqual(annotations,[2,4].map(line=>{
+  const from=state.doc.line(line).from+state.doc.line(line).text.indexOf('path');
+  return {line,values:[{variable,target:{from,to:from+4,expression:'path'}}]};
+ }));
  assert.deepEqual(debugInlineValues(state,null,[]),[]);
 });

@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.4.2
+
+While paused, click an inline variable name or value to inspect values and object fields in the selected stack frame. Click a type name to open the source type definition resolved by the language service. Breakpoint lines have a translucent red tint. For npm installations, update to `1.4.2` in Harness plugin details, then reload or restart.
+
 ## 1.4.1
 
 This release updates the English and Chinese README with a quick start, memory card workflow, language support, and debugging requirements. The updated introduction is available on GitHub and npm.

@@ -32,6 +32,23 @@ test('real compiler resolves imported alias, type, local shadowing, UTF-16 colum
   assert.deepEqual(result.targets, [{ path: 'new.js', line: 0, character: 9 }]);
 });
 
+test('type navigation resolves the type of a variable in TypeScript and Python', async t => {
+  const h = await fixture(t);
+  const lookup = async (path, line, name) => {
+    const source = await h.call('source', { path });
+    return h.call('definition', { path, line, character: source.text.split('\n')[line].indexOf(name), version: source.version, kind: 'type' });
+  };
+  const ts = await lookup('src/main.ts', 1, 'shape');
+  assert.deepEqual(ts.targets, [{ path: 'src/shapes.ts', line: 0, character: 17 }]);
+  await fs.writeFile(join(h.root, 'model.py'), 'class ModelRequest:\n    pass\n');
+  await fs.writeFile(join(h.root, 'client.py'), 'from model import ModelRequest\n\nclass Client:\n    def stream(self, request: ModelRequest):\n        return self, request\n');
+  const request = await lookup('client.py', 4, 'request');
+  assert.equal(request.status, 200, JSON.stringify(request));
+  assert.deepEqual(request.targets, [{ path: 'model.py', line: 0, character: 6 }]);
+  const self = await lookup('client.py', 4, 'self');
+  assert.deepEqual(self.targets, [{ path: 'client.py', line: 2, character: 6 }]);
+});
+
 test('source rejects traversal, escaping symlinks, binary, oversized and missing files', async t => {
   const h = await fixture(t);
   await fs.writeFile(join(h.base, 'secret.ts'), 'private');

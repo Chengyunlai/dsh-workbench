@@ -104,7 +104,7 @@ export function createLanguageServers(ctx, specs, config) {
       const uri = ctx.fs.fileUrl(source.root);
       const initialize = await request('initialize', {
         processId: null, rootUri: uri, workspaceFolders: [{ uri, name: 'workspace' }],
-        capabilities: { general: { positionEncodings: ['utf-16'] }, textDocument: { definition: { linkSupport: true }, synchronization: { dynamicRegistration: false } },
+        capabilities: { general: { positionEncodings: ['utf-16'] }, textDocument: { definition: { linkSupport: true }, typeDefinition: { linkSupport: true }, synchronization: { dynamicRegistration: false } },
           workspace: { configuration: true, workspaceFolders: true, didChangeWatchedFiles: { dynamicRegistration: false }, applyEdit: false }, window: { workDoneProgress: true } },
         initializationOptions: { ...spec.initializationOptions, ...(language === 'java' ? { workspaceFolders: [uri], settings: spec.settings } : {}) },
       }, signal);
@@ -116,11 +116,12 @@ export function createLanguageServers(ctx, specs, config) {
       await notify('workspace/didChangeConfiguration', { settings: spec.settings }, signal);
       if (spec.waitForJavaReady) await abortable(Promise.race([javaReady, ended, broken]), signal);
       return { get dead() { return dead; }, close,
-        async definition(source, position, signal) {
+        async definition(source, position, signal, typeDefinition) {
+          if (typeDefinition && !capabilities.typeDefinitionProvider) return [];
           const uri = ctx.fs.fileUrl(source.file);
           try {
             await notify('textDocument/didOpen', { textDocument: { uri, languageId: language, version: 1, text: source.text } }, signal);
-            const result = await request('textDocument/definition', { textDocument: { uri }, position }, signal);
+            const result = await request(typeDefinition ? 'textDocument/typeDefinition' : 'textDocument/definition', { textDocument: { uri }, position }, signal);
             await notify('textDocument/didClose', { textDocument: { uri } }, signal);
             return locationsOf(result);
           } catch (error) { await close(); signal.throwIfAborted(); throw serverError(error); }
@@ -130,7 +131,7 @@ export function createLanguageServers(ctx, specs, config) {
   }
 
   return {
-    query(language, source, position, callerSignal) {
+    query(language, source, position, callerSignal, typeDefinition = false) {
       if (disposed) return Promise.reject(failure('language navigation has been disposed', 'LANGUAGE_SERVER_DISPOSED', 503));
       const signal = AbortSignal.any([lifetime.signal, callerSignal]);
       const key = language + ':' + ctx.fs.fileUrl(source.root);
@@ -142,7 +143,7 @@ export function createLanguageServers(ctx, specs, config) {
         if (!entry.session || entry.session.dead) {
           await entry.session?.close(); entry.session = await start(language, source, signal);
         }
-        return entry.session.definition(source, position, signal);
+        return entry.session.definition(source, position, signal, typeDefinition);
       });
       // An aborted waiter must not allow later requests to overtake the active query.
       entry.tail = previous.then(() => query).then(() => {}, () => {});
