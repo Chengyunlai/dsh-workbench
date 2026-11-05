@@ -74,7 +74,7 @@ TS launch pauses at entry by default, allowing original-source maps to become av
 
 Opening source shows a debugger toolbar grouped into execution (start/resume, end, pause), stepping (over, into, out), and attach. Step Over uses an arrow passing over a call and executes the line without entering the called function. Step Into uses a downward arrow and enters the function; Step Out uses an upward arrow and finishes the current function before returning to its caller. The semantics follow [JetBrains stepping](https://www.jetbrains.com/help/idea/stepping-through-the-program.html). Icon hover hints include action names, shortcuts, and stepping descriptions. Unavailable actions are disabled. The toolbar remains before launch and after exit; output remains until the next launch. Groups wrap in narrow panes. A normal exit shows Ended; a step request racing with exit synchronizes the ended state.
 
-Click the gutter or press F9 to toggle a breakpoint. Hollow markers are unverified, filled markers are adapter-confirmed, and an arrow plus line background marks execution. F5 starts/continues, F8 steps over, F7 steps into, Shift+F8 steps out, Alt+F5 pauses, and Shift+F5 ends debugging. The source context menu provides these actions and attach; multiple matching configurations appear in a chooser.
+Click the gutter or press F9 to toggle a breakpoint. Breakpoint lines have a translucent red tint. Hollow markers are unverified, filled markers are adapter-confirmed, and an arrow plus line background marks execution. F5 starts/continues, F8 steps over, F7 steps into, Shift+F8 steps out, Alt+F5 pauses, and Shift+F5 ends debugging. The source context menu provides these actions and attach; multiple matching configurations appear in a chooser.
 
 The debugger defaults to the right. Use the Dock selector in its heading to move it to the bottom; browser storage retains this client preference across reopening. The bottom layout places stack, variables, and output side by side, wrapping in narrow panes. Dock changes preserve the source caret and viewport, selected frame, and variable expansion without executing debugger commands.
 
@@ -85,6 +85,8 @@ F5/F7/F8/Shift+F8/Alt+F5/Shift+F5 also work while the stack or variables have fo
 ### Hover variable inspection
 
 While paused, variable lines through the selected frame’s execution location in its source function show `name: type = value`. These are current paused values, not historical values from each line. Annotations read non-expensive scopes without evaluating expressions; types appear when supplied by the adapter. Changing frames or files and resuming clears old annotations. The hover stays open for pointer movement, expansion and copying; click outside or press Esc to dismiss.
+
+Click an inline variable name or value to open its inspector with the first level of object fields expanded. Click the type in the annotation or inspector to jump to the source type resolved for that variable by the language service. The concrete runtime subtype can differ. The editor displays a notice when no definition is available.
 
 While paused, hover a source variable or dotted member (such as `path` or `args.config`) to see its value and type in the selected stack frame. Expand objects to load children; select and copy long values. Alternatively, press Shift+F10 at the variable and choose Inspect variable value. Esc dismisses the popup. Changing files or frames, stepping, resuming, or ending closes the old popup and cancels pending queries.
 

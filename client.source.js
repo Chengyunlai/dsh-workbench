@@ -75,6 +75,7 @@ window.__ModuleLoader__.load({
     // ------------------------------------------------------------- i18n
     const en = {
       'debug.inspect': 'Inspect variable value', 'debug.hoverMissing': 'Not exposed in the selected frame', 'debug.hoverLimited': 'Variable limit reached; use Evaluate expression', 'debug.hoverInvalid': 'Invalid variable response', 'debug.hoverFailed': 'Could not inspect this variable: {message}',
+      'debug.typeDefinition': 'Go to source type definition', 'debug.typeMissing': 'No source type definition found',
       "tree.locate": "Locate current file",
       "tree.findName": "Find by file name",
       "tree.findFile": "Find in file",
@@ -312,6 +313,7 @@ window.__ModuleLoader__.load({
     };
     const zh = {
       'debug.inspect': '查看变量值', 'debug.hoverMissing': '当前栈帧未提供此变量', 'debug.hoverLimited': '已达到变量读取上限，请使用计算表达式', 'debug.hoverInvalid': '变量响应无效', 'debug.hoverFailed': '无法读取此变量：{message}',
+      'debug.typeDefinition': '跳转到源码类型定义', 'debug.typeMissing': '未找到源码中的类型定义',
       "tree.locate": "定位当前文件",
       "tree.findName": "按文件名查找",
       "tree.findFile": "在文件中查找",
@@ -649,6 +651,8 @@ window.__ModuleLoader__.load({
 .jb-variable-label{min-width:0;overflow-wrap:anywhere}
 .jb-variable-name{color:${C.text}}
 .jb-variable-type{display:block;color:${C.textDim};font:11px/16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.jb-variable-type-link{border:0;background:transparent;padding:0;text-align:left;color:${C.modified};cursor:pointer;overflow-wrap:anywhere}
+.jb-variable-type-link:hover,.jb-variable-type-link:focus-visible{text-decoration:underline}
 .jb-variable-separator{color:${C.textDim}}
 .jb-variable-value{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;color:${C.code};user-select:text}
 .jb-variable-value[data-kind=string]{color:${C.syntax.string}}
@@ -1641,6 +1645,17 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       modeRef.current = mode;
       const inspectionKey = !blocked && mode === 'source' && !debug.busy && !debug.evaluation && debug.session?.state === 'paused' && debug.selectedFrameId != null
         ? `${debug.cwd}:${debug.session.id}:${debug.session.pauseId}:${debug.selectedFrameId}:${debug.variablesVersion}` : null;
+      const currentInspection = useRef(null);
+      currentInspection.current = inspectionKey;
+      const jumpToType = at => {
+        const { debug, source, busy, blocked, onDefinition } = callbacks.current;
+        const key = currentInspection.current;
+        if (!key || busy || blocked || debug.session.frames.find(frame => frame.id === debug.selectedFrameId)?.path !== source.path) return;
+        editor.current?.closeInspection();
+        editor.current?.focus();
+        onDefinition(at.line, at.character, () => mounted.current && currentInspection.current === key
+          && callbacks.current.source.path === source.path && callbacks.current.source.version === source.version);
+      };
       const applied = useRef(null);
       callbacks.current = props;
       const [position, setPosition] = useState({ line: target.line ?? 0, character: target.character ?? 0 });
@@ -1674,6 +1689,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           takeFocus: document.activeElement === document.body || (parent.current.closest('.jb-changes')?.contains(document.activeElement) && document.activeElement.closest('.jb-filebutton') !== null),
           onHoverMount: value => { if (mounted.current) setHover(value); }, onHoverUnmount: dom => { if (mounted.current) setHover(value => value?.dom === dom ? null : value); },
           onDefinition: at => { if (!callbacks.current.busy && !callbacks.current.blocked) callbacks.current.onDefinition(at.line, at.character); },
+          onTypeDefinition: jumpToType, inspectLabel: t('debug.inspect'), typeLabel: t('debug.typeDefinition'),
           onBack: at => callbacks.current.onNavigate(-1, at), onForward: at => callbacks.current.onNavigate(1, at),
           onToggleBreakpoint: line => { if (!callbacks.current.blocked && !callbacks.current.source.external) callbacks.current.debug.toggle(line); }, breakpointLabel: t('debug.breakpoint'),
           onDebug: action => { if (!callbacks.current.blocked && !(callbacks.current.source.external && action === 'run')) action === 'evaluate' ? callbacks.current.debug.openEvaluation(editor.current.selectedText()) : action === 'run' ? callbacks.current.debug.run() : callbacks.current.debug.action(action); },
@@ -1741,7 +1757,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           mode === 'source' ? h('span', null, t('files.position', { line: String(position.line + 1), column: String(position.character + 1) })) : null,
           h('span', null, t(source.external ? 'files.library' : mode === 'preview' ? 'document.readOnly' : 'files.readOnly'))),
         menu ? h(EditorMenu, { menu, onClose: closeMenu }) : null,
-        hover && hover.key === inspectionKey ? createPortal(h(DebugHover, { key: inspectionKey + ':' + hover.expression, debug, expression: hover.expression, t, onClose: (focus = false) => { editor.current?.closeInspection(); if (focus) editor.current?.focus(); } }), hover.dom) : null,
+        hover && hover.key === inspectionKey ? createPortal(h(DebugHover, { debug, expression: hover.expression, variable: hover.variable, t,
+          onTypeDefinition: debug.session.frames.find(frame => frame.id === debug.selectedFrameId)?.path === source.path ? () => jumpToType(hover.at) : undefined,
+          onClose: (focus = false) => { editor.current?.closeInspection(); if (focus) editor.current?.focus(); } }), hover.dom) : null,
         debug.attach ? h(AttachPrompt, { debug, t, onClose: closeAttach }) : null,
         goLine && editor.current ? h(GoToLine, { editor: editor.current, t, onClose: closeGo }) : null);
     }
@@ -1996,22 +2014,25 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const paneLayout = usePaneLayout(t);
       debug.cwd = cwd; debug.path = content?.external ? undefined : target?.path; debug.setPath(debug.path); debug.sourcePending = content?.external || loading || (Boolean(loaded) && !contentMatches);
       debug.report = error => setError(error.message);
-      const define = async (line, character) => {
+      const define = async (line, character, typeContext) => {
         if (loading || !contentMatches) return;
         navigationRef.current?.abort();
         const controller = new AbortController(); navigationRef.current = controller;
         setNavigation({ busy: true, targets: [], message: null });
         try {
           const params = new URLSearchParams({ cwd, path: target.path, version: content.version, line: String(line), character: String(character) });
+          if (typeContext) params.set('kind', 'type');
           const result = await api(`/api/git.definition?${params}`, { signal: controller.signal });
           if (controller.signal.aborted) return;
-          const message = result.external > 0 ? t('files.external', { n: String(result.external) }) : result.targets.length === 0 ? t('files.none') : null;
+          if (typeContext && !typeContext()) { setNavigation({ busy: false, targets: [], message: null }); return; }
+          const message = result.external > 0 ? t('files.external', { n: String(result.external) }) : result.targets.length === 0 ? t(typeContext ? 'debug.typeMissing' : 'files.none') : null;
           setNavigation({ busy: false, targets: result.targets, message, origin: { ...target, line, character } });
           if (result.targets.length === 1) {
             visit({ ...result.targets[0], notice: message, focusSource: true }, { ...target, line, character });
           }
         } catch (error) {
           if (controller.signal.aborted) return;
+          if (typeContext && !typeContext()) { setNavigation({ busy: false, targets: [], message: null }); return; }
           const key = error.code === 'NAVIGATION_UNAVAILABLE' ? 'files.unavailable' : error.code === 'SOURCE_CHANGED' ? 'files.changed'
             : error.code === 'LANGUAGE_SERVER_MISSING' ? 'files.serverMissing' : error.code === 'LANGUAGE_SERVER_TIMEOUT' ? 'files.serverTimeout'
               : typeof error.code === 'string' && error.code.startsWith('LANGUAGE_SERVER_') ? 'files.serverFailed' : 'files.failed';

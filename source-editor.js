@@ -115,12 +115,15 @@ class BreakpointMarker extends GutterMarker {
   eq(other) { return this.enabled === other.enabled && this.verified === other.verified && this.current === other.current; }
   toDOM() { const span = document.createElement('span'); span.className = 'jb-breakpoint' + (this.enabled ? ' jb-breakpoint-enabled' : '') + (this.verified ? ' jb-breakpoint-verified' : '') + (this.current ? ' jb-debug-current' : ''); span.title = this.label; span.setAttribute('aria-label', this.label); span.textContent = this.current ? '▶' : this.enabled ? this.verified ? '●' : '○' : ''; return span; }
 }
-const executionLine = StateField.define({
+const debugLines = StateField.define({
   create: () => Decoration.none,
   update(value, transaction) {
     for (const effect of transaction.effects) if (effect.is(debugEffect)) {
-      return Decoration.set([['currentLine', 'jb-debug-line'], ['selectedLine', 'jb-debug-frame-line']].flatMap(([key, className]) => {
-        const line = effect.value[key];
+      const { breakpoints, currentLine, selectedLine } = effect.value;
+      return Decoration.set([
+        ...breakpoints.map(point => [point.line, 'jb-breakpoint-line']),
+        [currentLine, 'jb-debug-line'], [selectedLine, 'jb-debug-frame-line'],
+      ].flatMap(([line, className]) => {
         return line && line <= transaction.state.doc.lines ? [Decoration.line({ class: className }).range(transaction.state.doc.line(line).from)] : [];
       }), true);
     }
@@ -131,15 +134,32 @@ const executionLine = StateField.define({
 
 const inlineEffect = StateEffect.define();
 class InlineValue extends WidgetType {
-  constructor(text) { super(); this.text = text; }
-  eq(other) { return this.text === other.text; }
-  toDOM() { const span = document.createElement('span'); span.className = 'jb-debug-inline'; span.textContent = this.text; return span; }
+  constructor(items, actions) { super(); this.items = items; this.actions = actions; }
+  toDOM(view) {
+    const span = document.createElement('span');
+    span.className = 'jb-debug-inline';
+    this.items.forEach(({ variable, target }, index) => {
+      const button = (text, label, action, className) => {
+        const element = document.createElement('button');
+        element.type = 'button'; element.textContent = text; element.title = label; element.className = className;
+        element.addEventListener('click', event => { event.stopPropagation(); action(element); });
+        return element;
+      };
+      const inspect = text => button(text, this.actions.inspectLabel + ' · ' + variable.name,
+        anchor => this.actions.inspect(view, target, variable, anchor), '');
+      span.append(index ? '  ·  ' : '  ', inspect(variable.name));
+      if (variable.type) span.append(': ', button(variable.type, this.actions.typeLabel + ' · ' + variable.type,
+        () => this.actions.type(view, target), 'jb-debug-inline-type'));
+      span.append(' = ', inspect(variable.value.replace(/\s*\n\s*/g, ' ')));
+    });
+    return span;
+  }
 }
 const inlineValues = StateField.define({
   create: () => Decoration.none,
   update(value, transaction) {
     for (const effect of transaction.effects) if (effect.is(inlineEffect)) return Decoration.set(effect.value.map(item =>
-      Decoration.widget({ widget: new InlineValue(item.text), side: 1 }).range(transaction.state.doc.line(item.line).to)), true);
+      Decoration.widget({ widget: new InlineValue(item.values, item.actions), side: 1 }).range(transaction.state.doc.line(item.line).to)), true);
     return transaction.docChanged ? Decoration.none : value;
   },
   provide: field => EditorView.decorations.from(field),
@@ -167,10 +187,9 @@ export function debugInlineValues(state, lineNumber, variables) {
     if (!variable) return;
     const number = state.doc.lineAt(node.from).number;
     if (!lines.has(number)) lines.set(number, new Map());
-    lines.get(number).set(variable.name, variable);
+    lines.get(number).set(variable.name, { variable, target });
   } });
-  return [...lines].map(([line, values]) => ({ line, text: '  ' + [...values.values()].map(item =>
-    item.name + (item.type ? ': ' + item.type : '') + ' = ' + item.value.replace(/\s*\n\s*/g, ' ')).join('  ·  ') }));
+  return [...lines].map(([line, values]) => ({ line, values: [...values.values()] }));
 }
 
 const linkEffect = StateEffect.define();
@@ -237,23 +256,40 @@ export function navigationScrollOptions(box, coords) {
  * @returns Focus, caret/viewport/fold snapshots, reveal, host-source replacement and disposal actions; user edits remain disabled.
  */
 export function createSourceEditor(parent, options) {
-  let sourceVersion = options.version, inspectionKey = null, hoverTimer = null, hoverTarget = null;
+  let sourceVersion = options.version, inspectionKey = null, hoverTimer = null, hoverTarget = null, clickedValue = null;
   const inspection = hoverTooltip((view, position, side) => {
-    if (!inspectionKey || view.state.field(linkField).size) return null;
-    const target = debugHoverAt(view.state, position, side);
+    if (!inspectionKey || (!clickedValue && (view.state.field(linkField).size || view.state.field(inspection.active).some(item => item.clicked)))) return null;
+    const clicked = clickedValue;
+    const target = clicked?.target ?? debugHoverAt(view.state, position, side);
     if (!target) return null;
     const key = inspectionKey;
-    return { pos: target.from, end: target.to, above: false,
+    return { pos: target.from, end: target.to, above: false, clicked: Boolean(clicked),
       create() {
         const dom = document.createElement('div'); dom.className = 'jb-debug-hover';
         return { dom, offset: { x: 0, y: 6 },
-          mount: () => options.onHoverMount({ dom, key, expression: target.expression }),
+          ...(clicked ? { getCoords: () => clicked.anchor.getBoundingClientRect() } : {}),
+          mount: () => options.onHoverMount({ dom, key, expression: target.expression,
+            at: positionAt(view, target.to - 1), variable: clicked?.variable }),
           destroy: () => options.onHoverUnmount(dom) };
       } };
   }, { hideOnChange: true });
   const positionAt = (view, offset = view.state.selection.main.head) => {
     const line = view.state.doc.lineAt(offset);
     return { line: line.number - 1, character: offset - line.from };
+  };
+  const inlineActions = {
+    inspectLabel: options.inspectLabel, typeLabel: options.typeLabel,
+    inspect(view, target, variable, anchor) {
+      if (!inspectionKey) return;
+      clearTimeout(hoverTimer); hoverTarget = null;
+      clickedValue = { target, variable, anchor };
+      try { activateHover(view, target.from, 1, { tooltip: inspection }); }
+      finally { clickedValue = null; }
+    },
+    type(view, target) {
+      if (!inspectionKey) return;
+      options.onTypeDefinition(positionAt(view, target.to - 1));
+    },
   };
   const offsetAt = (state, position) => {
     const line = state.doc.line(Math.min(Math.max(1, position.line + 1), state.doc.lines));
@@ -273,7 +309,7 @@ export function createSourceEditor(parent, options) {
     EditorState.phrases.of(options.foldPhrases),
     EditorState.phrases.of(options.searchPhrases ?? {}),
     EditorView.contentAttributes.of({ tabindex: '0', 'aria-label': options.label, 'aria-readonly': 'true' }),
-    debugField, executionLine, inlineValues, inspection, tooltips({ parent: document.body, position: 'fixed' }),
+    debugField, debugLines, inlineValues, inspection, tooltips({ parent: document.body, position: 'fixed' }),
     gutter({ class: 'jb-breakpoints', lineMarker: (view, line) => { const number = view.state.doc.lineAt(line.from).number, value = view.state.field(debugField); const point = value.breakpoints.find(item => item.line === number); return new BreakpointMarker(Boolean(point), point?.verified === true, value.currentLine === number, options.breakpointLabel); }, lineMarkerChange: update => update.transactions.some(transaction => transaction.effects.some(effect => effect.is(debugEffect))), domEventHandlers: { mousedown: (view, line, event) => { event.preventDefault(); options.onToggleBreakpoint(view.state.doc.lineAt(line.from).number); return true; } } }),
     lineNumbers(), foldGutter(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(), bracketMatching(),
     highlightSelectionMatches({ highlightWordAroundCursor: true, wholeWords: true }),
@@ -317,6 +353,10 @@ export function createSourceEditor(parent, options) {
         options.onContextMenu({ x: event.clientX, y: event.clientY }, positionAt(view)); return true;
       },
       mousemove(event, view) {
+        if (event.target.closest?.('.jb-debug-inline')) {
+          clearTimeout(hoverTimer); hoverTarget = null;
+          return;
+        }
         if (!event.sourceCapabilities?.firesTouchEvents && inspectionKey && !event.metaKey && !event.ctrlKey) {
           const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
           const target = pos === null ? null : debugHoverAt(view.state, pos, -1);
@@ -362,8 +402,15 @@ export function createSourceEditor(parent, options) {
       '.jb-breakpoint': { display: 'inline-block', width: '16px', height: '22px', cursor: 'pointer', color: options.colors.textDim, textAlign: 'center' },
       '.jb-breakpoint-enabled': { color: options.colors.deleted, opacity: '.5' },
       '.jb-breakpoint-verified': { opacity: '1' },
+      '.jb-breakpoint-line': {
+        '--jb-breakpoint-tint': 'color-mix(in srgb, ' + options.colors.deleted + ' 18%, transparent)',
+        backgroundImage: 'linear-gradient(var(--jb-breakpoint-tint), var(--jb-breakpoint-tint))',
+      },
       '.jb-debug-current': { color: options.colors.accent, opacity: '1' },
       '.jb-debug-inline': { color: options.colors.textDim, fontStyle: 'italic', whiteSpace: 'pre', userSelect: 'none' },
+      '.jb-debug-inline button': { background: 'none', border: '0', padding: '0', color: 'inherit', font: 'inherit', cursor: 'pointer' },
+      '.jb-debug-inline button:hover, .jb-debug-inline button:focus-visible': { textDecoration: 'underline' },
+      '.jb-debug-inline .jb-debug-inline-type': { color: options.colors.accent },
       '.jb-debug-line': { backgroundColor: options.colors.selection },
       '.jb-debug-frame-line': { backgroundColor: options.colors.hover, boxShadow: 'inset 2px 0 ' + options.colors.accent },
       '.cm-cursor': { borderLeftColor: options.colors.text },
@@ -405,7 +452,7 @@ export function createSourceEditor(parent, options) {
   const dismiss = event => { clearTimeout(hoverTimer); if (!view.dom.contains(event.target) && !event.target.closest?.('.jb-debug-hover')) view.dispatch({ effects: closeHoverTooltips }); };
   document.addEventListener('pointerdown', dismiss, true);
   return {
-    setInlineValues: (line, variables) => view.dispatch({ effects: inlineEffect.of(debugInlineValues(view.state, line, variables)) }),
+    setInlineValues: (line, variables) => view.dispatch({ effects: inlineEffect.of(debugInlineValues(view.state, line, variables).map(item => ({ ...item, actions: inlineActions }))) }),
     setInspection: key => { if (key !== inspectionKey) { inspectionKey = key; clearTimeout(hoverTimer); hoverTarget = null; view.dispatch({ effects: [closeHoverTooltips, inlineEffect.of([])] }); } },
     inspect: () => { const head = view.state.selection.main.head; if (inspectionKey) activateHover(view, head, wordAt(view.state, head)?.to === head ? -1 : 1, { tooltip: inspection, until: transaction => transaction.selection !== undefined }); },
     closeInspection: () => { clearTimeout(hoverTimer); hoverTarget = null; view.dispatch({ effects: closeHoverTooltips }); },

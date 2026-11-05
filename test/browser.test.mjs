@@ -598,10 +598,18 @@ test('gutter breakpoints and debug shortcuts launch, step and disconnect through
   await ui.click('src'); await ui.click('main.ts'); await ui.caret(0);
   await ui.key('F9');
   assert.equal(ui.container.querySelectorAll('.jb-breakpoint-enabled').length, 1);
+  const marked = () => ui.container.querySelector('.cm-line.jb-breakpoint-line');
+  assert.equal(marked().textContent, ui.editor().state.doc.line(1).text);
+  const tint = ui.dom.window.getComputedStyle(marked()).getPropertyValue('--jb-breakpoint-tint');
+  assert.match(tint, /--dsw-alias-file-diff-deleted-marker\) 18%,\s*transparent/);
+  await ui.key('F9');
+  assert.equal(marked(), null);
+  await ui.key('F9');
   await ui.key('F5');
   assert.deepEqual(actions[0].breakpoints, { 'src/main.ts': [1] });
   assert.equal(actions[0].name, 'Launch JS');
   assert.ok(ui.container.querySelector('.jb-debug-line'));
+  assert.ok(marked().classList.contains('jb-debug-line'));
   assert.ok(ui.container.querySelector('.jb-breakpoint-verified'));
   assert.ok(ui.container.querySelector('.jb-debug-pane').textContent.includes('调用栈'));
   assert.deepEqual({
@@ -617,6 +625,7 @@ test('gutter breakpoints and debug shortcuts launch, step and disconnect through
   await ui.menu(ui.container.querySelector('.cm-content'), 'debug.attach');
   assert.equal(actions.at(-1).name, 'Attach JS');
   assert.equal(ui.container.querySelector('.jb-debug-line'), null);
+  assert.ok(marked());
 });
 
 test('stack selection previews source and variables, survives output, and resets only for a new pause', async context => {
@@ -1631,6 +1640,44 @@ test('pointer inspection stays open across movement and inline values clear when
  assert.equal(doc.querySelector('.jb-debug-hover'),null);
  await ui.key('F5');
  assert.equal(ui.container.querySelector('.jb-debug-inline'),null);
+});
+
+test('inline values inspect the selected caller frame and their types navigate from the original source token', async context => {
+ const text='function caller(request: Request) {\n  request.run();\n}';
+ const session={id:'inline-caller',name:'Sample',state:'paused',revision:1,pauseId:3,frames:[
+  {id:1,name:'callee',path:'src/lib.ts',line:1,column:1},{id:2,name:'caller',path:'src/main.ts',line:2,column:1}
+ ],scopes:[],output:''};
+ const requests=[];
+ const ui=await panel(context,server((url,options)=>{
+  if(url.pathname==='/api/git.source')return {ok:true,json:async()=>({path:url.searchParams.get('path'),text,version:'inline-v1'})};
+  if(url.pathname==='/api/git.debug.status')return {ok:true,json:async()=>session};
+  if(url.pathname==='/api/git.debug.action'){
+   const body=JSON.parse(options.body);requests.push(body);
+   const data=body.action==='scopes' ? {scopes:[{name:'Locals',variablesReference:10}]}
+    : {variables:body.reference===10 ? [{name:'request',value:'Request(payload=42)',type:'Request',variablesReference:20}]
+      : [{name:'payload',value:'42',type:'number',variablesReference:0}]};
+   return {ok:true,json:async()=>data};
+  }
+  if(url.pathname==='/api/git.definition'){
+   requests.push(Object.fromEntries(url.searchParams));
+   return {ok:true,json:async()=>({targets:[{path:'src/lib.ts',line:0,character:0}],external:0})};
+  }
+ }));
+ const doc=ui.dom.window.document, hover=()=>doc.querySelector('.jb-debug-hover-body');
+ await act(async()=>ui.container.querySelector('[role=option][aria-selected=false]').click());
+ const annotation=()=>ui.container.querySelector('.jb-debug-inline');
+ await act(async()=>annotation().querySelector('button').click());
+ assert.match(hover().textContent,/caller.*payload.*42/);
+ assert.equal(doc.activeElement,hover());
+ assert.ok(requests.some(row=>row.action==='scopes'&&row.frameId===2));
+ assert.ok(requests.some(row=>row.action==='variables'&&row.reference===20&&row.pauseId===3));
+ assert.ok(!requests.some(row=>['inspect','evaluate'].includes(row.action)));
+ await act(async()=>hover().dispatchEvent(new ui.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));
+ assert.equal(hover(),null);
+ await act(async()=>annotation().querySelector('.jb-debug-inline-type').click());
+ const query=requests.find(row=>row.kind==='type');
+ assert.deepEqual([query.path,query.version,query.line,query.character],['src/main.ts','inline-v1','0','22']);
+ assert.equal(ui.container.querySelector('.jb-editor-title .jb-diffpath').textContent,'src/lib.ts');
 });
 
 test('Python class window displays declarations, navigates methods without an LSP and preserves its window when source changes', async context => {

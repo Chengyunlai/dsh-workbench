@@ -2,6 +2,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { realpath } from 'node:fs/promises';
 import { Worker } from 'node:worker_threads';
+import { parser as pythonParser } from '@lezer/python';
 import { imageMime, readImagePreview } from './image-preview.js';
 import { serverLanguage } from './language-servers.js';
 
@@ -11,6 +12,25 @@ const LIBRARY_SOURCE = /\.(?:pyi?|go|java|[cm]?[jt]sx?)$/i;
 const LIBRARY_PREFIX = 'dsh-library://';
 const failure = (message, code, status = 400) => Object.assign(new Error(message), { code, status });
 const versionOf = text => createHash('sha256').update(text).digest('hex');
+
+function pythonReceiverType(locations, sourceUri, lines, line, character) {
+  // Pyright may report the parameter declaration for its synthesized Self type.
+  const receiver = /\bself\b/g;
+  if (locations.length !== 1 || locations[0].uri !== sourceUri
+    || ![...lines[line].matchAll(receiver)].some(match => match.index <= character && character < match.index + match[0].length)) return locations;
+  const { start } = locations[0].range;
+  const offset = (row, column) => lines.slice(0, row).reduce((length, text) => length + text.length + 1, column);
+  const position = offset(start.line, start.character), text = lines.join('\n');
+  const parameter = pythonParser.parse(text).resolveInner(position, 1);
+  const params = parameter.parent, method = params?.parent, owner = method?.parent?.parent;
+  if (parameter.name !== 'VariableName' || parameter.from !== position || text.slice(parameter.from, parameter.to) !== 'self'
+    || params?.name !== 'ParamList' || params.getChild('VariableName')?.from !== position || parameter.nextSibling?.name === 'TypeDef'
+    || method?.name !== 'FunctionDefinition' || method.parent?.name !== 'Body' || owner?.name !== 'ClassDefinition') return locations;
+  const name = owner.getChild('VariableName');
+  if (!name) return locations;
+  const before = text.slice(0, name.from), row = before.split('\n').length - 1, column = before.length - before.lastIndexOf('\n') - 1;
+  return [{ uri: sourceUri, range: { start: { line: row, character: column }, end: { line: row, character: column + name.to - name.from } } }];
+}
 
 /**
  * Resolve and read a bounded UTF-8 regular file inside a registered workspace.
@@ -127,6 +147,9 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
     definition: async (ctx, request, signal) => {
       const { query, cwd } = await readQuery(ctx, request, signal);
       const path = query.get('path');
+      const kind = query.get('kind');
+      if (kind !== null && kind !== 'type') throw failure('invalid definition kind', 'INVALID_DEFINITION_KIND');
+      const typeDefinition = kind === 'type';
       const source = await readSource(ctx, cwd, path, signal);
       if (query.get('version') !== source.version) throw failure('source changed; reopen it before navigating', 'SOURCE_CHANGED', 409);
       const lineText = query.get('line'), characterText = query.get('character');
@@ -137,7 +160,7 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
       const lsp = ctx.get('lsp');
       let locations;
       let engine = 'lsp';
-      if (lsp) {
+      if (lsp && !typeDefinition) {
         try {
           const result = await lsp.query({ operation: 'goToDefinition', filePath: source.external ? source.displayPath : path, position: { line, character }, workspaceRoot: cwd }, signal);
           if (result.kind !== 'locations') throw failure('unexpected language-service response', 'NAVIGATION_FAILED', 502);
@@ -153,10 +176,11 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
         if (!mappedRoot || await realpath(mappedRoot) !== ctx.fs.processPath(source.root)) throw failure('built-in navigation requires a local filesystem; configure an LSP provider for this workspace', 'NAVIGATION_UNAVAILABLE', 503);
         if (language) {
           engine = language;
-          locations = await languageServers.query(language, source, { line, character }, signal);
+          locations = await languageServers.query(language, source, { line, character }, signal, typeDefinition);
+          if (typeDefinition && language === 'python') locations = pythonReceiverType(locations, ctx.fs.fileUrl(source.file), lines, line, character);
         } else {
           engine = 'typescript';
-          locations = await typescriptDefinitions({ root: ctx.fs.processPath(source.root), file: ctx.fs.processPath(source.file), text: source.text, line, character }, signal);
+          locations = await typescriptDefinitions({ root: ctx.fs.processPath(source.root), file: ctx.fs.processPath(source.file), text: source.text, line, character, typeDefinition }, signal);
         }
       }
       const rootUrl = new URL(ctx.fs.fileUrl(source.root));

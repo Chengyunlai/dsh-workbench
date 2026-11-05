@@ -172,12 +172,15 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
     const [open, setOpen] = useState(defaultOpen);
     return h('details', { className: 'jb-variable-branch', open, onToggle: event => setOpen(event.currentTarget.open) }, h('summary', null, title), open ? h(Variables, { debug, reference, t }) : null);
   }
-  function VariableValue({ item }) {
+  function VariableValue({ item, onTypeDefinition, typeLabel }) {
     const kind = /^(str|string)$/i.test(item.type ?? '') ? 'string' : /^(int|float|double|number|long|short|byte|complex)/i.test(item.type ?? '') ? 'number'
       : /^(None|True|False|null|undefined|true|false)$/.test(item.value) ? 'constant' : 'plain';
     return h('span', { className: 'jb-variable-row' },
       h('span', { className: 'jb-variable-label' }, h('span', { className: 'jb-variable-name' }, item.name),
-        item.type ? h('span', { className: 'jb-variable-type' }, item.type) : null),
+        item.type ? onTypeDefinition
+          ? h('button', { type: 'button', className: 'jb-variable-type jb-variable-type-link', title: typeLabel,
+            onClick: event => { event.preventDefault(); onTypeDefinition(); } }, item.type)
+          : h('span', { className: 'jb-variable-type' }, item.type) : null),
       h('span', { className: 'jb-variable-separator', 'aria-hidden': true }, ': '),
       h('span', { className: 'jb-variable-value', 'data-kind': kind }, item.value));
   }
@@ -209,10 +212,12 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
     if (!debug.busy && debug.session?.id && (action === 'stop' ? debug.session.state !== 'ended' : action === 'pause' ? debug.session.state === 'running' : debug.session.state === 'paused')) debug.action(action);
   }
   /** Values are scoped to the selected pause/frame; the editor owns the hover's position and lifetime. */
-  function DebugHover({ debug, expression, t, onClose }) {
+  function DebugHover({ debug, expression, variable, t, onClose, onTypeDefinition }) {
     const [value, setValue] = useState(null), [error, setError] = useState(null), [loading, setLoading] = useState(true);
+    const ref = useRef(null);
     const session = debug.session, frame = session.frames.find(frame => frame.id === debug.selectedFrameId);
     useEffect(() => {
+      if (variable) { ref.current.focus({ preventScroll: true }); return; }
       const controller = new AbortController();
       setLoading(true); setValue(null); setError(null);
       api('/api/git.debug.action', { method: 'POST', signal: controller.signal, body: { cwd: debug.cwd, id: session.id,
@@ -226,15 +231,17 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
         .catch(error => { if (!controller.signal.aborted) error.code === 'DEBUG_INSPECTION_STALE' ? onClose() : setError(t('debug.hoverFailed', { message: error.message })); })
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
       return () => controller.abort();
-    }, [debug.cwd, session.id, session.pauseId, frame.id, debug.variablesVersion, expression]);
-    return h('section', { role: 'dialog', 'aria-label': t('debug.inspect'), className: 'jb-debug-hover-body',
+    }, [debug.cwd, session.id, session.pauseId, frame.id, debug.variablesVersion, expression, variable]);
+    const item = variable ?? value?.variable;
+    const row = item ? h(VariableValue, { item, onTypeDefinition, typeLabel: t('debug.typeDefinition') }) : null;
+    return h('section', { ref, tabIndex: variable ? -1 : undefined, role: 'dialog', 'aria-label': t('debug.inspect'), className: 'jb-debug-hover-body',
       onKeyDown: event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(true); } else { debugKeyDown(debug, event); if (event.defaultPrevented) onClose(true); } } },
       h('div', { className: 'jb-debug-hover-frame', title: frame.path }, frame.name + ' · ' + (frame.path?.split('/').at(-1) ?? t('debug.external')) + ':' + frame.line),
-      loading ? h('div', { className: 'jb-debug-placeholder', role: 'status' }, t('loading')) : null,
-      error ? h('div', { role: 'alert' }, error) : null,
-      value?.variable ? h('div', { className: 'jb-debug-hover-value' }, value.variable.variablesReference > 0
-        ? h(VariableTree, { debug, reference: value.variable.variablesReference, title: h(VariableValue, { item: value.variable }), t })
-        : h(VariableValue, { item: value.variable })) : value ? h('div', { className: 'jb-debug-placeholder', role: 'status' }, h('code', null, expression), ' · ', t(value.limited ? 'debug.hoverLimited' : 'debug.hoverMissing')) : null);
+      !variable && loading ? h('div', { className: 'jb-debug-placeholder', role: 'status' }, t('loading')) : null,
+      !variable && error ? h('div', { role: 'alert' }, error) : null,
+      item ? h('div', { className: 'jb-debug-hover-value' }, item.variablesReference > 0
+        ? h(VariableTree, { debug, reference: item.variablesReference, title: row, defaultOpen: Boolean(variable), t })
+        : row) : value ? h('div', { className: 'jb-debug-placeholder', role: 'status' }, h('code', null, expression), ' · ', t(value.limited ? 'debug.hoverLimited' : 'debug.hoverMissing')) : null);
   }
   function EvaluationDialog({ debug, t, onClose }) {
     const ref = useRef(null), input = useRef(null), pending = useRef(false), sequence = useRef(0);
