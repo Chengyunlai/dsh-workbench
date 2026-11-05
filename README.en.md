@@ -52,6 +52,15 @@ Suppose you are reading a `stream()` method and want to know where SSE bytes bec
 
 The Memory cards tool groups cards by archive folder and searches titles, summaries, tags, sources, and paths in combination. Cards are Markdown files in the project and default to `.dsh/cards/`. Linked cards use the nearest two source directories, questions without linked source go under `general/`, and existing cards can be grouped in the index by their source metadata. [Memory cards guide](USAGE.en.md#memory-cards)
 
+![Memory card with rendered YAML metadata, question recap, example, and recall prompt](screenshots/readme-v1.4.1/memory-card-preview.png)
+
+<details>
+<summary>View the grouped card index</summary>
+
+![Memory cards grouped under General and src/transport, with question, tag, and source search](screenshots/readme-v1.4.1/memory-card-index.png)
+
+</details>
+
 ## Demos
 
 These recordings use fictional projects. Select a screenshot to open its GIF.
@@ -60,12 +69,12 @@ These recordings use fictional projects. Select a screenshot to open its GIF.
 
 ### Python class relationships
 
-![Python class diagram in the workbench](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-dark.png)
+![Python source and a docked class diagram showing two EventReader implementations](screenshots/readme-v1.4.1/python-class-diagram.png)
 
 <details>
-<summary>View the light theme</summary>
+<summary>View the same classes in the hierarchy tree</summary>
 
-![Python class diagram in the light theme](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-04-v1.3.0/classes-light.png)
+![Python source and a docked hierarchy tree with implementations and a method](screenshots/readme-v1.4.1/python-class-hierarchy.png)
 
 </details>
 
@@ -78,7 +87,7 @@ These recordings use fictional projects. Select a screenshot to open its GIF.
 
 [Code folding and tab restoration](https://raw.githubusercontent.com/Chengyunlai/dsh-workbench/demo-assets/demos/2026-11-03-beecb54/code-folding.gif) · [Debugger hover recording notes](https://github.com/Chengyunlai/dsh-workbench/blob/demo-assets/demos/2026-11-04-dc2b2e3/RECORDING.md)
 
-The cover is a concept illustration. Screenshots and GIFs come from earlier versions in isolated Harness Web instances on macOS with fictional source and commit history. The GIFs use edited holds between steps.
+The cover is a concept illustration. The class and card screenshots show the Chinese interface of workbench `1.4.1` running in Harness Web with a fictional Beacon Stream project and sample cards. Other demos come from earlier isolated runs. The GIFs use edited holds between steps.
 
 </details>
 
