@@ -336,7 +336,8 @@ export function createSourceEditor(parent, options) {
       blur(event, view) { if (view.state.field(linkField).size) view.dispatch({ effects: linkEffect.of(null) }); },
     }),
     EditorView.theme({
-      '&': { height: '100%', backgroundColor: options.colors.bg, color: options.colors.code, fontSize: '12.5px' },
+      '&': { backgroundColor: options.colors.bg, color: options.colors.code, fontSize: '12.5px' },
+      '&.cm-editor': { height: '100%' },
       '&.cm-focused': { outline: 'none' },
       '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace', lineHeight: '22px' },
       '.cm-content': { caretColor: options.colors.text, padding: '6px 0' },

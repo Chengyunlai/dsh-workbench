@@ -3,6 +3,7 @@
     { "icon": true, "label": "查找" },
     { "icon": true, "label": "变更" },
     { "icon": true, "label": "历史" },
+    { "icon": true, "label": "记忆卡片" },
     { "icon": true, "label": "调试" },
     { "icon": true, "label": "终端" }
   ],

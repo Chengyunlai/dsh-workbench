@@ -80,7 +80,20 @@ window.__ModuleLoader__.load({
       "tree.findFile": "Find in file",
       "tree.findDirectory": "Find in directory",
       "classes.inherits": "Inheritance", "classes.protocolBase": "Declared Protocol base", "classes.abstractHint": "Italic: abstract method",
-      "classes.title": "Python class relationships",
+      "classes.factory": "Factory return association", "classes.factoryHint": "Annotated factory returns · Not a protocol compatibility check",
+      "classes.evidence": "Factory return evidence", "classes.fit": "Fit diagram to pane",
+      "classes.languageTitle": "{language} class relationships", "classes.beta": "Beta", "classes.betaHint": "Python class analysis is in Beta.",
+      "classes.unsupportedFile": "This is a {language} file. Class relationships currently support Python (.py/.pyi) only, in Beta.",
+      "classes.unsupportedProject": "This project uses {language}. Class relationships currently support Python only, in Beta.",
+      "classes.mixedUnsupported": "Multiple project languages detected. Select a Python file to use class relationships (Beta).",
+      "classes.externalUnsupported": "Library source previews are readable, but library class analysis is not supported. Select a workspace Python file (Beta).",
+      "classes.choosePython": "Select a Python file or open a Python project to use class relationships (Beta).", "classes.detecting": "Identifying project file types…",
+      "classes.language.python": "Python", "classes.language.javascript": "JavaScript", "classes.language.typescript": "TypeScript", "classes.language.javascript-typescript": "JavaScript / TypeScript", "classes.language.go": "Go", "classes.language.java": "Java", "classes.language.rust": "Rust", "classes.language.c": "C", "classes.language.cpp": "C++", "classes.language.markdown": "Markdown", "classes.language.json": "JSON", "classes.language.yaml": "YAML", "classes.language.other": "Other",
+      "classes.view": "Relationship view", "classes.tree": "Hierarchy", "classes.graph": "Diagram",
+      "classes.treeHint": "←/→ to collapse/expand · Double-click or Enter/F4 to open source",
+      "classes.expand": "Expand {name}", "classes.collapse": "Collapse {name}", "classes.reference": "Repeated reference; expand the first occurrence",
+      "classes.factoryShort": "Factory", "classes.treeLimited": "Some rows are hidden. Collapse branches to reveal more.", "classes.viewUnsaved": "View changed for this pane; the preference could not be saved.",
+      "classes.title": "Class relationships",
       "classes.dock": "Position",
       "classes.right": "Right",
       "classes.bottom": "Bottom",
@@ -91,7 +104,7 @@ window.__ModuleLoader__.load({
       "classes.zoomOut": "Zoom out",
       "classes.zoomIn": "Zoom in",
       "classes.zoomReset": "Reset zoom",
-      "classes.hint": "Declared inheritance · Double-click a class or click a method to open source · Drag blank space to pan",
+      "classes.hint": "Source relationships · Double-click a class or click a method to open source · Drag blank space to pan",
       "classes.limited": "Partial graph: scan or display limit reached. Narrow the project or increase the scan limits.",
       "classes.skipped": "Skipped {n} files",
       "classes.empty": "No Python class declarations found.",
@@ -182,8 +195,10 @@ window.__ModuleLoader__.load({
       "debug.output": "Program output",
       "debug.fullPath": "Full path", "debug.noVariables": "No variables in this scope",
       'document.preview': 'Reading preview', 'document.source': 'Source', 'document.mode': 'Document view',
+      'document.metadataTags': 'Tags', 'document.metadataKind': 'Type', 'document.metadataSource': 'Source',
       'document.image': 'Image: {alt}', 'document.readOnly': 'Markdown · Read-only', 'document.linkFailed': 'This link cannot be opened inside the workspace.',
       'layout.treeWidth': 'File tree width', 'layout.treeHeight': 'File tree height',
+      'layout.classWidth': 'Class diagram width', 'layout.classHeight': 'Class diagram height',
       'layout.resizeHint': 'Drag to resize · Arrow keys to adjust · Double-click or Enter to reset', 'layout.pixels': '{n} pixels',
       'layout.unsaved': 'Size changed for this panel. Browser storage is unavailable, so it cannot be saved.',
 
@@ -202,6 +217,7 @@ window.__ModuleLoader__.load({
       'files.foldedLines': 'Folded lines', 'files.unfoldedLines': 'Unfolded lines', 'files.rangeTo': 'to',
       'files.opening': 'Opening {path}…', 'files.openFailed': 'Could not open {path}: {message}',
       'files.openTabs': 'Open files', 'files.closeTab': 'Close {path}',
+      'files.tabMenu': 'File tab actions', 'files.tabClose': 'Close', 'files.tabCloseOthers': 'Close other tabs', 'files.tabCloseAll': 'Close all tabs',
       'files.linePrompt': 'Line[:column] · Enter to go · Esc to cancel',
       'files.invalidLine': 'Enter an existing line and column.',
       'files.position': 'Ln {line}, Col {column}',
@@ -209,7 +225,8 @@ window.__ModuleLoader__.load({
       'files.pick': 'Select a file to read its source.',
       'files.results': 'Choose a definition',
       'files.none': 'No definition found here.',
-      'files.external': '{n} definitions outside this workspace cannot be opened.',
+      'files.external': '{n} definitions have no readable source preview.',
+      'files.library': 'Library source · Read-only · UTF-8', 'files.libraryShort': 'Library', 'files.libraryExpired': 'This library reference expired. Navigate from project source again.',
       'files.unavailable': 'No language service is available for this file or execution environment.',
       'files.serverMissing': 'The language server is unavailable. Configure its launch command in the Git plugin settings.',
       'files.serverTimeout': 'Code navigation timed out. Check the project and language-server configuration, or increase the navigation timeout in plugin settings.',
@@ -241,17 +258,36 @@ window.__ModuleLoader__.load({
       'group.changes': 'Changes',
       'group.unversioned': 'Unversioned Files',
       'filter.placeholder': 'Filter files',
-      'review.button': 'Suggest to AI',
-      'review.placeholder': 'Write your review suggestion for the AI…',
+      'review.button.task': 'Assign a task',
+      'review.button.explain': 'Explain',
+      'review.title.task': 'Assign a change task',
+      'review.title.explain': 'Explain it to me',
+      'review.note.task': 'Uses the default DeepSeek conversation, with no extra skills or workflows.',
+      'review.note.explain': 'Uses the default DeepSeek conversation and saves the explanation as one memory card.',
+      'review.placeholder.task': 'Describe the fix or feature change to make in this project…',
+      'review.placeholder.explain': 'What do you want to understand?',
       'review.send': 'Send',
       'review.cancel': 'Cancel',
-      'review.sent': 'Sent to a new conversation ✓',
+      'review.sent': 'New conversation created ✓',
       'review.error': 'Failed to send: {message}',
       'review.admission': 'The conversation was created. Check its messages before sending again.',
-      'review.context': 'Git panel · {tag} · {path}',
       'review.code.added': '{n} lines selected',
       'review.code.clear': 'Clear',
       'review.code.hint': 'Click diff lines to include them',
+      'cards.title': 'Memory cards',
+      'cards.filter': 'Search questions, tags, or sources',
+      'cards.general': 'General', 'cards.uncategorized': 'Uncategorized',
+      'cards.refresh': 'Refresh memory cards',
+      'cards.dir': 'Cards folder: {dir}',
+      'cards.loading': 'Loading memory cards…',
+      'cards.empty': 'No memory cards yet. Ask “Explain it to me” to create cards in this folder.',
+      'cards.noMatch': 'No memory cards match the filter.',
+      'cards.error': 'Could not load memory cards: {message}',
+      'cards.open': 'Open card',
+      'cards.back': 'Back to cards',
+      'cards.skipped': 'Skipped {n} cards',
+      'cards.truncated': 'Showing the first {n} cards',
+      'cards.detailError': 'Could not read this card: {message}',
       'diff.select': 'Select a file to view its changes.',
       'diff.staged': 'Staged changes',
       'diff.unstaged': 'Uncommitted changes',
@@ -281,7 +317,20 @@ window.__ModuleLoader__.load({
       "tree.findFile": "在文件中查找",
       "tree.findDirectory": "在目录中查找内容",
       "classes.inherits": "继承", "classes.protocolBase": "显式 Protocol 基类", "classes.abstractHint": "斜体：抽象方法",
-      "classes.title": "Python 类关系图",
+      "classes.factory": "工厂返回关联", "classes.factoryHint": "依据工厂返回注解关联 · 不代表已通过协议兼容性检查",
+      "classes.evidence": "工厂返回关联依据", "classes.fit": "适应面板",
+      "classes.languageTitle": "{language} 类关系", "classes.beta": "Beta", "classes.betaHint": "Python 类关系分析目前为 Beta。",
+      "classes.unsupportedFile": "当前为 {language} 文件，类关系暂不支持此类型。目前仅支持 Python（.py／.pyi），处于 Beta 阶段。",
+      "classes.unsupportedProject": "当前项目识别为 {language}，类关系暂未支持。目前仅支持 Python，处于 Beta 阶段。",
+      "classes.mixedUnsupported": "检测到多语言项目，请选择 Python 文件查看类关系（Beta）。",
+      "classes.externalUnsupported": "库源码可以阅读，暂不支持库文件的类关系分析。请选择工作区内的 Python 文件（Beta）。",
+      "classes.choosePython": "请选择 Python 文件或打开 Python 项目，以查看类关系（Beta）。", "classes.detecting": "正在识别项目文件类型…",
+      "classes.language.python": "Python", "classes.language.javascript": "JavaScript", "classes.language.typescript": "TypeScript", "classes.language.javascript-typescript": "JavaScript / TypeScript", "classes.language.go": "Go", "classes.language.java": "Java", "classes.language.rust": "Rust", "classes.language.c": "C", "classes.language.cpp": "C++", "classes.language.markdown": "Markdown", "classes.language.json": "JSON", "classes.language.yaml": "YAML", "classes.language.other": "其他",
+      "classes.view": "关系展示方式", "classes.tree": "层级树", "classes.graph": "关系图",
+      "classes.treeHint": "←/→ 折叠展开 · 双击或 Enter/F4 阅读源码",
+      "classes.expand": "展开 {name}", "classes.collapse": "折叠 {name}", "classes.reference": "重复引用，展开见首次出现的位置",
+      "classes.factoryShort": "工厂关联", "classes.treeLimited": "部分行未显示，请折叠分支后继续查看。", "classes.viewUnsaved": "已切换当前视图，但偏好未能保存。",
+      "classes.title": "类关系",
       "classes.dock": "位置",
       "classes.right": "右侧",
       "classes.bottom": "底部",
@@ -292,7 +341,7 @@ window.__ModuleLoader__.load({
       "classes.zoomOut": "缩小",
       "classes.zoomIn": "放大",
       "classes.zoomReset": "重置缩放",
-      "classes.hint": "源码声明的继承关系 · 双击类或点击方法跳转源码 · 拖动空白处平移",
+      "classes.hint": "源码关系 · 双击类或点击方法跳转源码 · 拖动空白处平移",
       "classes.limited": "当前为部分关系图：已达到扫描或显示上限，可缩小项目范围或调整扫描配置。",
       "classes.skipped": "已跳过 {n} 个文件",
       "classes.empty": "未找到 Python 类声明。",
@@ -383,8 +432,10 @@ window.__ModuleLoader__.load({
       "debug.output": "程序输出",
       "debug.fullPath": "完整路径", "debug.noVariables": "此作用域没有变量",
       'document.preview': '阅读预览', 'document.source': '源码', 'document.mode': '文档视图',
+      'document.metadataTags': '标签', 'document.metadataKind': '类型', 'document.metadataSource': '来源',
       'document.image': '图片：{alt}', 'document.readOnly': 'Markdown · 只读', 'document.linkFailed': '无法在当前工作区内打开此链接',
       'layout.treeWidth': '文件树宽度', 'layout.treeHeight': '文件树高度',
+      'layout.classWidth': '类图宽度', 'layout.classHeight': '类图高度',
       'layout.resizeHint': '拖动调整尺寸 · 方向键微调 · 双击或 Enter 恢复默认', 'layout.pixels': '{n} 像素',
       'layout.unsaved': '尺寸已调整，但浏览器存储不可用，仅对本次面板生效',
 
@@ -403,6 +454,7 @@ window.__ModuleLoader__.load({
       'files.foldedLines': '已折叠行', 'files.unfoldedLines': '已展开行', 'files.rangeTo': '至',
       'files.opening': '正在打开 {path}…', 'files.openFailed': '无法打开 {path}：{message}',
       'files.openTabs': '已打开文件', 'files.closeTab': '关闭 {path}',
+      'files.tabMenu': '文件标签操作', 'files.tabClose': '关闭', 'files.tabCloseOthers': '关闭其他标签', 'files.tabCloseAll': '关闭全部标签',
       'files.linePrompt': '行号[:列号] · Enter 跳转 · Esc 取消',
       'files.invalidLine': '请输入文件中存在的行号和列号',
       'files.position': '行 {line}，列 {column}',
@@ -410,7 +462,8 @@ window.__ModuleLoader__.load({
       'files.pick': '选择文件以阅读源码。',
       'files.results': '选择一个定义',
       'files.none': '这里没有找到定义。',
-      'files.external': '有 {n} 个定义位于工作区外，无法打开。',
+      'files.external': '有 {n} 个定义暂未提供可读的源码预览。',
+      'files.library': '库源码 · 只读 · UTF-8', 'files.libraryShort': '库', 'files.libraryExpired': '库源码引用已过期，请重新从项目代码跳转。',
       'files.unavailable': '这个文件或运行环境尚无可用的语言服务',
       'files.serverMissing': '语言服务尚未就绪，请在 Git 插件设置中配置对应的启动命令',
       'files.serverTimeout': '代码导航超时，请检查项目与语言服务配置，或在插件设置中增加等待时间',
@@ -442,17 +495,36 @@ window.__ModuleLoader__.load({
       'group.changes': '工作区变更',
       'group.unversioned': '未跟踪文件',
       'filter.placeholder': '过滤文件',
-      'review.button': '向 AI 提建议',
-      'review.placeholder': '写下你给 AI 的评审建议…',
+      'review.button.task': '分配修改任务',
+      'review.button.explain': '讲给我听',
+      'review.title.task': '分配修改任务',
+      'review.title.explain': '讲给我听',
+      'review.note.task': '默认 DeepSeek 会话，不附加技能或工作流',
+      'review.note.explain': '使用默认 DeepSeek 会话，完整讲解保存为一张记忆卡片',
+      'review.placeholder.task': '描述要完成的修复或功能改动…',
+      'review.placeholder.explain': '想弄懂哪件事或哪段原理？',
       'review.send': '发送',
       'review.cancel': '取消',
-      'review.sent': '已发送到新对话 ✓',
+      'review.sent': '已创建新对话 ✓',
       'review.error': '发送失败：{message}',
       'review.admission': '对话已创建，请先检查其中的消息，再决定是否重发。',
-      'review.context': 'Git 面板 · {tag} · {path}',
       'review.code.added': '已选择 {n} 行代码',
       'review.code.clear': '清空',
       'review.code.hint': '点击 diff 中的行可加入消息',
+      'cards.title': '记忆卡片',
+      'cards.filter': '搜索问题、标签或来源',
+      'cards.general': '通用', 'cards.uncategorized': '未归类',
+      'cards.refresh': '刷新记忆卡片',
+      'cards.dir': '卡片目录：{dir}',
+      'cards.loading': '正在读取记忆卡片…',
+      'cards.empty': '还没有记忆卡片。在「讲给我听」会话中讲解后，卡片会出现在这里。',
+      'cards.noMatch': '没有匹配筛选条件的卡片。',
+      'cards.error': '读取记忆卡片失败：{message}',
+      'cards.open': '打开卡片',
+      'cards.back': '返回卡片列表',
+      'cards.skipped': '跳过 {n} 张卡片',
+      'cards.truncated': '仅显示前 {n} 张卡片',
+      'cards.detailError': '读取卡片失败：{message}',
       'diff.select': '选择文件以查看其变更。',
       'diff.staged': '暂存区变更',
       'diff.unstaged': '未提交变更',
@@ -478,7 +550,7 @@ window.__ModuleLoader__.load({
 
     // ------------------------------------------------------------- css
     const css = `
-.jb-root{container-type:inline-size;container-name:git-panel;box-sizing:border-box;width:100%;min-width:0;height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:${C.bg};color:${C.text};font-size:13px;line-height:20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif}
+.jb-root{container-type:inline-size;container-name:git-panel;box-sizing:border-box;flex:1;width:100%;min-width:0;height:100%;max-height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:${C.bg};color:${C.text};font-size:13px;line-height:20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif}
 .jb-toolbar{flex:none;display:flex;align-items:center;gap:10px;height:38px;padding:0 10px;background:${C.toolbar};border-bottom:1px solid ${C.border}}
 .jb-toolbar .jb-selectwrap{position:relative;display:inline-flex;align-items:center;gap:6px;min-width:0}
 .jb-toolbar svg.jb-tool-icon{flex:none;color:${C.text}}
@@ -515,7 +587,7 @@ window.__ModuleLoader__.load({
 .jb-tools-divider:hover{background:${C.hover}}
 .jb-tools-notice{padding:4px 8px;border-top:1px solid ${C.border};color:${C.text};font-size:12px}
 .jb-content{position:relative;flex:1;min-height:0;display:flex}
-.jb-browser-seat{flex:1;min-width:0;min-height:0;display:flex}
+.jb-browser-seat{flex:1;min-width:0;min-height:0;display:flex;overflow:hidden}
 .jb-filebutton{box-sizing:border-box;width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left}
 .jb-filebutton:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
 .jb-editor-title{display:flex;align-items:center;gap:8px;padding:6px 12px;background:${C.gutter};border-bottom:1px solid ${C.border};flex:none;min-height:24px}
@@ -614,7 +686,14 @@ window.__ModuleLoader__.load({
 .jb-document-seat[hidden]{display:none}
 .jb-document-error{flex:none;padding:6px 16px;background:${C.toolbar};color:${C.text};overflow-wrap:anywhere}
 .jb-document{box-sizing:border-box;flex:1;min-height:0;overflow:auto;padding:20px clamp(16px,3%,36px) 40px;color:${C.text};background:${C.bg};font-size:14px;line-height:1.8;overflow-wrap:anywhere;user-select:text}
-.jb-document>:first-child{margin-top:0}
+.jb-document>:first-child,.jb-document-body>:first-child{margin-top:0}
+.jb-document-metadata{margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid ${C.border}}
+.jb-document .jb-document-metadata h1{margin:0 0 8px;padding:0;border:0}
+.jb-document-metadata .jb-card-tag{white-space:normal}
+.jb-document-metadata dl{display:grid;gap:2px;margin:8px 0 0;font-size:12px}
+.jb-document-metadata dl>div{display:flex;flex-wrap:wrap;gap:0 12px}
+.jb-document-metadata dt{min-width:3em;color:${C.textDim}}
+.jb-document-metadata dd{min-width:0;margin:0;white-space:pre-wrap}
 .jb-document p{margin:0 0 14px}
 .jb-document h1,.jb-document h2,.jb-document h3,.jb-document h4,.jb-document h5,.jb-document h6{font-weight:500;line-height:1.5;margin:24px 0 12px;scroll-margin-top:16px}
 .jb-document h1{font-size:24px;padding-bottom:10px;border-bottom:1px solid ${C.border}}
@@ -655,14 +734,25 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-debug-hover .jb-variable-row{flex-wrap:wrap;white-space:pre-wrap;overflow-wrap:anywhere}
 .jb-debug-hover .jb-variable-value{white-space:pre-wrap;overflow-wrap:anywhere}
 
-.jb-class-window{position:fixed;z-index:9000;right:12px;top:48px;width:min(760px,calc(100vw - 24px));height:calc(100vh - 72px);min-width:min(360px,calc(100vw - 24px));min-height:240px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);display:flex;flex-direction:column;resize:both;overflow:hidden;border:1px solid ${C.border};border-radius:6px;background:${C.panel};color:${C.text};box-shadow:0 3px 8px #0003;font:12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.jb-class-window[data-dock=bottom]{top:auto;bottom:12px;left:12px;width:calc(100vw - 24px);height:min(480px,70vh)}
-.jb-class-window header,.jb-class-controls{display:flex;gap:6px;align-items:center;padding:8px;border-bottom:1px solid ${C.border};flex-wrap:wrap}
+.jb-reader-layout{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden;container-type:inline-size;container-name:workbench-reader}
+.jb-reader-workspace{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
+.jb-reader-workspace[data-class-dock=bottom]{flex-direction:column}
+.jb-class-window{box-sizing:border-box;flex:0 0 clamp(240px,var(--jb-class-width,44%),calc(100% - 286px));min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;container-type:size;container-name:class-pane;background:${C.panel};color:${C.text};font:12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.jb-reader-workspace[data-class-dock=bottom]>.jb-class-window{flex-basis:clamp(min(160px,45%),var(--jb-class-height,45%),max(0px,calc(100% - 166px)))}
+@container workbench-reader (max-width:660px){.jb-reader-workspace[data-class-dock=right]{flex-direction:column}.jb-reader-workspace[data-class-dock=right]>.jb-class-window{flex-basis:clamp(min(160px,45%),var(--jb-class-height,45%),max(0px,calc(100% - 166px)))}}
+.jb-class-window header,.jb-class-controls{display:flex;flex:none;gap:4px;align-items:center;padding:5px 6px;border-bottom:1px solid ${C.border};flex-wrap:wrap}
 .jb-class-window button,.jb-class-window select,.jb-class-window input{font:inherit;color:inherit;background:${C.panel};border:1px solid ${C.border};border-radius:4px;padding:3px 7px}
 .jb-class-window button{cursor:pointer}.jb-class-window button:hover{background:${C.hover}}.jb-class-window button:focus-visible,.jb-class-window input:focus-visible{outline:2px solid ${C.accent};outline-offset:1px}
-.jb-class-window input{min-width:90px;flex:1}.jb-class-hint{padding:4px 10px;color:${C.textDim};font-size:11px;overflow-wrap:anywhere}.jb-class-hint[role=alert]{color:${C.text}}
-.jb-class-results{display:flex;flex-direction:column;max-height:140px;overflow:auto}.jb-class-results button{text-align:left}
-.jb-class-viewport{flex:1;min-height:0;overflow:auto;cursor:grab;touch-action:none}.jb-class-canvas{position:relative;transform-origin:top left}.jb-class-links{position:absolute;inset:0;stroke:${C.textDim};stroke-width:1.5;pointer-events:none}
+.jb-class-mode{display:flex;gap:1px;margin-left:6px}.jb-class-window .jb-class-mode button{font-size:11px;padding:2px 5px;border-color:transparent;background:transparent}.jb-class-window .jb-class-mode [aria-selected=true]{color:${C.accent};background:${C.selection}}
+.jb-class-beta{flex:none;padding:0 4px;border:1px solid ${C.border};border-radius:3px;color:${C.textDim};font-size:10px;line-height:16px}.jb-class-unavailable{min-height:0;overflow:auto;padding:16px 12px;color:${C.textDim};font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.jb-class-tree-seat{display:flex;flex:1;min-height:0;min-width:0;flex-direction:column;overflow:hidden}.jb-class-tree{flex:1;min-height:0;overflow:auto;outline:none;padding:4px 0}.jb-class-tree-row{display:flex;align-items:center;gap:5px;box-sizing:border-box;min-height:25px;padding-right:8px;white-space:nowrap;cursor:default;font:12px/24px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.jb-class-tree-row:hover{background:${C.hover}}.jb-class-tree-row[data-active=true]{background:${C.selection}}.jb-class-tree:focus-visible [data-active=true]{box-shadow:inset 2px 0 ${C.accent}}
+.jb-class-window .jb-class-tree-toggle{display:inline-flex;align-items:center;justify-content:center;flex:none;width:16px;height:22px;padding:0;border:0;background:transparent;color:${C.textDim};font:12px/1 inherit}.jb-class-tree-symbol{display:inline-flex;align-items:center;justify-content:center;flex:none;width:15px;height:15px;font-size:10px;line-height:15px;border-radius:50%;color:${C.modified};background:color-mix(in srgb,${C.modified} 14%,${C.panel})}.jb-class-tree-row[data-kind=protocol] .jb-class-tree-symbol{color:${C.added};background:color-mix(in srgb,${C.added} 14%,${C.panel})}.jb-class-tree-row[data-kind=method] .jb-class-tree-symbol{background:transparent;border-radius:0}.jb-class-tree-row[data-kind=unresolved]{color:${C.textDim}}
+.jb-class-tree-name{overflow:hidden;text-overflow:ellipsis;min-width:0}.jb-class-tree-badge{flex:none;font:10px/18px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:${C.textDim};padding:0 3px;border:1px solid ${C.border};border-radius:3px}.jb-class-tree-path{margin-left:auto;max-width:30%;overflow:hidden;text-overflow:ellipsis;font-size:10px;color:${C.textDim}}@container class-pane (max-width:340px){.jb-class-tree-path{display:none}}
+.jb-class-window input{width:0;min-width:80px;flex:1}.jb-class-controls button{flex:none;padding:3px 5px}.jb-class-controls button[aria-pressed=true]{color:${C.accent};border-color:${C.accent}}.jb-class-controls svg{display:block}.jb-class-hint{padding:4px 8px;color:${C.textDim};font-size:11px;overflow-wrap:anywhere}.jb-class-hint[role=alert]{color:${C.text}}
+.jb-class-info{flex:0 1 auto;min-height:0;max-height:30%;overflow:auto;border-bottom:1px solid ${C.border}}
+@container class-pane (max-height:240px){.jb-class-info{display:none}}
+.jb-class-results{display:flex;flex:none;flex-direction:column;max-height:20%;overflow:auto}.jb-class-results button{text-align:left}
+.jb-class-viewport{flex:1;min-width:0;min-height:0;overflow:auto;cursor:grab;touch-action:none}.jb-class-stage{position:relative;overflow:hidden;margin-inline:auto}.jb-class-canvas{position:absolute;left:0;top:0;transform-origin:top left}.jb-class-links{position:absolute;inset:0;stroke:${C.textDim};stroke-width:1.5;pointer-events:none}
 .jb-class-card{position:absolute;box-sizing:border-box;border:1px solid color-mix(in srgb,${C.modified} 22%,${C.border});border-radius:3px;background:color-mix(in srgb,${C.modified} 3%,${C.panel});display:flex;flex-direction:column;overflow:hidden;cursor:default;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .jb-class-card[data-kind=protocol]{border-color:color-mix(in srgb,${C.added} 28%,${C.border});background:color-mix(in srgb,${C.added} 4%,${C.panel})}
 .jb-class-card[data-selected=true]{border-color:${C.accent};box-shadow:0 0 0 1px ${C.accent}}
@@ -673,7 +763,9 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-class-members button[data-abstract=true]{font-style:italic;color:${C.modified}}.jb-class-method-symbol{flex:none;width:14px;font:600 11px/1 ui-monospace,monospace;color:${C.modified}}.jb-class-method-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.jb-class-parameters{color:${C.textDim};font-weight:400}.jb-class-return{color:${C.textDim};margin-left:auto;flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jb-class-unresolved{padding:2px 6px;font-size:10px;color:${C.textDim};overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .jb-class-links{stroke:${C.modified};stroke-linejoin:round;stroke-linecap:round}.jb-class-links .jb-class-arrow{fill:${C.panel}}.jb-class-links [data-protocol=true]{stroke:${C.added}}.jb-class-links [data-protocol=true] .jb-class-edge{stroke-dasharray:5 4}
-.jb-class-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:${C.textDim};padding:2px 10px 7px}.jb-class-legend-inherit:before,.jb-class-legend-protocol:before{content:"";display:inline-block;vertical-align:middle;width:18px;border-top:1.5px solid ${C.modified};margin-right:5px}.jb-class-legend-protocol:before{border-color:${C.added};border-top-style:dashed}
+.jb-class-links [data-factory=true]{stroke:${C.textDim}}.jb-class-links [data-factory=true] .jb-class-edge{stroke-dasharray:2 4}.jb-class-links [data-factory=true] .jb-class-arrow{fill:none}
+.jb-class-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:${C.textDim};padding:2px 10px 7px}.jb-class-legend-inherit:before,.jb-class-legend-protocol:before,.jb-class-legend-factory:before{content:"";display:inline-block;vertical-align:middle;width:18px;border-top:1.5px solid ${C.modified};margin-right:5px}.jb-class-legend-protocol:before{border-color:${C.added};border-top-style:dashed}.jb-class-legend-factory:before{border-color:${C.textDim};border-top-style:dotted}
+.jb-class-evidence{padding:0 10px 7px;font-size:11px;color:${C.textDim};flex:none}.jb-class-evidence>div{max-height:86px;overflow:auto;margin-top:4px}.jb-class-window .jb-class-evidence button{display:block;width:100%;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;padding:3px 0;color:${C.text};font-size:11px}
 
 .jb-debug-hover code{font:inherit;color:${C.text}}
 .jb-debug-hover .jb-variable-list{padding-left:12px}
@@ -691,7 +783,7 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 @media(hover:hover){.jb-editor-popup [role=menuitem]:hover:not(:disabled){background:${C.selection}}}
 @media(pointer:coarse){.jb-goto input{font-size:16px}}
 .jb-changes{flex:1;min-width:0;display:flex}
-.jb-code-browser{position:relative;min-height:0}
+.jb-code-browser{position:relative;min-height:0;overflow:hidden}
 .jb-code-workspace{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
 .jb-code-browser .jb-code-workspace>.jb-tree{box-sizing:border-box;width:clamp(160px,var(--jb-tree-width,340px),calc(100% - 246px));min-width:0}
 .jb-pane-divider{position:relative;flex:none;align-self:stretch;background:${C.bg};touch-action:none;user-select:none;outline:none}
@@ -751,7 +843,7 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-node[data-status=?] .jb-filename{color:${C.untracked}}
 .jb-node[data-status=D] .jb-filename{text-decoration:line-through}
 .jb-stats{flex:none;color:${C.textDim};font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.jb-detail{position:relative;flex:1;min-width:0;display:flex;flex-direction:column}
+.jb-detail{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column}
 .jb-source-notice{position:absolute;top:76px;right:8px;z-index:2;max-width:calc(100% - 16px);box-sizing:border-box;padding:6px 10px;background:${C.toolbar};color:${C.text};border:1px solid ${C.border};border-radius:4px;box-shadow:var(--dsw-elevation-panel);overflow-wrap:anywhere}
 .jb-diffwrap{flex:1;min-height:0;display:flex;flex-direction:column}
 .jb-diffhead{flex:none;display:flex;align-items:center;gap:10px;height:34px;padding:0 14px;background:${C.gutter};border-bottom:1px solid ${C.border}}
@@ -797,6 +889,37 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-review-code-head{display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;color:${C.textDim};font-size:11px;border-bottom:1px solid ${C.border}}
 .jb-review-code-clear{background:none;border:none;color:${C.modified};font:inherit;font-size:11px;cursor:pointer;padding:0}
 .jb-review-code-body{margin:0;padding:6px 8px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:17px;color:${C.code};white-space:pre}
+.jb-review-head{display:flex;flex-direction:column;gap:1px;min-width:0}
+.jb-review-title{font-size:12.5px;font-weight:500;color:${C.text};overflow-wrap:anywhere}
+.jb-review-note{color:${C.textDim};font-size:11.5px;overflow-wrap:anywhere}
+.jb-cards{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column;background:${C.panel};color:${C.text}}
+.jb-tool-panel>.jb-cards{min-height:0;flex:1}
+.jb-cards-bar{display:flex;align-items:center;gap:8px;flex:none;min-height:34px;padding:4px 10px;border-bottom:1px solid ${C.border};flex-wrap:wrap}
+.jb-cards-filter{box-sizing:border-box;display:flex;align-items:center;gap:6px;flex:1 1 160px;min-width:0;height:26px;padding:0 8px;background:${C.toolbar};border:1px solid ${C.border};border-radius:4px}
+.jb-cards-filter svg{flex:none;width:14px;height:14px;color:${C.textDim}}
+.jb-cards-filter input{flex:1;min-width:0;height:100%;background:transparent;border:0;outline:none;color:${C.text};font:inherit;font-size:12.5px}
+.jb-cards-filter input::placeholder{color:${C.textDim}}
+.jb-cards-dir{flex:0 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${C.textDim};font-size:11.5px}
+.jb-cards-body{flex:1;min-height:0;overflow:auto}
+.jb-cards-list{display:flex;flex-direction:column;gap:6px;padding:6px 10px}
+.jb-card-group>summary{padding:4px 2px;color:${C.text};font-size:12px;overflow-wrap:anywhere;cursor:pointer}
+.jb-card-group>summary small{margin-inline-start:6px;color:${C.textDim}}
+.jb-card-group>.jb-cards-list{padding:3px 0 6px 12px}
+.jb-card-row{box-sizing:border-box;display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;border:1px solid ${C.border};border-radius:5px;background:${C.bg};color:${C.text};font:inherit;padding:7px 10px;cursor:default}
+.jb-card-row:focus-visible{outline:2px solid ${C.accent};outline-offset:-2px}
+.jb-card-title{font-size:12.5px;font-weight:500;overflow-wrap:anywhere}
+.jb-card-tags{display:flex;flex-wrap:wrap;gap:4px}
+.jb-card-tag{font-size:10.5px;line-height:16px;padding:0 6px;border-radius:8px;background:${C.gutter};border:1px solid ${C.border};color:${C.textDim};white-space:nowrap}
+.jb-card-summary{color:${C.textDim};font-size:11.5px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.jb-card-source{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${C.textDim};font-size:11.5px}
+.jb-cards-empty{padding:14px 12px;color:${C.textDim};overflow-wrap:anywhere}
+.jb-cards-notice{padding:3px 12px;color:${C.textDim};font-size:11.5px;overflow-wrap:anywhere}
+.jb-cards-detail{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}
+.jb-cards-detail-bar{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap;min-height:32px;padding:4px 10px;border-bottom:1px solid ${C.border}}
+.jb-cards-detail-title{min-width:0;flex:1 1 120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:500}
+.jb-cards-reader{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
+.jb-cards-reader .jb-document{padding:12px 14px 24px;font-size:13px;line-height:1.7}
+@media(hover:hover){.jb-card-row:hover{background:${C.hover}}}
 .jb-notice{flex:none;display:flex;align-items:center;gap:6px;padding:6px 14px;font-size:12px;background:${C.toolbar};border-bottom:1px solid ${C.border};color:${C.text}}
 .jb-notice-error{color:${C.deleted}}
 .jb-empty{color:${C.textDim};padding:16px;font-size:13px;background:${C.panel}}
@@ -970,6 +1093,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         find: LU.search,
         changes: LU.branch,
         log: [path('M3 12a9 9 0 1 0 3-6.7L3 8'), path('M3 3v5h5M12 7v5l3 2')],
+        // Two stacked cards: a foreground card and the sheet behind it.
+        cards: [h('rect', { x: 8, y: 3, width: 12, height: 12, rx: 2 }), path('M5 8v9a3 3 0 0 0 3 3h9')],
         debug: [path('M8 7 6 3m10 4 2-4M3 13h4m10 0h4M3 7l4 3m10 0 4-3M3 19l4-3m10 0 4 3'), h('rect', { x: 7, y: 6, width: 10, height: 15, rx: 5 }), path('M12 6v15M7 11h10')],
         terminal: [h('rect', { x: 3, y: 4, width: 18, height: 16, rx: 2 }), path('m7 9 3 3-3 3m6 0h4')],
       };
@@ -1111,18 +1236,22 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }));
     }
 
-    /** Inline "suggest to the AI" composer: textarea, selected-code preview, send/cancel, sent/error states. */
-    function ReviewComposer({ t, sending, sent, error, code, onSubmit, onClearCode, onClose }) {
+    /** Inline composer for one of the two AI actions: title/note, textarea, selected-code preview, send/cancel, sent/error states. */
+    function ReviewComposer({ t, intent, sending, sent, error, code, onSubmit, onClearCode, onClose }) {
       const [value, setValue] = useState('');
       const prevSent = useRef(false);
       useEffect(() => {
         if (sent && !prevSent.current) setValue('');
         prevSent.current = sent;
       }, [sent]);
+      const language = intent === 'explain' ? 'explain' : 'task';
       const submit = () => { if (value.trim() !== '' && !sending) onSubmit(value.trim()); };
-      return h('div', { className: 'jb-reviewbar' },
+      return h('div', { className: 'jb-reviewbar', 'data-intent': language },
+        h('div', { className: 'jb-review-head' },
+          h('span', { className: 'jb-review-title' }, t('review.title.' + language)),
+          h('span', { className: 'jb-review-note' }, t('review.note.' + language))),
         h('textarea', {
-          className: 'jb-review-input', value, placeholder: t('review.placeholder'),
+          className: 'jb-review-input', value, placeholder: t('review.placeholder.' + language),
           onChange: (event) => setValue(event.target.value),
           onKeyDown: (event) => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); submit(); }
@@ -1143,6 +1272,14 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           h('button', { type: 'button', className: 'jb-review-btn', onClick: submit, disabled: sending || value.trim() === '' }, t('review.send'))));
     }
 
+    /** The two AI entry points; the primary action assigns work, the ghost action explains and sediments memory cards. */
+    function reviewActions(t, disabled, onReview) {
+      return [
+        h('button', { type: 'button', className: 'jb-review-btn', disabled, onClick: () => onReview('task') }, t('review.button.task')),
+        h('button', { type: 'button', className: 'jb-review-btn jb-review-btn-ghost', disabled, onClick: () => onReview('explain') }, t('review.button.explain')),
+      ];
+    }
+
     function DiffView({ path, tag, stats, diff, t, review, codeSet, onToggleCode, onReview, onReviewSend, onReviewClose, onClearCode, onReadSource }) {
       if (diff === null) return h('div', { className: 'jb-diffempty' }, t('diff.select'));
       if (diff.binary) return h('div', { className: 'jb-diffempty' }, t('diff.binary'));
@@ -1160,8 +1297,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           h('span', { className: 'jb-difftag' }, tag),
           stats !== null ? h('span', { className: 'jb-diffstats' }, `+${stats.ins} −${stats.del}`) : null,
           h('span', { className: 'jb-spacer' }),
-          h('button', { type: 'button', className: 'jb-review-btn', onClick: onReview }, t('review.button'))),
-        review.open ? h(ReviewComposer, { t, sending: review.sending, sent: review.sent, error: review.error, code: codeSet, onSubmit: onReviewSend, onClearCode, onClose: onReviewClose }) : null,
+          ...reviewActions(t, undefined, onReview)),
+        review.open ? h(ReviewComposer, { t, intent: review.intent, sending: review.sending, sent: review.sent, error: review.error, code: codeSet, onSubmit: onReviewSend, onClearCode, onClose: onReviewClose }) : null,
         h(DiffLines, { lines, selectable: review.open, codeSet, onToggle: onToggleCode }));
     }
 
@@ -1207,8 +1344,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           h('span', { className: 'jb-logdetail-subject', title: detail.subject }, detail.subject),
           h('span', { className: 'jb-loghash', title: detail.hash }, detail.short),
           h('span', { className: 'jb-spacer' }),
-          h('button', { type: 'button', className: 'jb-review-btn', onClick: onReview }, t('review.button'))),
-        review.open ? h(ReviewComposer, { t, sending: review.sending, sent: review.sent, error: review.error, code: codeSet, onSubmit: onReviewSend, onClearCode, onClose: onReviewClose }) : null,
+          ...reviewActions(t, undefined, onReview)),
+        review.open ? h(ReviewComposer, { t, intent: review.intent, sending: review.sending, sent: review.sent, error: review.error, code: codeSet, onSubmit: onReviewSend, onClearCode, onClose: onReviewClose }) : null,
         h('div', { className: 'jb-logdetail-meta' },
           `${detail.author}${detail.email ? ` <${detail.email}>` : ''} · ${fmtDateTime(detail.date)}${detail.parents.length > 1 ? ` · ${t('log.parents', { n: String(detail.parents.length) })}` : ''}`),
         detail.files.length > 0
@@ -1219,6 +1356,112 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
               h('span', { className: 'jb-dfile-path' }, file.path))))
           : null,
         lines.length > 0 ? h(DiffLines, { lines, selectable: review.open, codeSet, onToggle: onToggleCode }) : h('div', { className: 'jb-diffempty' }, t('diff.empty')));
+    }
+
+    /** Memory cards sedimented by explain conversations: filter the folder, then read one card inline. */
+    function CardsPanel({ cwd, active, t, onOpen }) {
+      const [list, setList] = useState({ loading: false, error: null, data: null });
+      const [filter, setFilter] = useState('');
+      const [revision, setRevision] = useState(0);
+      const [selection, setSelection] = useState(null);
+      const listSequence = useRef(0), detailSequence = useRef(0), scrollRef = useRef(null);
+      useEffect(() => {
+        if (!active || cwd === null) return undefined;
+        const controller = new AbortController();
+        const sequence = ++listSequence.current;
+        setList((old) => ({ ...old, loading: true, error: null }));
+        api(`/api/git.cards?${new URLSearchParams({ cwd })}`, { signal: controller.signal })
+          .then((data) => { if (!controller.signal.aborted && sequence === listSequence.current) setList({ loading: false, error: null, data }); })
+          .catch((error) => {
+            if (!controller.signal.aborted && error.name !== 'AbortError' && sequence === listSequence.current) setList({ loading: false, error: error.message, data: null });
+          });
+        return () => controller.abort();
+      }, [active, cwd, revision]);
+      useEffect(() => () => { listSequence.current += 1; detailSequence.current += 1; }, []);
+      const openCard = (card) => {
+        const sequence = ++detailSequence.current;
+        setSelection({ card, loading: true, error: null, body: null });
+        api(`/api/git.card?${new URLSearchParams({ cwd, path: card.path }).toString()}`)
+          .then((data) => {
+            if (sequence !== detailSequence.current) return;
+            setSelection({ card: { ...card, ...data }, loading: false, error: null, body: typeof data?.body === 'string' ? data.body : '' });
+          })
+          .catch((error) => {
+            if (sequence === detailSequence.current) setSelection((old) => old ? { ...old, loading: false, error: error.message, body: null } : old);
+          });
+      };
+      const back = () => { detailSequence.current += 1; setSelection(null); };
+      const data = list.data;
+      const cards = useMemo(() => (Array.isArray(data?.cards) ? data.cards.filter((card) => card && typeof card.path === 'string') : [])
+        .sort((a, b) => String(a.title ?? a.path).localeCompare(String(b.title ?? b.path)) || String(a.path).localeCompare(String(b.path))), [data]);
+      const query = filter.trim().toLowerCase();
+      const words = query.split(/\s+/);
+      const visible = query === '' ? cards : cards.filter((card) => {
+        const terms = [card.title, card.summary, card.source, card.path, ...(Array.isArray(card.tags) ? card.tags : [])]
+          .filter(value => typeof value === 'string').join('\n').toLowerCase();
+        return words.every(term => terms.includes(term));
+      });
+      const folder = String(data?.cardsDir ?? '').replace(/\\/g, '/').replace(/\/+$/, '');
+      const prefix = folder ? folder + '/' : '';
+      const groups = new Map();
+      for (const card of visible) {
+        const relative = card.path.startsWith(prefix) ? card.path.slice(prefix.length) : card.path;
+        const group = typeof card.group === 'string' ? card.group : relative.split('/').slice(0, -1).join('/');
+        const members = groups.get(group) ?? [];
+        members.push(card);
+        groups.set(group, members);
+      }
+      const skipped = Number(data?.skipped) > 0 ? Number(data.skipped) : 0;
+      const truncated = data?.truncated === true ? cards.length : Number(data?.truncated);
+      const truncatedCount = Number.isSafeInteger(truncated) && truncated > 0 ? truncated : 0;
+      if (selection !== null) {
+        const card = selection.card ?? {};
+        const title = typeof card.title === 'string' && card.title !== '' ? card.title : String(card.path ?? '');
+        const tags = Array.isArray(card.tags) ? card.tags.filter((tag) => typeof tag === 'string' && tag !== '') : [];
+        return h('div', { className: 'jb-cards' },
+          h('div', { className: 'jb-cards-detail' },
+            h('div', { className: 'jb-cards-detail-bar' },
+              h('button', { type: 'button', className: 'jb-review-btn jb-review-btn-ghost', onClick: back }, t('cards.back')),
+              h('span', { className: 'jb-cards-detail-title', title: card.path ?? title }, title),
+              tags.length > 0 ? h('span', { className: 'jb-card-tags' }, ...tags.map((tag) => h('span', { key: tag, className: 'jb-card-tag' }, tag))) : null),
+            selection.loading
+              ? h('div', { className: 'jb-cards-empty', role: 'status' }, t('cards.loading'))
+              : selection.error !== null
+                ? h('div', { className: 'jb-cards-empty', role: 'alert' }, t('cards.detailError', { message: selection.error }))
+                : h('div', { className: 'jb-cards-reader' }, h(MarkdownReader, {
+                  source: { text: selection.body ?? '', path: card.path ?? '' },
+                  target: { documentScroll: 0, focusSource: false }, scrollRef, t, blocked: false, onOpen, onNavigate: () => {},
+                }))));
+      }
+      const cardRow = card => h('button', {
+        key: card.path, type: 'button', className: 'jb-card-row', 'data-card-path': card.path, title: card.path,
+        'aria-label': t('cards.open') + ': ' + (card.title || card.path), onClick: () => openCard(card),
+      },
+      h('span', { className: 'jb-card-title' }, card.title || card.path),
+      Array.isArray(card.tags) && card.tags.length > 0 ? h('span', { className: 'jb-card-tags' },
+        ...card.tags.filter((tag) => typeof tag === 'string' && tag !== '').map((tag) => h('span', { key: tag, className: 'jb-card-tag' }, tag))) : null,
+      typeof card.summary === 'string' && card.summary !== '' ? h('span', { className: 'jb-card-summary' }, card.summary) : null,
+      typeof card.source === 'string' && card.source !== '' ? h('span', { className: 'jb-card-source', title: card.source }, card.source) : null);
+      const groupRows = [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([group, members]) => h('details', {
+        key: `${group}:${query !== ''}`, className: 'jb-card-group', open: true,
+      },
+      h('summary', null, group === 'general' ? t('cards.general') : group || t('cards.uncategorized'), h('small', null, String(members.length))),
+      h('div', { className: 'jb-cards-list' }, ...members.map(cardRow))));
+      return h('div', { className: 'jb-cards' },
+        h('div', { className: 'jb-cards-bar' },
+          h('div', { className: 'jb-cards-filter' }, searchGlyph(),
+            h('input', { type: 'search', value: filter, placeholder: t('cards.filter'), 'aria-label': t('cards.filter'), onChange: (event) => setFilter(event.target.value) })),
+          h('button', { type: 'button', className: 'jb-tb-btn', title: t('cards.refresh'), 'aria-label': t('cards.refresh'),
+            onClick: () => setRevision((value) => value + 1) }, refreshGlyph()),
+          typeof data?.cardsDir === 'string' && data.cardsDir !== '' ? h('span', { className: 'jb-cards-dir', title: data.cardsDir }, t('cards.dir', { dir: data.cardsDir })) : null),
+        list.loading ? h('div', { className: 'jb-cards-empty', role: 'status' }, t('cards.loading')) : null,
+        list.error !== null ? h('div', { className: 'jb-cards-empty', role: 'alert' }, t('cards.error', { message: list.error })) : null,
+        skipped > 0 ? h('div', { className: 'jb-cards-notice', role: 'status' }, t('cards.skipped', { n: String(skipped) })) : null,
+        truncatedCount > 0 ? h('div', { className: 'jb-cards-notice', role: 'status' }, t('cards.truncated', { n: String(truncatedCount) })) : null,
+        h('div', { className: 'jb-cards-body' },
+          data !== null && !list.loading && list.error === null && visible.length === 0
+            ? h('div', { className: 'jb-cards-empty' }, query === '' ? t('cards.empty') : t('cards.noMatch')) : null,
+          groupRows.length ? h('div', { className: 'jb-cards-list' }, ...groupRows) : null));
     }
 
     /** Render only expanded directories; a path filter bounds its visible results. */
@@ -1313,7 +1556,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         element.style.top = Math.max(8, Math.min(menu.y, window.innerHeight - rect.height - 8)) + 'px';
         element.querySelector('[role=menuitem]:not(:disabled)')?.focus();
       }, [menu]);
-      return createPortal(h('div', { ref, className: 'jb-editor-popup', role: 'menu', 'aria-label': menu.title,
+      return createPortal(h('div', { ref, className: 'jb-editor-popup', role: 'menu', 'aria-label': menu.label ?? menu.title,
         style: { left: menu.x, top: menu.y },
         onKeyDown: event => {
           if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
@@ -1360,7 +1603,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('button', { type: 'button', className: 'jb-btn', onClick: onClose }, t('tree.close'))), document.body);
     }
 
-    const ClassGraphWindow = createClassGraphUI(React, api, createPortal);
+    const ClassGraphWindow = createClassGraphUI(React, api);
     const { useDebugger, DebugPane, EvaluationDialog, DebugHover, controlItems: debugControlItems } = createDebugUI(React, api, { createPortal, usePopupDismiss });
 
     /** An explicit local port/PID prompt uses the editor's Enter/Escape interaction. */
@@ -1406,18 +1649,18 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const closeGo = useCallback(() => setGoLine(false), []);
       const closeAttach = useCallback(() => callbacks.current.debug.closeAttach(), []);
       const showMenu = (anchor, at) => {
-        const { debug, t } = callbacks.current;
+        const { debug, t, source } = callbacks.current;
         setMenu({ ...anchor, items: [
-        { id: 'class-relations', label: t('classes.title'), disabled: !source.path.endsWith('.py'), run: () => callbacks.current.onClasses({ path: callbacks.current.source.path, line: at.line }) },
+        { id: 'class-relations', label: t('classes.title'), disabled: source.external, run: () => callbacks.current.onClasses({ path: callbacks.current.source.path, line: at.line }) },
         { id: 'debug-inspect', label: t('debug.inspect'), disabled: callbacks.current.blocked || debug.busy || debug.session?.state !== 'paused' || debug.selectedFrameId == null, run: () => setInspectRequest(value => value + 1) },
-        { id: 'debug-start', label: t(debug.session?.state === 'paused' ? 'debug.continue' : 'debug.launch'), shortcut: 'F5', disabled: debug.busy || (debug.session?.id && !['paused', 'ended'].includes(debug.session.state)), run: () => debug.run() },
-        { id: 'debug-attach', label: t('debug.attach'), disabled: debug.busy || (debug.session?.id && debug.session.state !== 'ended'), run: () => debug.start('attach') },
+        { id: 'debug-start', label: t(debug.session?.state === 'paused' ? 'debug.continue' : 'debug.launch'), shortcut: 'F5', disabled: source.external || debug.busy || (debug.session?.id && !['paused', 'ended'].includes(debug.session.state)), run: () => debug.run() },
+        { id: 'debug-attach', label: t('debug.attach'), disabled: source.external || debug.busy || (debug.session?.id && debug.session.state !== 'ended'), run: () => debug.start('attach') },
         ...debugControlItems(debug, t).filter(item => item.id !== 'debug-continue').map(item => item.id === 'debug-evaluate' ? { ...item, run: () => debug.openEvaluation(editor.current.selectedText()) } : item),
-        { id: 'debug-breakpoint', label: t('debug.breakpoint'), shortcut: 'F9', run: () => debug.toggle(at.line + 1) },
+        { id: 'debug-breakpoint', label: t('debug.breakpoint'), shortcut: 'F9', disabled: source.external, run: () => debug.toggle(at.line + 1) },
         { id: 'definition', label: t('files.definition'), shortcut: 'F12', disabled: callbacks.current.busy, run: () => callbacks.current.onDefinition(at.line, at.character) },
         { id: 'find', label: t('tree.findFile'), shortcut: '⌘F / Ctrl F', run: () => editor.current.find() },
         { id: 'line', label: t('files.goLine'), shortcut: '⌘L / Ctrl G', run: () => setGoLine(true) },
-        { id: 'diff', label: t('files.diff'), run: () => callbacks.current.onShowDiff() },
+        { id: 'diff', label: t('files.diff'), disabled: source.external, run: () => callbacks.current.onShowDiff() },
         { id: 'back', label: t('files.back'), disabled: !callbacks.current.canBack, run: () => callbacks.current.onNavigate(-1, editor.current.position()) },
         { id: 'forward', label: t('files.forward'), disabled: !callbacks.current.canForward, run: () => callbacks.current.onNavigate(1, editor.current.position()) },
         ] });
@@ -1432,8 +1675,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           onHoverMount: value => { if (mounted.current) setHover(value); }, onHoverUnmount: dom => { if (mounted.current) setHover(value => value?.dom === dom ? null : value); },
           onDefinition: at => { if (!callbacks.current.busy && !callbacks.current.blocked) callbacks.current.onDefinition(at.line, at.character); },
           onBack: at => callbacks.current.onNavigate(-1, at), onForward: at => callbacks.current.onNavigate(1, at),
-          onToggleBreakpoint: line => { if (!callbacks.current.blocked) callbacks.current.debug.toggle(line); }, breakpointLabel: t('debug.breakpoint'),
-          onDebug: action => { if (!callbacks.current.blocked) action === 'evaluate' ? callbacks.current.debug.openEvaluation(editor.current.selectedText()) : action === 'run' ? callbacks.current.debug.run() : callbacks.current.debug.action(action); },
+          onToggleBreakpoint: line => { if (!callbacks.current.blocked && !callbacks.current.source.external) callbacks.current.debug.toggle(line); }, breakpointLabel: t('debug.breakpoint'),
+          onDebug: action => { if (!callbacks.current.blocked && !(callbacks.current.source.external && action === 'run')) action === 'evaluate' ? callbacks.current.debug.openEvaluation(editor.current.selectedText()) : action === 'run' ? callbacks.current.debug.run() : callbacks.current.debug.action(action); },
           onGoLine: () => { if (!callbacks.current.blocked) setGoLine(true); }, onContextMenu: (anchor, at) => { if (!callbacks.current.blocked) showMenu(anchor, at); }, onPosition: setPosition,
         });
         editor.current = instance; applied.current = source;
@@ -1487,7 +1730,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       useEffect(() => {
         if (definitions.length <= 1 || !editor.current) return;
         setMenu({ ...editor.current.anchor(), title: t('files.results'), items: definitions.map((item, index) => ({
-          id: String(index), label: item.path + ':' + (item.line + 1), run: () => callbacks.current.onChooseDefinition(item),
+          id: String(index), label: (item.displayPath ?? item.path) + ':' + (item.line + 1), run: () => callbacks.current.onChooseDefinition(item),
         })) });
       }, [definitions]);
       return h(React.Fragment, null,
@@ -1496,7 +1739,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         markdown ? h('div', { className: 'jb-document-seat', hidden: mode !== 'preview' }, h(MarkdownReader, { source, target, scrollRef: documentRef, t, blocked: blocked || mode !== 'preview', onOpen: props.onOpenDocument, onNavigate: delta => props.onNavigate(delta) })) : null,
         h('div', { className: 'jb-editor-status' },
           mode === 'source' ? h('span', null, t('files.position', { line: String(position.line + 1), column: String(position.character + 1) })) : null,
-          h('span', null, t(mode === 'preview' ? 'document.readOnly' : 'files.readOnly'))),
+          h('span', null, t(source.external ? 'files.library' : mode === 'preview' ? 'document.readOnly' : 'files.readOnly'))),
         menu ? h(EditorMenu, { menu, onClose: closeMenu }) : null,
         hover && hover.key === inspectionKey ? createPortal(h(DebugHover, { key: inspectionKey + ':' + hover.expression, debug, expression: hover.expression, t, onClose: (focus = false) => { editor.current?.closeInspection(); if (focus) editor.current?.focus(); } }), hover.dom) : null,
         debug.attach ? h(AttachPrompt, { debug, t, onClose: closeAttach }) : null,
@@ -1528,19 +1771,26 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             h('span', null, source.mime + ' · ' + new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(source.size / 1024) + ' KiB'))));
     }
 
-    /** Persistent file tabs with keyboard activation and explicit close controls. */
-    function SourceTabs({ paths, activePath, panelId, t, onSelect, onClose, onEmpty }) {
-      const ref = useRef(null), closing = useRef(false);
+    /** Persistent file tabs with keyboard activation and a shared close menu. */
+    function SourceTabs({ paths, activePath, labels, panelId, t, onSelect, onClose, onMenu, onFindInFiles }) {
+      const ref = useRef(null);
       const activeIndex = paths.indexOf(activePath);
       useLayoutEffect(() => {
         ref.current?.querySelector('[aria-selected=true]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-        if (closing.current) {
-          closing.current = false;
-          const selected = ref.current?.querySelector('[aria-selected=true]');
-          if (selected) selected.focus(); else onEmpty();
-        }
       }, [paths, activePath]);
-      const close = path => { closing.current = true; onClose(path); };
+      const close = path => onClose('one', path);
+      const openMenu = (path, event) => {
+        event.preventDefault(); event.stopPropagation();
+        const tab = event.currentTarget.querySelector('[role=tab]');
+        const rect = tab.getBoundingClientRect();
+        const pointer = event.type === 'contextmenu' && (event.clientX !== 0 || event.clientY !== 0);
+        onMenu({ x: pointer ? event.clientX : rect.left, y: pointer ? event.clientY : rect.bottom,
+          label: t('files.tabMenu'), items: [
+            { id: 'close', label: t('files.tabClose'), run: () => close(path) },
+            { id: 'others', label: t('files.tabCloseOthers'), disabled: paths.length < 2, run: () => onClose('others', path) },
+            { id: 'all', label: t('files.tabCloseAll'), run: () => onClose('all') },
+          ] });
+      };
       return h('div', { ref, role: 'tablist', 'aria-label': t('files.openTabs'), className: 'jb-source-tabs',
         onKeyDown: event => {
           const index = Number(event.target.closest('[data-tab-index]')?.dataset.tabIndex);
@@ -1552,18 +1802,21 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           } else if (event.key === 'Delete') { event.preventDefault(); event.stopPropagation(); close(paths[index]); }
         } }, ...paths.map((path, index) => {
           const basename = path.split('/').at(-1);
-          const label = paths.some(other => other !== path && other.split('/').at(-1) === basename) ? path : basename;
+          const displayPath = labels.get(path) ?? path;
+          const label = paths.some(other => other !== path && other.split('/').at(-1) === basename) ? displayPath : basename;
           return h('div', { key: path, className: 'jb-source-tab', 'data-active': path === activePath, 'data-tab-index': index, role: 'presentation',
+            onContextMenu: event => openMenu(path, event),
+            onKeyDown: event => { if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) openMenu(path, event); },
             onKeyDownCapture: event => { if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'f') { event.preventDefault(); event.stopPropagation(); onFindInFiles(''); } },
-        onAuxClick: event => { if (event.button === 1) { event.preventDefault(); event.stopPropagation(); close(path); } } },
-            h('button', { type: 'button', role: 'tab', id: `${panelId}-tab-${index}`, 'aria-controls': panelId, 'aria-selected': path === activePath, 'aria-label': path, tabIndex: index === activeIndex ? 0 : -1, title: path,
-              onClick: () => onSelect(path, true) }, fileIconGlyph(path, false), h('span', null, label)),
-            h('button', { type: 'button', className: 'jb-source-tab-close', tabIndex: path === activePath ? 0 : -1, 'aria-label': t('files.closeTab', { path }), title: t('files.closeTab', { path }), onClick: () => close(path) }, '×'));
+            onAuxClick: event => { if (event.button === 1) { event.preventDefault(); event.stopPropagation(); close(path); } } },
+            h('button', { type: 'button', role: 'tab', id: `${panelId}-tab-${index}`, 'aria-controls': panelId, 'aria-haspopup': 'menu', 'aria-selected': path === activePath, 'aria-label': displayPath, tabIndex: index === activeIndex ? 0 : -1, title: displayPath,
+              onClick: () => onSelect(path, true) }, fileIconGlyph(path, false), h('span', null, label), labels.has(path) ? h('small', null, t('files.libraryShort')) : null),
+            h('button', { type: 'button', className: 'jb-source-tab-close', tabIndex: path === activePath ? 0 : -1, 'aria-label': t('files.closeTab', { path: displayPath }), title: t('files.closeTab', { path: displayPath }), onClick: () => close(path) }, '×'));
         }));
     }
 
     /** Own source/diff requests and definition history independently of the conversation. */
-    function CodeBrowser({ cwd, changes, initialTarget, debugHost, onShowDebug, onFindInFiles, t }) {
+    function CodeBrowser({ cwd, changes, initialTarget, debugHost, onShowDebug, onFindInFiles, onExplain, t }) {
       const [files, setFiles] = useState(null);
       const [filter, setFilter] = useState('');
       const filterInput = useRef(null), alive = useRef(true), copySequence = useRef(0);
@@ -1575,7 +1828,14 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const [treeError, setTreeError] = useState(null);
       const [history, setHistory] = useState(() => ({ items: initialTarget ? [initialTarget] : [], index: initialTarget ? 0 : -1 }));
       const [openPaths, setOpenPaths] = useState(() => initialTarget ? [initialTarget.path] : []);
-      const positions = useRef(new Map()), reader = useRef(null), detailRef = useRef(null);
+      const [libraryLabels, setLibraryLabels] = useState(() => new Map());
+      const positions = useRef(new Map()), reader = useRef(null), detailRef = useRef(null), closingTabs = useRef(false);
+      useLayoutEffect(() => {
+        if (!closingTabs.current) return;
+        closingTabs.current = false;
+        const detail = detailRef.current;
+        (detail?.querySelector('.jb-source-tabs [aria-selected=true]') ?? detail)?.focus();
+      }, [openPaths]);
       const panelId = React.useId();
       const target = history.items[history.index] ?? null;
       const [view, setView] = useState('source');
@@ -1591,6 +1851,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const [menu, setMenu] = useState(null);
       const closeMenu = useCallback(() => setMenu(null), []);
       const [classSeed, setClassSeed] = useState(null);
+      const [classDock, setClassDock] = useState('right');
       const navigationRef = useRef(null);
       const diffRef = useRef(null);
       const initialRef = useRef(initialTarget);
@@ -1641,18 +1902,20 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         if (path === target?.path && view === 'source') { if (focusSource && !loading) reader.current?.focus(); return; }
         visit({ path, line: 0, character: 0, ...positions.current.get(path), focusSource });
       };
-      const closeTab = path => {
-        remember();
-        const index = openPaths.indexOf(path), remaining = openPaths.filter(item => item !== path);
-        setOpenPaths(remaining); positions.current.delete(path);
-        if (path !== target?.path) { if (path === loaded?.path) setLoaded(null); return; }
-        if (remaining.length) {
-          const next = remaining[Math.max(0, index - 1)];
-          visit({ path: next, line: 0, character: 0, ...positions.current.get(next) });
-          positions.current.delete(path);
-        } else {
+      const closeTabs = (action, path) => {
+        if (action !== 'all' && !openPaths.includes(path)) return;
+        const remaining = action === 'all' ? [] : action === 'others' ? [path] : openPaths.filter(item => item !== path);
+        if (remaining.length === openPaths.length) return;
+        closingTabs.current = true;
+        setOpenPaths(remaining);
+        if (!remaining.length) {
           navigationRef.current?.abort(); setHistory({ items: [], index: -1 }); setLoaded(null); setLoading(false); setError(null); setView('source');
+        } else if (!remaining.includes(target?.path)) {
+          const next = remaining[Math.max(0, openPaths.indexOf(target?.path) - 1)] ?? remaining[0];
+          visit({ path: next, line: 0, character: 0, ...positions.current.get(next) });
         }
+        if (loaded && !remaining.includes(loaded.path)) setLoaded(null);
+        for (const closed of openPaths) if (!remaining.includes(closed)) positions.current.delete(closed);
       };
       const copy = value => {
         const sequence = ++copySequence.current;
@@ -1678,6 +1941,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             { id: 'find-directory', label: t('tree.findDirectory'), shortcut: '⌘⇧F / Ctrl Shift F', run: () => onFindInFiles(path) },
           ] : [
             { id: 'source', label: t('files.read'), run: () => openFile(path) },
+            { id: 'explain', label: t('review.button.explain'), run: () => onExplain(path) },
             { id: 'find-file', label: t('tree.findFile'), shortcut: '⌘F / Ctrl F', disabled: /\.(?:png|jpe?g|gif|webp|bmp|ico|icns|avif)$/i.test(path), run: () => visit({ path, line: 0, character: 0, documentMode: 'source', focusSource: true, find: true }) },
             { id: 'diff', label: t('files.diff'), run: () => visit({ path, line: 0, character: 0 }, null, 'diff') },
           ]),
@@ -1711,10 +1975,13 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         else if (view === 'diff' && entry?.staged) params.set('staged', '1');
         const untrackedDiff = view === 'diff' && entry?.untracked;
         api(`/api/git.${view === 'source' || untrackedDiff ? 'source' : 'diff'}?${params}`, { signal: controller.signal })
-          .then(data => { if (!controller.signal.aborted) setLoaded({ path: target.path, view, target, content: untrackedDiff ? { ...data, untracked: true, ...(data.kind === 'image' ? { binary: true } : {}) } : data }); })
+          .then(data => { if (!controller.signal.aborted) {
+            if (data.external) setLibraryLabels(old => new Map(old).set(target.path, data.displayPath));
+            setLoaded({ path: target.path, view, target, content: untrackedDiff ? { ...data, untracked: true, ...(data.kind === 'image' ? { binary: true } : {}) } : data });
+          } })
           .catch(error => {
             if (controller.signal.aborted) return;
-            const key = { IMAGE_TOO_LARGE: 'image.tooLarge', IMAGE_INVALID: 'image.invalid', IMAGE_ICNS_UNSUPPORTED: 'image.icnsUnsupported', SOURCE_TOO_LARGE: 'files.tooLarge', SOURCE_BINARY: 'files.binary', SOURCE_NOT_FILE: 'files.notFile', SOURCE_ENCODING: 'files.encoding', SOURCE_OUTSIDE_WORKSPACE: 'files.outside' }[error.code];
+            const key = { LIBRARY_SOURCE_EXPIRED: 'files.libraryExpired', IMAGE_TOO_LARGE: 'image.tooLarge', IMAGE_INVALID: 'image.invalid', IMAGE_ICNS_UNSUPPORTED: 'image.icnsUnsupported', SOURCE_TOO_LARGE: 'files.tooLarge', SOURCE_BINARY: 'files.binary', SOURCE_NOT_FILE: 'files.notFile', SOURCE_ENCODING: 'files.encoding', SOURCE_OUTSIDE_WORKSPACE: 'files.outside' }[error.code];
             setError(key ? t(key) : t('error.load', { message: error.message }));
           })
           .finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -1727,7 +1994,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const debugRef = useRef(debug); debugRef.current = debug;
       const closeEvaluation = useCallback(() => debugRef.current.closeEvaluation(), []);
       const paneLayout = usePaneLayout(t);
-      debug.cwd = cwd; debug.path = target?.path; debug.setPath(target?.path); debug.sourcePending = loading || (Boolean(loaded) && !contentMatches);
+      debug.cwd = cwd; debug.path = content?.external ? undefined : target?.path; debug.setPath(debug.path); debug.sourcePending = content?.external || loading || (Boolean(loaded) && !contentMatches);
       debug.report = error => setError(error.message);
       const define = async (line, character) => {
         if (loading || !contentMatches) return;
@@ -1761,22 +2028,23 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('div', { ref: paneLayout.workspace, className: 'jb-code-workspace' }, h('div', { className: 'jb-tree' },
           h('div', { className: 'jb-tree-toolbar' },
             h('div', { className: 'jb-filter' }, searchGlyph(), h('input', { ref: filterInput, type: 'search', value: filter, 'aria-label': t('tree.findName'), placeholder: t('filter.placeholder'), onChange: event => setFilter(event.target.value) })),
-            h('button', { type: 'button', className: 'jb-tb-btn', title: t('classes.title'), 'aria-label': t('classes.title'), onClick: () => setClassSeed({ path: target?.path, line: target?.line ?? 0 }) }, lucideSvg([h('rect', { x: 8, y: 2, width: 8, height: 6, rx: 1 }), h('path', { d: 'M12 8v5M5 13h14M5 13v3m14-3v3' }), h('rect', { x: 2, y: 16, width: 6, height: 6, rx: 1 }), h('rect', { x: 16, y: 16, width: 6, height: 6, rx: 1 })], 16)),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('classes.title'), 'aria-label': t('classes.title'), disabled: content?.external, onClick: () => setClassSeed({ path: target?.path, line: reader.current?.position?.().line ?? target?.line ?? 0 }) }, lucideSvg([h('rect', { x: 8, y: 2, width: 8, height: 6, rx: 1 }), h('path', { d: 'M12 8v5M5 13v3m14-3v3' }), h('rect', { x: 2, y: 16, width: 6, height: 6, rx: 1 }), h('rect', { x: 16, y: 16, width: 6, height: 6, rx: 1 })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.locate'), 'aria-label': t('tree.locate'), disabled: !target || !files?.includes(target.path), onClick: () => { setFilter(''); setRevealRevision(value => value + 1); } }, lucideSvg([h('circle', { cx: 12, cy: 12, r: 6 }), h('path', { d: 'M12 2v6m0 8v6M2 12h6m8 0h6' })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.findDirectory'), 'aria-label': t('tree.findDirectory'), onClick: () => onFindInFiles('') }, searchGlyph(16))),
           treeError ? h('div', { className: 'jb-notice' }, treeError) : files === null ? h('div', { className: 'jb-tree-hint' }, t('loading')) : h(WorkspaceTree, { files, changes, selectedPath: target?.path, onSelect: openFile, onMenu: fileMenu, filter, revealRevision, t })),
         h(PaneDivider, { layout: paneLayout, t }),
+        h('div', { className: 'jb-reader-layout' }, h('div', { className: 'jb-reader-workspace', 'data-class-dock': classDock },
         h('div', { ref: detailRef, tabIndex: -1, className: 'jb-detail', 'aria-busy': loading },
-          h(SourceTabs, { paths: openPaths, activePath: target?.path, panelId, t, onSelect: selectTab, onClose: closeTab, onEmpty: () => detailRef.current?.focus() }),
+          h(SourceTabs, { paths: openPaths, activePath: target?.path, labels: libraryLabels, panelId, t, onSelect: selectTab, onClose: closeTabs, onMenu: setMenu, onFindInFiles }),
           h('div', { className: 'jb-editor-title' }, (loaded?.path ?? target?.path) ? fileIconGlyph(loaded?.path ?? target.path, false) : null,
-            h('span', { className: 'jb-diffpath', title: loaded?.path ?? target?.path }, loaded?.path ?? target?.path),
+            h('span', { className: 'jb-diffpath', title: content?.displayPath ?? loaded?.path ?? target?.path }, content?.displayPath ?? loaded?.path ?? target?.path),
             shownView === 'diff' ? h('span', null, t('files.diff')) : null),
-          loaded && (loading || error) ? h('div', { className: 'jb-source-notice', role: error ? 'alert' : 'status' }, error ? t('files.openFailed', { path: target.path, message: error }) : t('files.opening', { path: target.path }))
+          loaded && (loading || error) ? h('div', { className: 'jb-source-notice', role: error ? 'alert' : 'status' }, error ? t('files.openFailed', { path: target.displayPath ?? libraryLabels.get(target.path) ?? target.path, message: error }) : t('files.opening', { path: target.displayPath ?? libraryLabels.get(target.path) ?? target.path }))
             : navigation.busy || navigation.message ? h('div', { className: 'jb-source-notice', role: 'status' }, navigation.busy ? t('loading') : navigation.message) : null,
           h('div', { className: 'jb-source-panel', role: 'tabpanel', id: panelId, 'aria-labelledby': target ? `${panelId}-tab-${openPaths.indexOf(target.path)}` : undefined },
           !content ? h('div', { className: 'jb-diffempty', role: error ? 'alert' : undefined }, error ?? t(loading ? 'loading' : 'files.pick'))
                 : shownView === 'source' ? h(content.kind === 'image' ? ImageReader : SourceEditor, { ...(content.kind === 'image' ? { key: content.path + ':' + content.version } : {}), source: content, target: shownTarget, onClasses: setClassSeed, onDefinition: define, t, debug, busy: navigation.busy, blocked: loading || !contentMatches,
-                  onReader: instance => { reader.current = instance; }, canBack: history.index > 0, canForward: history.index + 1 < history.items.length, onNavigate: navigate, onShowDiff: () => { remember(); setView('diff'); },
+                  onReader: instance => { reader.current = instance; }, canBack: history.index > 0, canForward: history.index + 1 < history.items.length, onNavigate: navigate, onShowDiff: () => { if (!content.external) { remember(); setView('diff'); } },
                   onOpenDocument: destination => visit(destination),
                   definitions: navigation.targets, onChooseDefinition: item => visit({ ...item, focusSource: true }, navigation.origin) })
                   : content.binary ? h('div', { className: 'jb-diffempty' }, t('diff.binary'))
@@ -1787,8 +2055,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                           const line = event.target.closest('[data-new-line]')?.dataset.newLine;
                           if (line !== undefined) setHistory(old => ({ ...old, items: old.items.map((item, index) => index === old.index ? { ...item, line: Number(line) - 1, character: 0 } : item) }));
                           setView('source');
-                        } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {} }))))),
-        classSeed ? h(ClassGraphWindow, { cwd, seed: classSeed, onOpen: destination => visit(destination), onClose: () => { setClassSeed(null); reader.current?.focus(); }, t }) : null,
+                        } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {} })))),
+        classSeed ? h(PaneDivider, { layout: paneLayout, t, pane: 'classes' }) : null,
+        classSeed ? h(ClassGraphWindow, { cwd, seed: classSeed, currentPath: target?.path ?? null, files, external: target?.path?.startsWith('dsh-library://') === true, dock: classDock, onDock: setClassDock, onOpen: destination => visit(destination), onClose: () => { setClassSeed(null); reader.current?.focus(); }, t }) : null))),
         debugHost ? createPortal(h(DebugPane, { debug, t, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
           { id: 'source', label: t('files.read'), shortcut: 'Enter / F4', disabled: !frame.path, run: () => debug.selectFrame(frame.id, true) },
           ...debugControlItems(debug, t),
@@ -1802,7 +2071,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
 
     // ------------------------------------------------------------- panel
     function WorkbenchPanel(props) {
-      const { useWorkspaces, useSessions, t, openSession, sessionId } = props;
+      const { useWorkspaces, useSessions, t, openSession, sessionId, getLocale } = props;
       const workspaces = useWorkspaces((state) => state.items);
       const sessions = useSessions((state) => state.byId ?? {});
       const [overrideId, setOverrideId] = useState(null);
@@ -1845,6 +2114,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const [detail, setDetail] = useState(null);
       const [detailLoading, setDetailLoading] = useState(false);
       const [reviewOpen, setReviewOpen] = useState(false);
+      const [reviewIntent, setReviewIntent] = useState('task');
       const [reviewTarget, setReviewTarget] = useState(null);
       const [reviewSending, setReviewSending] = useState(false);
       const [reviewSent, setReviewSent] = useState(false);
@@ -1947,7 +2217,10 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         }
       }, [cwd]);
 
-      const openReview = useCallback((target) => {
+      const diffTagFor = (entry) => t(entry.untracked ? 'diff.untracked' : entry.staged && entry.unstagedToo ? 'diff.both' : entry.staged ? 'diff.staged' : 'diff.unstaged');
+
+      const openReview = useCallback((intent, target) => {
+        setReviewIntent(intent === 'explain' ? 'explain' : 'task');
         setReviewTarget(target);
         setReviewSent(false);
         setReviewError(null);
@@ -1966,30 +2239,44 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
 
       const clearReviewCode = useCallback(() => setReviewCode([]), []);
 
+      /** Open a workspace file a memory card links to, keeping document-mode and anchor targets. */
+      const openCardsDestination = useCallback((destination) => {
+        const path = typeof destination === 'string' ? destination : destination?.path;
+        if (typeof path !== 'string' || path === '') return;
+        setSourceTarget({
+          path,
+          line: Number.isSafeInteger(destination?.line) && destination.line >= 0 ? destination.line : 0,
+          character: Number.isSafeInteger(destination?.character) && destination.character >= 0 ? destination.character : 0,
+          ...(typeof destination?.documentMode === 'string' ? { documentMode: destination.documentMode } : {}),
+          ...(typeof destination?.documentAnchor === 'string' ? { documentAnchor: destination.documentAnchor } : {}),
+          focusSource: true,
+        });
+      }, []);
+
+      const localeId = () => {
+        try {
+          const active = getLocale?.();
+          return typeof active === 'string' && active.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+        } catch (error) { return 'en'; }
+      };
+
       /**
-       * Send the review suggestion into a NEW project conversation: the Host
-       * creates a fresh Session bound to this repo and admits the message
-       * (mode 'queue'), then the panel opens that conversation. The message
-       * carries the user's text, any diff lines the user selected, and only a
-       * path/tag context line — never the whole diff.
+       * Dispatch one AI action into a NEW default DeepSeek conversation. The Host
+       * composes the first message; the client only sends the user's text, the
+       * selected diff-line texts, the current-view target, and the active locale.
+       * The panel then opens the returned conversation.
        */
       const sendReview = useCallback(async (text) => {
         if (cwd === null || reviewTarget === null) return;
         setReviewSending(true);
         setReviewError(null);
         try {
-          const target = reviewTarget;
-          const tag = target.kind === 'workspace' ? t('panel') : target.kind === 'commit'
-            ? t('log.detail')
-            : t(target.entry.untracked ? 'diff.untracked' : target.entry.staged && target.entry.unstagedToo ? 'diff.both' : target.entry.staged ? 'diff.staged' : 'diff.unstaged');
-          const label = target.kind === 'workspace' ? '.' : target.kind === 'commit' ? target.detail.hash : target.entry.path;
-          let message = text;
-          if (reviewCode.length > 0) message += '\n\n```diff\n' + [...reviewCode].sort((a, b) => Number(a.id) - Number(b.id)).map((item) => item.text).join('\n') + '\n```';
-          message += '\n\n---\n' + t('review.context', { tag, path: label });
-          const data = await api('/api/git.review', {
-            method: 'POST',
-            body: { cwd, text: message },
-          });
+          const body = { cwd, intent: reviewIntent, text, locale: localeId() };
+          if (reviewCode.length > 0) body.code = [...reviewCode].sort((a, b) => Number(a.id) - Number(b.id)).map((item) => item.text);
+          if (reviewTarget.kind === 'diff' && reviewTarget.entry) body.target = { tag: diffTagFor(reviewTarget.entry), path: reviewTarget.entry.path };
+          else if (reviewTarget.kind === 'commit' && reviewTarget.detail) body.target = { tag: t('log.detail'), path: reviewTarget.detail.hash };
+          else if (reviewTarget.path) body.target = { tag: t('files.read'), path: reviewTarget.path };
+          const data = await api('/api/git.dispatch', { method: 'POST', body });
           if (data.ok === true) {
             setReviewSent(true);
             openSession(data.sessionId);
@@ -2002,7 +2289,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         } finally {
           setReviewSending(false);
         }
-      }, [cwd, reviewTarget, reviewCode, t, openSession]);
+      }, [cwd, reviewTarget, reviewIntent, reviewCode, t, openSession, getLocale]);
 
       const query = filter.trim().toLowerCase();
       const filtered = (status?.changes ?? []).filter((entry) =>
@@ -2034,15 +2321,15 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
               : null)
           : null,
         h('span', { className: 'jb-spacer' }),
-        h('button', { type: 'button', className: 'jb-review-btn', disabled: cwd === null || reviewSending, onClick: () => openReview({ kind: 'workspace' }) }, t('review.button')),
+        ...reviewActions(t, cwd === null || reviewSending, (intent) => openReview(intent, { kind: 'workspace' })),
         h('button', { type: 'button', className: 'jb-tb-btn', title: t('panel'), disabled: statusLoading || cwd === null, onClick: () => reload() }, refreshGlyph()));
 
-      const toolLabels = { find: t('search.title'), changes: t('tabs.changes'), log: t('tabs.log'), debug: t('debug.title'), terminal: t('terminal.title') };
+      const toolLabels = { find: t('search.title'), changes: t('tabs.changes'), log: t('tabs.log'), cards: t('cards.title'), debug: t('debug.title'), terminal: t('terminal.title') };
       const toolBar = h('div', { className: 'jb-tools-bar', role: 'toolbar', 'aria-label': t('tools.title') },
         ...Object.entries(toolLabels).map(([tool, label]) => h('button', {
           key: tool, type: 'button', className: 'jb-tool-toggle', 'data-tool': tool,
           'aria-label': label, title: label, 'aria-pressed': tab === tool, 'aria-controls': toolsId + '-' + tool,
-          disabled: tool === 'terminal' ? !props.terminalAvailable || !currentSession?.id : !status?.isRepo || Boolean(statusError),
+          disabled: tool === 'terminal' ? !props.terminalAvailable || !currentSession?.id : tool === 'cards' ? cwd === null : !status?.isRepo || Boolean(statusError),
           onClick: () => tools.toggle(tool),
         }, toolGlyph(tool))));
 
@@ -2084,10 +2371,10 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                   path: selectedEntry?.displayPath ?? '', tag: diffTag,
                   stats: selectedEntry && !selectedEntry.untracked ? { ins: selectedEntry.ins, del: selectedEntry.del } : null,
                   diff, t, onReadSource: line => { setSourceTarget({ path: selectedEntry.path, line, character: 0, focusSource: true }); },
-                  review: { open: reviewOpen && reviewTarget?.kind === 'diff', sending: reviewSending, sent: reviewSent, error: reviewError },
+                  review: { open: reviewOpen && reviewTarget?.kind === 'diff', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
                   codeSet: reviewCode,
                   onToggleCode: toggleReviewCode,
-                  onReview: () => openReview({ kind: 'diff', entry: selectedEntry }),
+                  onReview: (intent) => openReview(intent, { kind: 'diff', entry: selectedEntry }),
                   onReviewSend: sendReview,
                   onReviewClose: closeReview,
                   onClearCode: clearReviewCode,
@@ -2121,10 +2408,10 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             ? h('div', { className: 'jb-logdetail' }, h('div', { className: 'jb-empty' }, t('loading')))
             : h(CommitDetail, {
               detail, t,
-              review: { open: reviewOpen && reviewTarget?.kind === 'commit', sending: reviewSending, sent: reviewSent, error: reviewError },
+              review: { open: reviewOpen && reviewTarget?.kind === 'commit', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
               codeSet: reviewCode,
               onToggleCode: toggleReviewCode,
-              onReview: () => openReview({ kind: 'commit', detail }),
+              onReview: (intent) => openReview(intent, { kind: 'commit', detail }),
               onReviewSend: sendReview,
               onReviewClose: closeReview,
               onClearCode: clearReviewCode,
@@ -2134,21 +2421,24 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       return h('div', { className: 'jb-root' },
         h('style', null, css),
         toolbar,
-        reviewOpen && reviewTarget?.kind === 'workspace' ? h(ReviewComposer, { t, sending: reviewSending, sent: reviewSent, error: reviewError, code: reviewCode, onSubmit: sendReview, onClearCode: clearReviewCode, onClose: closeReview }) : null,
+        reviewOpen && reviewTarget?.kind === 'workspace' ? h(ReviewComposer, { t, intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError, code: reviewCode, onSubmit: sendReview, onClearCode: clearReviewCode, onClose: closeReview }) : null,
         h('div', { className: 'jb-content' },
           status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat' },
-            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, debugHost, onShowDebug: showDebug, onFindInFiles: openFind, t })) : notice),
+            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, debugHost, onShowDebug: showDebug, onFindInFiles: openFind,
+              onExplain: path => openReview('explain', { kind: 'workspace', path }), t })) : notice),
         h('div', { className: 'jb-tools-window', hidden: tab === null, style: { height: tools.height } },
           h('div', { className: 'jb-tools-divider', ...tools.divider }),
           h('div', { className: 'jb-tools-header' }, h('span', null, toolLabels[tab]),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tools.hide'), 'aria-label': t('tools.hide'), onClick: tools.hide }, '−')),
-          ...['find', 'changes', 'log', 'debug', 'terminal'].map(tool => h('div', {
+          ...['find', 'changes', 'log', 'cards', 'debug', 'terminal'].map(tool => h('div', {
             key: tool, id: toolsId + '-' + tool, className: 'jb-tool-panel', 'data-tool': tool,
             hidden: tab !== tool, role: 'region', 'aria-label': toolLabels[tool], ref: tool === 'debug' ? setDebugHost : undefined,
-          }, tool === 'find' ? (cwd ? h(WorkspaceSearch, { key: cwd, cwd, scope: searchScope, request: findRequest, active: tab === 'find', onOpen: setSourceTarget, t }) : notice) : tool === 'changes' ? changesContent : tool === 'log' ? logContent : tool === 'terminal'
-            ? h(TerminalDock, { key: currentSession?.id ?? 'none', sessionId: currentSession?.id, cwd: currentSession?.cwd,
-              available: Boolean(props.terminalAvailable && currentSession?.id && cwd === currentSession.cwd), active: tab === 'terminal', onClose: tools.hide,
-              create: props.createTerminal, release: props.releaseTerminal, t }) : null)),
+          }, tool === 'find' ? (cwd ? h(WorkspaceSearch, { key: cwd, cwd, scope: searchScope, request: findRequest, active: tab === 'find', onOpen: setSourceTarget, t }) : notice) : tool === 'changes' ? changesContent : tool === 'log' ? logContent
+            : tool === 'cards' ? h(CardsPanel, { key: cwd ?? 'none', cwd, active: tab === 'cards', t, onOpen: openCardsDestination })
+            : tool === 'terminal'
+              ? h(TerminalDock, { key: currentSession?.id ?? 'none', sessionId: currentSession?.id, cwd: currentSession?.cwd,
+                available: Boolean(props.terminalAvailable && currentSession?.id && cwd === currentSession.cwd), active: tab === 'terminal', onClose: tools.hide,
+                create: props.createTerminal, release: props.releaseTerminal, t }) : null)),
           tools.error ? h('div', { className: 'jb-tools-notice', role: 'alert' }, tools.error) : null),
         toolBar);
     }
@@ -2219,7 +2509,12 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         const entry = { sessionId, key, model: terminals.view(sessionId, key, key) };
         activeTerminals.add(entry); return entry;
       };
-      const Panel = (props) => h(WorkbenchPanel, { ...props, openSession, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
+      // The dispatch payload carries the active locale id ('zh' | 'en'); read it lazily at send time.
+      const getLocale = () => {
+        try { return ctx.locale.getLocale?.()?.active ?? 'en'; }
+        catch (error) { return 'en'; }
+      };
+      const Panel = (props) => h(WorkbenchPanel, { ...props, openSession, getLocale, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
       const SidebarPanel = props => {
         const info = props.useTabInfo?.();
         const navigation = info?.tab.navigation;
@@ -2228,7 +2523,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         return resource ? h(DocumentPreviewBridge, { ...props, resource, info,
           isCurrentSession: sessionId => ctx.sidebarRight.mounted.getSnapshot() === sessionId,
           openOriginal: (address, kind, params, replaceTab) => ctx.sidebarRight.openResource(address, { kind, params, replaceTab }) })
-          : h(WorkbenchPanel, { ...props, openSession, previewRequest: request, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
+          : h(WorkbenchPanel, { ...props, openSession, getLocale, previewRequest: request, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
       };
       ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'workbench: dictionaries');
       const t = ctx.locale.bind(NS);

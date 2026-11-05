@@ -27,3 +27,13 @@ test('missing server commands are actionable and do not create a process', async
   assert.equal(result.code, 'LANGUAGE_SERVER_MISSING');
   assert.equal(spawns, 0);
 });
+
+test('bundled Pyright library definitions can be read outside the project without changing its code', async t => {
+ const h=await fixture(t);const path=join(h.root,'library.py'),text='from pathlib import Path\nvalue = Path("sample.json")\n';
+ await writeFile(path,text);
+ const result=await h.definition('library.py',1,'Path');
+ assert.equal(result.status,200,JSON.stringify(result));assert.equal(result.external,0);
+ const target=result.targets.find(target=>target.external);assert.ok(target,'Pyright exposes its installed library declarations');
+ const source=await h.call('source',{path:target.path});assert.equal(source.status,200);assert.ok(source.text.includes('class Path'));
+ assert.equal(source.external,true);
+});

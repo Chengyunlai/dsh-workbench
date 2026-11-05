@@ -2,7 +2,33 @@
 import { Marked } from 'marked';
 import createDOMPurify from 'dompurify';
 import GithubSlugger from 'github-slugger';
+import { isMap, isScalar, isSeq, parseDocument } from 'yaml';
 import { escapeSource, highlightDocumentCode } from './source-editor.js';
+
+/** Read a leading YAML mapping without resolving aliases or consuming ordinary Markdown. */
+function readFrontmatter(text) {
+  const block = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text.slice(0, 16_384));
+  if (!block) return null;
+  const yaml = block[1];
+  let document;
+  try {
+    document = parseDocument(yaml, { prettyErrors: false, logLevel: 'silent' });
+  } catch (error) {
+    // An unparseable header remains visible as Markdown.
+    return null;
+  }
+  if (document.errors.length || !isMap(document.contents) || !document.contents.items.length) return null;
+  const fields = new Map();
+  const scalar = node => String(node.value ?? '');
+  for (const { key, value } of document.contents.items) {
+    if (!isScalar(key) || typeof key.value !== 'string') return null;
+    if (isScalar(value)) fields.set(key.value, scalar(value));
+    else if (isSeq(value) && value.items.every(isScalar)) fields.set(key.value, value.items.map(scalar));
+    else if (value?.range) fields.set(key.value, yaml.slice(value.range[0], value.range[1]).trim());
+    else fields.set(key.value, '');
+  }
+  return { fields, body: text.slice(block[0].length) };
+}
 
 /** Build a document component using the host React instance.
  * @param React - Host React exports.
@@ -12,8 +38,23 @@ export function createMarkdownReader(React) {
   const h = React.createElement;
   const { useMemo, useLayoutEffect, useState } = React;
   const purifier = createDOMPurify(window);
+  function DocumentMetadata({ fields, t }) {
+    const title = fields.get('title');
+    const rawTags = fields.get('tags');
+    const tags = (Array.isArray(rawTags) ? rawTags : [rawTags]).filter(Boolean);
+    const rows = [...fields].filter(([key]) => key !== 'title' && key !== 'tags');
+    return h('header', { className: 'jb-document-metadata' },
+      title ? h('h1', null, title) : null,
+      tags.length ? h('div', { className: 'jb-card-tags', role: 'group', 'aria-label': t('document.metadataTags') },
+        ...tags.map((tag, index) => h('span', { key: index, className: 'jb-card-tag' }, tag))) : null,
+      rows.length ? h('dl', null, ...rows.map(([key, value]) => h('div', { key },
+        h('dt', null, key === 'kind' ? t('document.metadataKind') : key === 'source' ? t('document.metadataSource') : key),
+        h('dd', null, Array.isArray(value) ? value.join(', ') : value)))) : null);
+  }
   return function MarkdownReader({ source, target, scrollRef, t, blocked, onOpen, onNavigate }) {
     const [error, setError] = useState(null);
+    const frontmatter = useMemo(() => readFrontmatter(source.text), [source.text]);
+    const body = frontmatter?.body ?? source.text;
     const html = useMemo(() => {
       const slugger = new GithubSlugger();
       const marked = new Marked({ gfm: true, renderer: {
@@ -33,11 +74,11 @@ export function createMarkdownReader(React) {
           return '<a href="' + escapeSource(href) + '"' + (title ? ' title="' + escapeSource(title) + '"' : '') + (/^https?:/i.test(href) ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + this.parser.parseInline(tokens) + '</a>';
         },
       } });
-      return purifier.sanitize(marked.parse(source.text, { async: false }), {
+      return purifier.sanitize(marked.parse(body, { async: false }), {
         FORBID_TAGS: ['img', 'style', 'input', 'form', 'iframe', 'object', 'embed', 'svg', 'math'],
         ALLOWED_ATTR: ['href', 'title', 'id', 'class', 'align', 'target', 'rel'], ALLOW_DATA_ATTR: false,
       });
-    }, [source.text, t]);
+    }, [body, t]);
     useLayoutEffect(() => {
       setError(null);
       const parent = scrollRef.current;
@@ -79,6 +120,8 @@ export function createMarkdownReader(React) {
         onKeyDown: event => {
           if ((event.metaKey || event.ctrlKey) && ['[', ']'].includes(event.key)) { event.preventDefault(); event.stopPropagation(); onNavigate(event.key === '[' ? -1 : 1); }
         },
-        onClick: activate, onAuxClick: activate, dangerouslySetInnerHTML: { __html: html } }));
+        onClick: activate, onAuxClick: activate },
+        frontmatter ? h(DocumentMetadata, { fields: frontmatter.fields, t }) : null,
+        h('div', { className: 'jb-document-body', dangerouslySetInnerHTML: { __html: html } })));
   };
 }

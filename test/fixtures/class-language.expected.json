@@ -1,0 +1,12 @@
+{
+  "javascript": {
+    "title": "JavaScript 类关系",
+    "message": "当前为 JavaScript 文件，类关系暂不支持此类型。目前仅支持 Python（.py／.pyi），处于 Beta 阶段。",
+    "scanCalls": 0
+  },
+  "python": {
+    "title": "Python 类关系",
+    "beta": "Beta",
+    "scanCalls": 1
+  }
+}

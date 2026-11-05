@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { writeFile, mkdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parsePythonClasses, linkPythonClasses } from '../python-class-graph.js';
-import { classGraphLayout } from '../class-graph-client.js';
+import { classGraphLayout, initialClassFocus } from '../class-graph-client.js';
 import { fixture } from './support/host.mjs';
 const parsed = (path, text) => parsePythonClasses(path, text, 'version');
 
@@ -79,4 +79,75 @@ test('method signatures come from syntax, omit self/cls, and preserve optional a
  const [read,create]=mod.classes[0].methods;
  assert.equal(read.parameters,'key: str, fallback=factory()');assert.equal(read.returns,'str | None');
  assert.equal(create.parameters,'name');assert.equal(create.returns,'');
+});
+
+test('bare yield keeps valid files indexed without accepting incomplete yield-from or other broken syntax', () => {
+ const mod=parsed('observations.py','from contextlib import contextmanager\n@contextmanager\ndef identity():\n try:\n  yield\n finally:\n  cleanup()\nclass Trace: pass\n');
+ assert.deepEqual(mod.classes.map(n=>n.name),['Trace']);
+ for(const text of ['def f():\n yield from\n','def f():\n yield +\n','def f():\n yield\nclass Broken(: pass\n']) assert.throws(()=>parsed('bad.py',text),{code:'CLASS_GRAPH_SYNTAX'});
+});
+
+test('annotated factories connect locally imported clients to Protocols and retain navigable evidence without inheriting methods', () => {
+ const graph=linkPythonClasses([
+  parsed('pkg/contracts.py','from typing import Protocol\nclass Port(Protocol):\n def generate(self): ...\nclass Client(Port, Protocol):\n def configure(self): ...\n'),
+  parsed('pkg/clients.py','"""Provider clients."""\nclass _NoRedirect: pass\nclass OpenAI:\n def generate(self): pass\nclass Anthropic: pass\n'),
+  parsed('pkg/factory.py','from .contracts import Client as Result\ndef create(which) -> Result:\n if which:\n  from .clients import OpenAI as Impl\n  return Impl()\n from . import clients as module\n return module.Anthropic()\n')]);
+ const byId=id=>graph.nodes.find(n=>n.id===id), factories=graph.edges.filter(e=>e.kind==='factory');
+ assert.deepEqual(factories.map(e=>[byId(e.from).name,byId(e.to).name]),[['OpenAI','Client'],['Anthropic','Client']]);
+ assert.deepEqual(factories[0].evidence,[{path:'pkg/factory.py',version:'version',function:'create',line:4,character:9}]);
+ assert.deepEqual(byId(factories[0].from).overrides,[],'factory association never participates in inheritance/MRO');
+ const focus=initialClassFocus(graph,{path:'pkg/clients.py',line:0});
+ assert.equal(byId(focus).name,'OpenAI');
+ assert.deepEqual(classGraphLayout(graph,focus).nodes.map(n=>n.name),['Port','Client','OpenAI','Anthropic']);
+ assert.equal(byId(initialClassFocus(graph,{path:'pkg/factory.py',line:0})).name,'Client');
+ assert.equal(byId(initialClassFocus(graph,{path:'pkg/clients.py',line:2})).name,'OpenAI','caret inside class takes priority');
+ assert.equal(byId(initialClassFocus(graph,{path:'pkg/clients.py',line:1})).name,'_NoRedirect','an explicit caret inside a helper takes priority');
+});
+
+test('factory associations reject rebound constructors, dynamic returns, generators, async functions and unannotated ducks', () => {
+ const declarations='from typing import Protocol\nclass Port(Protocol):\n def run(self): ...\nclass Impl:\n def run(self): pass\n';
+ for(const body of [
+  'def create(Impl) -> Port:\n return Impl()\n',
+  'def create() -> Port:\n Impl = dynamic()\n return Impl()\n',
+  'def create() -> Port:\n Impl, other = pair\n return Impl()\n',
+  'def create() -> Port:\n [Impl, other] = pair\n return Impl()\n',
+  'def create() -> Port:\n Impl += other\n return Impl()\n',
+  'def create() -> Port:\n match source:\n  case {"key": Impl}: pass\n return Impl()\n',
+  'def create() -> Port:\n for Impl in source:\n  return Impl()\n',
+  'def create() -> Port:\n with resource() as Impl:\n  return Impl()\n',
+  'def create() -> Port:\n try: pass\n except Error as Impl:\n  return Impl()\n',
+  'def create() -> Port:\n if (Impl := dynamic()):\n  return Impl()\n',
+  'def create() -> Port:\n global Impl\n return Impl()\n',
+  'def create() -> Port:\n def Impl(): pass\n return Impl()\n',
+  'def create() -> Port:\n yield\n return Impl()\n',
+  'async def create() -> Port:\n return Impl()\n',
+  'def create() -> Port:\n return wrap(Impl())\n',
+  'def create() -> Port:\n result = Impl()\n return result\n',
+  'def create():\n return Impl()\n',
+  '@decorator\ndef create() -> Port:\n return Impl()\n',
+ ]) assert.equal(linkPythonClasses([parsed('api.py',declarations+body)]).edges.length,0,body);
+ const graph=linkPythonClasses([parsed('api.py',declarations+'def create() -> Port:\n return Impl()\ndef another() -> Port:\n return Impl()\n')]);
+ assert.equal(graph.edges.length,1);assert.equal(graph.edges[0].evidence.length,2);
+ const explicit=linkPythonClasses([parsed('api.py',declarations.replace('class Impl:','class Impl(Port):')+'def create() -> Port:\n return Impl()\n')]);
+ assert.equal(explicit.edges.length,1);assert.equal(explicit.edges[0].kind,undefined,'explicit inheritance takes precedence');
+ assert.equal(linkPythonClasses([parsed('api.py',declarations+'from dynamic import *\ndef create() -> Port:\n return Impl()\n')]).edges.length,0,'wildcard imports can replace constructor and protocol names');
+});
+
+test('default file focus prefers public related classes while a caret inside a private helper remains exact', () => {
+ const graph=linkPythonClasses([parsed('client.py','class _Helper:\n def redirect(self): pass\n\nclass Client:\n def generate(self): pass\n')]);
+ const name=seed=>graph.nodes.find(n=>n.id===initialClassFocus(graph,seed)).name;
+ assert.equal(name({path:'client.py',line:0}),'_Helper');
+ assert.equal(name({path:'client.py',line:1}),'_Helper');
+ assert.equal(name({path:'client.py',line:3}),'Client');
+ assert.equal(name({path:'client.py',line:20}),'Client');
+ assert.equal(name({path:'client.py'}),'Client');
+ assert.equal(initialClassFocus({nodes:[],edges:[]},{path:'empty.py'}),null);
+});
+
+test('class scanning includes workspace Python declaration files and resolves their declared relationships', async t => {
+ const h=await fixture(t,null);
+ await writeFile(join(h.root,'contracts.pyi'),'from typing import Protocol\nclass Port(Protocol):\n def run(self) -> None: ...\n');
+ await writeFile(join(h.root,'client.py'),'from contracts import Port\nclass Client(Port):\n def run(self) -> None: pass\n');
+ const graph=await h.call('classes');assert.equal(graph.status,200);assert.equal(graph.total,2);
+ assert.ok(graph.nodes.some(node=>node.path==='contracts.pyi'&&node.name==='Port'));assert.equal(graph.edges.length,1);
 });
