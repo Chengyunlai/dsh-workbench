@@ -1,5 +1,11 @@
 # Upgrade the development workbench
 
+## 1.4.0
+
+Select `1.4.0` in Harness plugin details, then reload or restart. Python class relationships offer a hierarchy tree and a docked diagram, with language availability following the active file. Supported library sources returned by language services open in read-only tabs. File tabs have a close menu, and the Markdown preview displays YAML metadata separately.
+
+Explain it to me assigns one card to each new conversation, starting with a question recap and keeping the full explanation and a recall question. New cards use source-based folders. The bottom tool groups cards by folder and can group older cards using their source field. Existing cards need no migration. See [Memory cards](USAGE.en.md#memory-cards).
+
 ## 1.3.0
 
 Update `@yunlai/dsh-workbench` to `1.3.0` in Harness plugin details, then reload or restart. This release adds Python class relationships from existing syntax trees, compact UML nodes with method signatures, and source navigation. It does not execute or import project code or require additional project declarations. It also improves navigation centering, paused-frame inline values and pointer interaction with debug hovers. Existing project configuration and layouts need no migration; see [class relationships](USAGE.en.md#python-class-relationships) and [debug inspection](DEBUGGING.en.md#hover-variable-inspection).
