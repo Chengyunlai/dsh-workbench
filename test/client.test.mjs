@@ -267,7 +267,7 @@ test('workbench branding preserves installed dock identifiers and leaves the con
   assert.equal(types[0].keepMounted, true);
   assert.equal(types[0].canOpen('dsh-resource://file/session/s/docs/guide.md'), true);
   assert.equal(types[0].canOpen('dsh-resource://changes-review/session/s/1/1'), true);
-  assert.equal(types[0].canOpen('dsh-resource://file/session/s/main.py'), false);
+  assert.equal(types[0].canOpen('dsh-resource://file/session/s/main.py'), true);
   assert.deepEqual({
     title: types[0].title(), description: types[0].guide[0].description(), englishTitle: dictionaries.en.panel,
     pluginTitle: JSON.parse(readFileSync(new URL('../locale/zh.json', import.meta.url), 'utf8')).meta.title,

@@ -6,7 +6,7 @@ import { createMarkdownReader } from './markdown-reader.js';
 import { createPaneLayout } from './pane-layout.js';
 import { createBottomTools } from './bottom-tools.js';
 import { createWorkspaceSearchUI } from './workspace-search-client.js';
-import { parsePreviewAddress, resolveDocumentPreview } from './document-preview.js';
+import { parsePreviewAddress, previewPatterns, resolveDocumentPreview } from './document-preview.js';
 
 /**
  * DSH Workbench — code, documents, Git inspection and debugging beside chat.
@@ -124,6 +124,9 @@ window.__ModuleLoader__.load({
       "tree.copyName": "Copy name",
       "tree.copyRelative": "Copy relative path",
       "tree.copyAbsolute": "Copy absolute path",
+      "tree.revealLocal": "Show in file manager",
+      "tree.openLocal": "Open in file manager",
+      "tree.openLocalFailed": "Could not open this path in the file manager. Check that the workspace is accessible from the Harness desktop.",
       "tree.copied": "Copied: {value}",
       "tree.manualCopy": "Copy path",
       "tree.copyHint": "Clipboard access is unavailable. Press ⌘C / Ctrl+C to copy the selected text.",
@@ -362,6 +365,9 @@ window.__ModuleLoader__.load({
       "tree.copyName": "复制名称",
       "tree.copyRelative": "复制相对路径",
       "tree.copyAbsolute": "复制绝对路径",
+      "tree.revealLocal": "在文件管理器中显示",
+      "tree.openLocal": "在文件管理器中打开",
+      "tree.openLocalFailed": "无法在文件管理器中打开此路径。请确认 Harness 桌面端可以访问该工作区。",
       "tree.copied": "已复制：{value}",
       "tree.manualCopy": "复制路径",
       "tree.copyHint": "无法访问剪贴板，请按 ⌘C / Ctrl+C 复制已选中的文本。",
@@ -1834,12 +1840,23 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Own source/diff requests and definition history independently of the conversation. */
-    function CodeBrowser({ cwd, changes, initialTarget, debugHost, onShowDebug, onFindInFiles, onExplain, t }) {
+    function CodeBrowser({ cwd, changes, initialTarget, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t }) {
       const [files, setFiles] = useState(null);
       const [filter, setFilter] = useState('');
       const filterInput = useRef(null), alive = useRef(true), copySequence = useRef(0);
       const [filterFocus, setFilterFocus] = useState(0), [revealRevision, setRevealRevision] = useState(0);
       const [copyNotice, setCopyNotice] = useState(null), [manualCopy, setManualCopy] = useState(null);
+      const [canOpenLocal, setCanOpenLocal] = useState(false);
+      const [localOpenError, setLocalOpenError] = useState(false);
+      useEffect(() => {
+        if (typeof desktopPaths?.canOpenWorkspacePath !== 'function' || typeof desktopPaths.openWorkspacePath !== 'function') return;
+        let current = true;
+        Promise.resolve().then(() => desktopPaths.canOpenWorkspacePath()).then(
+          result => { if (current) setCanOpenLocal(result?.ok === true && result.value === true); },
+          () => { if (current) setCanOpenLocal(false); },
+        );
+        return () => { current = false; };
+      }, [desktopPaths]);
       const closeCopy = useCallback(() => setManualCopy(null), []);
       useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
       useLayoutEffect(() => { if (filterFocus) { filterInput.current.focus(); filterInput.current.setSelectionRange?.(filter.length, filter.length); } }, [filterFocus]);
@@ -1963,6 +1980,13 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             { id: 'find-file', label: t('tree.findFile'), shortcut: '⌘F / Ctrl F', disabled: /\.(?:png|jpe?g|gif|webp|bmp|ico|icns|avif)$/i.test(path), run: () => visit({ path, line: 0, character: 0, documentMode: 'source', focusSource: true, find: true }) },
             { id: 'diff', label: t('files.diff'), run: () => visit({ path, line: 0, character: 0 }, null, 'diff') },
           ]),
+          ...(canOpenLocal ? [{ id: 'open-local', label: t(directory ? 'tree.openLocal' : 'tree.revealLocal'), run: async () => {
+            setLocalOpenError(false);
+            try {
+              const result = await desktopPaths.openWorkspacePath(directory ? { path: absolute } : { path: absolute, action: 'reveal' });
+              if (alive.current) setLocalOpenError(result?.ok !== true);
+            } catch (_error) { if (alive.current) setLocalOpenError(true); }
+          } }] : []),
           { id: 'copy-name', label: t('tree.copyName'), run: () => copy(path.split('/').at(-1)) },
           { id: 'copy-relative', label: t('tree.copyRelative'), run: () => copy(path) },
           { id: 'copy-absolute', label: t('tree.copyAbsolute'), run: () => copy(absolute) },
@@ -2085,6 +2109,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         ] }) }), debugHost) : null,
         debug.evaluation && debug.session?.state === 'paused' && debug.selectedFrameId != null ? h(EvaluationDialog, { key: `${cwd}:${debug.session.id}:${debug.session.pauseId}:${debug.selectedFrameId}`, debug, t, onClose: closeEvaluation }) : null,
         manualCopy !== null ? h(CopyPathDialog, { value: manualCopy, t, onClose: closeCopy }) : null,
+        localOpenError ? h('div', { className: 'jb-layout-notice', role: 'alert' }, t('tree.openLocalFailed')) : null,
         copyNotice ? h('div', { className: 'jb-layout-notice', role: 'status' }, copyNotice) : null,
         paneLayout.error ? h('div', { className: 'jb-layout-notice', role: 'alert' }, paneLayout.error) : null,
         menu ? h(EditorMenu, { menu, onClose: closeMenu }) : null);
@@ -2446,7 +2471,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('div', { className: 'jb-content' },
           status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat' },
             h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, debugHost, onShowDebug: showDebug, onFindInFiles: openFind,
-              onExplain: path => openReview('explain', { kind: 'workspace', path }), t })) : notice),
+              onExplain: path => openReview('explain', { kind: 'workspace', path }), desktopPaths: props.desktopPaths, t })) : notice),
         h('div', { className: 'jb-tools-window', hidden: tab === null, style: { height: tools.height } },
           h('div', { className: 'jb-tools-divider', ...tools.divider }),
           h('div', { className: 'jb-tools-header' }, h('span', null, toolLabels[tab]),
@@ -2500,7 +2525,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         setError(null);
         const index = tab.navigation.params?.index ?? 0;
         if (resource.sessionId !== sessionId || !Number.isSafeInteger(index) || index < 0) fallback();
-        else resolveDocumentPreview(resource, index, cwd, workspaces, path => api(path, { signal: controller.signal }))
+        else resolveDocumentPreview(resource, index, cwd, workspaces, path => api(path, { signal: controller.signal }), tab.navigation.params?.line)
           .then(request => {
             if (controller.signal.aborted || !isCurrentSession(sessionId)) return;
             if (!request) { fallback(); return; }
@@ -2518,10 +2543,11 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         ] : t('loading')));
     }
 
-    const inject = { slots: { required: true }, locale: { required: true }, uiWorkspace: { required: true }, sidebarRightTabs: { required: true }, sidebarRight: { required: true }, webTerminals: { required: false } };
+    const inject = { slots: { required: true }, locale: { required: true }, uiWorkspace: { required: true }, sidebarRightTabs: { required: true }, sidebarRight: { required: true }, webTerminals: { required: false }, remote: { required: false }, 'remote.session': { required: false } };
     function apply(ctx) {
       const openSession = (id) => ctx.uiWorkspace.openSession(id);
       const terminals = ctx.get?.('webTerminals') ?? ctx.webTerminals;
+      const desktopPaths = ctx.remote?.session;
       const activeTerminals = new Set();
       const releaseTerminal = entry => { if (!activeTerminals.delete(entry)) return; terminals.close(entry.sessionId, entry.key, entry.key); };
       ctx.effect(() => () => { for (const entry of [...activeTerminals]) releaseTerminal(entry); }, 'workbench: embedded terminals');
@@ -2535,7 +2561,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         try { return ctx.locale.getLocale?.()?.active ?? 'en'; }
         catch (error) { return 'en'; }
       };
-      const Panel = (props) => h(WorkbenchPanel, { ...props, openSession, getLocale, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
+      const Panel = (props) => h(WorkbenchPanel, { ...props, openSession, getLocale, desktopPaths, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
       const SidebarPanel = props => {
         const info = props.useTabInfo?.();
         const navigation = info?.tab.navigation;
@@ -2544,7 +2570,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         return resource ? h(DocumentPreviewBridge, { ...props, resource, info,
           isCurrentSession: sessionId => ctx.sidebarRight.mounted.getSnapshot() === sessionId,
           openOriginal: (address, kind, params, replaceTab) => ctx.sidebarRight.openResource(address, { kind, params, replaceTab }) })
-          : h(WorkbenchPanel, { ...props, openSession, getLocale, previewRequest: request, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
+          : h(WorkbenchPanel, { ...props, openSession, getLocale, desktopPaths, previewRequest: request, terminalAvailable: Boolean(terminals && typeof require.async === 'function'), createTerminal, releaseTerminal });
       };
       ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'workbench: dictionaries');
       const t = ctx.locale.bind(NS);
@@ -2554,7 +2580,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       ctx.effect(() => ctx.sidebarRightTabs.register({
         id: TAB_ID, kind: PANEL_ID, title: () => t('panel'),
         keepMounted: true,
-        patterns: ['*.md', '*.markdown', '*.mdown', 'dsh-resource://changes-review/session/**'],
+        patterns: previewPatterns,
         canOpen: address => parsePreviewAddress(address) !== null,
         guide: [{ id: PANEL_ID, order: 40, title: () => t('panel'), description: () => t('guide.description'), icon: WorkbenchIcon }],
       }), 'workbench: right sidebar type');

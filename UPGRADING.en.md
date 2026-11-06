@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.4.4
+
+Conversation links to Python, Go, Java, JavaScript, and TypeScript open in the workbench at the requested line. The file tree context menu can open a directory or reveal a file in the system file manager. Reload or restart Harness after updating.
+
 ## 1.4.3
 
 The workbench tree can open Git-ignored files under the workspace root’s `.dsh` directory, including personal memory cards. Reload or restart Harness after updating the plugin.
