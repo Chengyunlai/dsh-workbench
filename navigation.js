@@ -128,8 +128,10 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
     tree: async (ctx, request, signal) => {
       const { cwd } = await readQuery(ctx, request, signal);
       const result = await runGit(ctx, cwd, ['ls-files', '--cached', '--others', '--exclude-standard', '--full-name', '-z'], { signal });
+      const ignoredDsh = await runGit(ctx, cwd, ['ls-files', '--others', '--ignored', '--exclude-standard', '--full-name', '-z', '--', '.dsh/'], { signal });
       const prefix = (await runGit(ctx, cwd, ['rev-parse', '--show-prefix'], { signal })).stdout.replace(/\r?\n$/, '');
-      const files = [...new Set(result.stdout.split('\0').filter(path => path && path.startsWith(prefix)).map(path => path.slice(prefix.length)))].sort();
+      const files = [...new Set([result, ignoredDsh].flatMap(({ stdout }) => stdout.split('\0'))
+        .filter(path => path && path.startsWith(prefix)).map(path => path.slice(prefix.length)))].sort();
       return json({ files });
     },
     source: async (ctx, request, signal) => {

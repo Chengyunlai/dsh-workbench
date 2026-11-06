@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.4.3
+
+The workbench tree can open Git-ignored files under the workspace root’s `.dsh` directory, including personal memory cards. Reload or restart Harness after updating the plugin.
+
 ## 1.4.2
 
 While paused, click an inline variable name or value to inspect values and object fields in the selected stack frame. Click a type name to open the source type definition resolved by the language service. Breakpoint lines have a translucent red tint. For npm installations, update to `1.4.2` in Harness plugin details, then reload or restart.
