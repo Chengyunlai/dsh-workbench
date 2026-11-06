@@ -7,15 +7,23 @@ import { fixture } from './support/host.mjs';
 import { Worker } from 'node:worker_threads';
 import { once } from 'node:events';
 
-test('tree includes tracked unchanged and new files, excludes ignored files, scopes subdirectory workspaces', async t => {
+test('tree includes tracked and new files plus ignored .dsh files within the current workspace', async t => {
   const h = await fixture(t);
+  await fs.appendFile(join(h.root, '.gitignore'), '\n.dsh/\n');
+  for (const directory of [h.root, join(h.root, 'src')]) {
+    await fs.mkdir(join(directory, '.dsh/cards'), { recursive: true });
+    await fs.writeFile(join(directory, '.dsh/cards/note.md'), '# Personal note\n');
+  }
   const tree = await h.call('tree');
   assert.equal(tree.status, 200);
   assert.ok(tree.files.includes('src/shapes.ts'));
   assert.ok(tree.files.includes('new.js'));
   assert.ok(!tree.files.includes('ignored.txt'));
+  assert.ok(tree.files.includes('.dsh/cards/note.md'));
+  assert.ok(!tree.files.includes('src/.dsh/cards/note.md'));
+  assert.equal((await h.call('source', { path: '.dsh/cards/note.md' })).text, '# Personal note\n');
   const sub = await h.call('tree', { cwd: join(h.root, 'src') });
-  assert.deepEqual(sub.files, ['main.ts', 'shapes.ts']);
+  assert.deepEqual(sub.files, ['.dsh/cards/note.md', 'main.ts', 'shapes.ts']);
 });
 
 test('real compiler resolves imported alias, type, local shadowing, UTF-16 columns and JavaScript', async t => {
