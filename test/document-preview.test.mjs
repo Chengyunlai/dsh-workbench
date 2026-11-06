@@ -9,7 +9,7 @@ test('document resource parsing keeps encoded names and rejects other viewers an
     { kind: 'file', sessionId: 's 1', path: 'docs/hello #?.MD' });
   assert.deepEqual(parsePreviewAddress('dsh-resource://changes-review/session/s%201/12/3'), { kind: 'review', sessionId: 's 1', seq: 12 });
   for (const address of ['https://a/README.md', 'dsh-resource://file/absolute/repo/README.md',
-    'dsh-resource://file/session/s/main.ts', 'dsh-resource://file/session/%zz/README.md',
+    'dsh-resource://file/session/s/image.png', 'dsh-resource://file/session/%zz/README.md',
     'dsh-resource://changes-review/session/s/9007199254740992/1', 'dsh-resource://changes-review/session/s/1/0']) {
     assert.equal(parsePreviewAddress(address), null, address);
   }

@@ -10,7 +10,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const source = { 'src/main.ts': "const emoji = '😀'; render();", 'src/lib.ts': 'export function render() {}' };
 
-async function panel(testContext, fetch, { dock, paneSizes, platform, navigation, terminal = false } = {}) {
+async function panel(testContext, fetch, { dock, paneSizes, platform, navigation, terminal = false, desktopPaths } = {}) {
   let dictionary = {};
   const t = (key, vars = {}) => Object.entries(vars).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), dictionary[key] ?? key);
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true, url: 'https://harness.test/' });
@@ -56,7 +56,7 @@ async function panel(testContext, fetch, { dock, paneSizes, platform, navigation
   });
   plugin.apply({
     effect: fn => fn(), locale: { register: (namespace, dictionaries) => { dictionary = dictionaries.zh; return () => {}; }, bind: () => t },
-    webTerminals: terminalService,
+    webTerminals: terminalService, remote: { session: desktopPaths },
     uiWorkspace: { openSession() {} }, sidebarRightTabs: { register: () => () => {} },
     sidebarRight: { mounted: { getSnapshot: () => onScreen }, openResource: (address, options) => originals.push({ address, options }) },
     slots: { inject: (name, fn) => fn(), register: (spec, component) => { if (spec.name === 'sidebar.right.pane.tab') Panel = component; return () => {}; } },
@@ -149,6 +149,17 @@ test('file links decode their own session path and a stale review cannot redirec
   await act(async () => release({ ok: true, json: async () => ({ files: [{ path: 'main.ts' }] }) }));
   assert.equal(ui.originals.length, 0);
   assert.equal(ui.opened.length, 1);
+});
+
+test('conversation code links open the workbench at the requested one-based line', async context => {
+  const ui = await panel(context, server(), {
+    navigation: { address: 'dsh-resource://file/session/own/src/model_contracts.py', params: { line: 77 }, revision: 1 },
+  });
+  const target = ui.opened[0].options.params.documentPreview.target;
+  assert.equal(target.path, 'src/model_contracts.py');
+  assert.equal(target.line, 76);
+  assert.equal(target.documentMode, 'source');
+  assert.equal(ui.originals.length, 0);
 });
 
 test('a newer document cancels a pending summary, and summary failures offer retry or the original preview', async context => {
@@ -1466,6 +1477,23 @@ test('decode failures are visible, a new file clears them, and untracked image d
   assert.ok(ui.container.querySelector('.jb-image-stage img'));
   await ui.menu([...ui.container.querySelectorAll('.jb-filebutton')].find(node => node.textContent.includes('broken.png')), 'files.diff');
   assert.ok(ui.container.querySelector('.jb-diffempty').textContent.includes(ui.t('diff.binary')));
+});
+
+test('the tree opens directories and reveals files through the desktop service', async context => {
+ const calls = [];
+ const ui = await panel(context, server(), { desktopPaths: {
+  canOpenWorkspacePath: async () => ({ ok: true, value: true }),
+  openWorkspacePath: async request => { calls.push(request); return { ok: request.action === 'reveal' }; },
+ } });
+ await ui.menu(ui.button('src'), 'tree.openLocal');
+ assert.equal(calls[0].path, '/demo/src');
+ assert.equal(calls[0].action, undefined);
+ assert.ok([...ui.container.querySelectorAll('[role=alert]')].some(row => row.textContent === ui.t('tree.openLocalFailed')));
+ await ui.click('src');
+ await ui.menu(ui.button('main.ts'), 'tree.revealLocal');
+ assert.equal(calls[1].path, '/demo/src/main.ts');
+ assert.equal(calls[1].action, 'reveal');
+ assert.ok(!ui.container.textContent.includes(ui.t('tree.openLocalFailed')));
 });
 
 test('file and directory menus copy paths, support keyboard access and locate the current source', async context => {
