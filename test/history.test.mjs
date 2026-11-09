@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { writeFile, rename, unlink } from 'node:fs/promises';
+import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fixture } from './support/host.mjs';
+const exec = promisify(execFile);
+
+test('commit file diffs read Git snapshots for roots, deleted files and binary files without using current disk content', async t => {
+  const h = await fixture(t);
+  const git = async (...args) => (await exec('git', args, { cwd: h.root })).stdout.trim();
+  const commit = async message => { await git('add', '-A'); await git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', message); return git('rev-parse', 'HEAD'); };
+  await writeFile(join(h.root, 'old file.py'), 'original message\n');
+  await writeFile(join(h.root, 'image.png'), Buffer.from([0, 1, 2, 3]));
+  const first = await commit('Root');
+  const root = await h.call('diff', { path: 'old file.py', commit: first });
+  assert.equal(root.status, 200); assert.ok(root.text.includes('+original message'));
+  const initial = await h.call('commit', { hash: first, summary: '1' });
+  assert.equal(initial.diff, ''); assert.equal(initial.files.find(file => file.path === 'image.png').binary, true);
+  assert.equal((await h.call('diff', { path: 'image.png', commit: first })).binary, true);
+  await rename(join(h.root, 'old file.py'), join(h.root, 'new file.py'));
+  const moved = await commit('Move');
+  const detail = await h.call('commit', { hash: moved, summary: '1' });
+  assert.deepEqual(detail.files.map(file => file.path).sort(), ['new file.py', 'old file.py']);
+  await unlink(join(h.root, 'new file.py'));
+  const removed = await commit('Delete');
+  const deletion = await h.call('diff', { path: 'new file.py', commit: removed });
+  assert.equal(deletion.status, 200); assert.ok(deletion.text.includes('-original message'));
+  await writeFile(join(h.root, 'old file.py'), 'unrelated current source\n');
+  const historical = await h.call('diff', { path: 'old file.py', commit: first });
+  assert.equal(historical.text, root.text);
+  assert.ok(!historical.text.includes('unrelated'));
+  assert.equal((await h.call('diff', { path: '../secret', commit: first })).status, 400);
+  assert.equal((await h.call('diff', { path: 'old file.py', commit: '--output=secret' })).status, 400);
+});
+
+test('merge summaries and file previews compare the same first parent', async t => {
+  const h = await fixture(t);
+  const git = async (...args) => (await exec('git', args, { cwd: h.root })).stdout.trim();
+  const commit = async message => { await git('add', '-A'); await git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', message); return git('rev-parse', 'HEAD'); };
+  await commit('Root');
+  const baseBranch = await git('branch', '--show-current');
+  await git('checkout', '-qb', 'topic'); await writeFile(join(h.root, 'topic.py'), 'topic content\n'); await commit('Topic');
+  await git('checkout', baseBranch); await writeFile(join(h.root, 'base.py'), 'base content\n'); await commit('Base');
+  await git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'merge', '--no-ff', '-m', 'Merge topic', 'topic');
+  const hash = await git('rev-parse', 'HEAD');
+  const detail = await h.call('commit', { hash, summary: '1' });
+  assert.equal(detail.parents.length, 2);
+  assert.deepEqual(detail.files.map(file => file.path), ['topic.py']);
+  const diff = await h.call('diff', { path: 'topic.py', commit: hash });
+  assert.ok(diff.text.includes('+topic content')); assert.ok(!diff.text.includes('base content'));
+});

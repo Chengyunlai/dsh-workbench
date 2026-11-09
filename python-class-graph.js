@@ -111,7 +111,22 @@ export function parsePythonClasses(path, text, version) {
           if (group.some(n => n.name === 'AssignOp')) continue;
           bases.push({ name: group.length === 1 ? dotted(group[0]) : null, text: text.slice(group[0].from, group.at(-1).to) });
         }
-        const body = list.find(n => n.name === 'Body'), methods = [];
+        const body = list.find(n => n.name === 'Body'), methods = [], fields = [];
+        for (const entry of children(body)) {
+          if (entry.name !== 'AssignStatement') continue;
+          const parts = children(entry), name = parts[0], annotation = parts[1];
+          if (name?.name !== 'VariableName' || annotation?.name !== 'TypeDef') continue;
+          const types = new Set();
+          const collect = node => {
+            if (node.name === 'VariableName' || (node.name === 'MemberExpression' && children(node)[1]?.name === '.')) {
+              const reference = dotted(node); if (reference) types.add(reference);
+              return;
+            }
+            children(node).forEach(collect);
+          };
+          collect(annotation);
+          fields.push({ name: slice(name), annotation: slice(annotation).replace(/^:\s*/, ''), types: [...types], ...location(name) });
+        }
         for (const entry of children(body)) {
           const decorated = entry.name === 'DecoratedStatement', parts = children(entry);
           const fn = decorated ? parts.find(n => n.name === 'FunctionDefinition') : entry;
@@ -124,7 +139,7 @@ export function parsePythonClasses(path, text, version) {
           const returns = fs.find(n => n.name === 'TypeDef');
           methods.push({ name: slice(token), parameters, returns: returns ? slice(returns).replace(/^->\s*/, '').replace(/\s+/g, ' ').slice(0, 120) : '', ...location(token), decorators: decorated ? parts.filter(n => n.name === 'Decorator').map(n => dotted(children(n)[1])).filter(Boolean) : [] });
         }
-        classes.push({ id: path + ':' + nameNode.from, path, version, name, qualified, ...location(nameNode), endLine: location({ from: node.to - 1 }).line, bases, methods, decorated });
+        classes.push({ id: path + ':' + nameNode.from, path, version, name, qualified, ...location(nameNode), endLine: location({ from: node.to - 1 }).line, bases, methods, fields, decorated });
         walk(body, [...parents, name], false);
       } else if (node.name !== 'FunctionDefinition') {
         // Classes nested in control flow are recorded as declarations, without treating conditional imports as unconditional bindings.
@@ -242,6 +257,23 @@ export function linkPythonClasses(modules) {
       const edge = existing ?? { from: target.id, to: result.id, kind: 'factory', evidence: [] };
       edge.evidence.push({ path: mod.path, version: mod.version, function: factory.name, line: call.line, character: call.character });
       if (!existing) edges.push(edge);
+    }
+  }
+  for (const node of nodes) {
+    const mod = owner.get(node.id);
+    for (const field of node.fields ?? []) for (const name of field.types) {
+      const canon = canonical(mod, name);
+      let target = mod.bindings.has(name.split('.')[0]) ? canon && resolveSymbol(canon) : null;
+      const nesting = node.qualified.split('.');
+      if (!mod.bindings.has(name.split('.')[0])) {
+        for (let depth = nesting.length; depth >= 0 && !target; depth--) {
+          target = resolveSymbol([mod.module, ...nesting.slice(0, depth), name].join('.'));
+        }
+      }
+      if (!target || target.id === node.id) continue;
+      let edge = edges.find(edge => edge.kind === 'field' && edge.from === node.id && edge.to === target.id);
+      if (!edge) { edge = { kind: 'field', from: node.id, to: target.id, fields: [] }; edges.push(edge); }
+      edge.fields.push(field.name);
     }
   }
   return { nodes, edges };

@@ -1,7 +1,7 @@
 import { createClassGraphUI } from './class-graph-client.js';
 import { createTerminalDock } from './terminal-client.js';
 import { createDebugUI } from './debug-client.js';
-import { createSourceEditor } from './source-editor.js';
+import { createSourceEditor, highlightSourceLines } from './source-editor.js';
 import { createMarkdownReader } from './markdown-reader.js';
 import { createPaneLayout } from './pane-layout.js';
 import { createBottomTools } from './bottom-tools.js';
@@ -81,6 +81,7 @@ window.__ModuleLoader__.load({
       "tree.findFile": "Find in file",
       "tree.findDirectory": "Find in directory",
       "classes.inherits": "Inheritance", "classes.protocolBase": "Declared Protocol base", "classes.abstractHint": "Italic: abstract method",
+      "classes.fieldAssociation": "Field type association",
       "classes.factory": "Factory return association", "classes.factoryHint": "Annotated factory returns · Not a protocol compatibility check",
       "classes.evidence": "Factory return evidence", "classes.fit": "Fit diagram to pane",
       "classes.languageTitle": "{language} class relationships", "classes.beta": "Beta", "classes.betaHint": "Python class analysis is in Beta.",
@@ -303,6 +304,10 @@ window.__ModuleLoader__.load({
       'log.detail': 'Commit',
       'log.files': '{n} files changed',
       'log.parents': '{n} parents',
+      'log.pickCommit': 'Select a commit to browse its changed files.',
+      'log.closeDiff': 'Close commit diff',
+      'diff.split': 'Side by side', 'diff.unified': 'Unified', 'diff.before': 'Before', 'diff.after': 'After',
+      'log.diff': 'Commit diff · {hash}',
       'loading': 'Loading…',
       'changes.limited': 'Showing {shown} of {total} changes',
       'error.load': 'Could not load repository state: {message}',
@@ -322,6 +327,7 @@ window.__ModuleLoader__.load({
       "tree.findFile": "在文件中查找",
       "tree.findDirectory": "在目录中查找内容",
       "classes.inherits": "继承", "classes.protocolBase": "显式 Protocol 基类", "classes.abstractHint": "斜体：抽象方法",
+      "classes.fieldAssociation": "字段类型关联",
       "classes.factory": "工厂返回关联", "classes.factoryHint": "依据工厂返回注解关联 · 不代表已通过协议兼容性检查",
       "classes.evidence": "工厂返回关联依据", "classes.fit": "适应面板",
       "classes.languageTitle": "{language} 类关系", "classes.beta": "Beta", "classes.betaHint": "Python 类关系分析目前为 Beta。",
@@ -544,6 +550,10 @@ window.__ModuleLoader__.load({
       'log.detail': '提交',
       'log.files': '共 {n} 个文件变更',
       'log.parents': '{n} 个父提交',
+      'log.pickCommit': '选择一条提交，查看更改文件。',
+      'log.closeDiff': '关闭提交差异',
+      'diff.split': '左右对比', 'diff.unified': '统一差异', 'diff.before': '变更前', 'diff.after': '变更后',
+      'log.diff': '提交差异 · {hash}',
       'loading': '加载中……',
       'changes.limited': '仅显示 {shown} / {total} 项变更',
       'error.load': '无法加载仓库状态：{message}',
@@ -730,7 +740,7 @@ window.__ModuleLoader__.load({
 .jb-document-image{display:inline-block;padding:4px 8px;border:1px solid ${C.border};border-radius:4px;color:${C.textDim}}
 .jb-document-checkbox{color:${C.accent}}
 .jb-document ::selection{background:${C.textSelection};color:${C.code}}
-${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + role + '{color:' + color + '}').join('\n')}
+${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + role + ',.jb-diffbody .jb-syntax-' + role + '{color:' + color + '}').join('\n')}
 .jb-editor-status{flex:none;display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;padding:2px 10px;border-top:1px solid ${C.border};font-size:12px;color:${C.text}}
 .jb-editor-popup{box-sizing:border-box;position:fixed;z-index:10000;width:280px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;background:${C.toolbar};border:0;border-radius:5px;padding:4px;box-shadow:var(--dsw-elevation-panel);color:${C.text};font:13px/20px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .jb-editor-popup [role=menuitem]{display:flex;width:100%;justify-content:space-between;gap:18px;box-sizing:border-box;border:0;border-radius:3px;background:transparent;color:inherit;font:inherit;text-align:left;padding:5px 8px;cursor:default}
@@ -774,6 +784,8 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-class-unresolved{padding:2px 6px;font-size:10px;color:${C.textDim};overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .jb-class-links{stroke:${C.modified};stroke-linejoin:round;stroke-linecap:round}.jb-class-links .jb-class-arrow{fill:${C.panel}}.jb-class-links [data-protocol=true]{stroke:${C.added}}.jb-class-links [data-protocol=true] .jb-class-edge{stroke-dasharray:5 4}
 .jb-class-links [data-factory=true]{stroke:${C.textDim}}.jb-class-links [data-factory=true] .jb-class-edge{stroke-dasharray:2 4}.jb-class-links [data-factory=true] .jb-class-arrow{fill:none}
+.jb-class-links [data-field=true]{stroke:${C.modified}}.jb-class-links [data-field=true] .jb-class-edge{stroke-dasharray:6 4}.jb-class-links [data-field=true] .jb-class-arrow{fill:none}
+.jb-class-legend-field:before{content:"";display:inline-block;vertical-align:middle;width:18px;border-top:1.5px dashed ${C.modified};margin-right:5px}
 .jb-class-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:${C.textDim};padding:2px 10px 7px}.jb-class-legend-inherit:before,.jb-class-legend-protocol:before,.jb-class-legend-factory:before{content:"";display:inline-block;vertical-align:middle;width:18px;border-top:1.5px solid ${C.modified};margin-right:5px}.jb-class-legend-protocol:before{border-color:${C.added};border-top-style:dashed}.jb-class-legend-factory:before{border-color:${C.textDim};border-top-style:dotted}
 .jb-class-evidence{padding:0 10px 7px;font-size:11px;color:${C.textDim};flex:none}.jb-class-evidence>div{max-height:86px;overflow:auto;margin-top:4px}.jb-class-window .jb-class-evidence button{display:block;width:100%;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;padding:3px 0;color:${C.text};font-size:11px}
 
@@ -934,7 +946,8 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-notice{flex:none;display:flex;align-items:center;gap:6px;padding:6px 14px;font-size:12px;background:${C.toolbar};border-bottom:1px solid ${C.border};color:${C.text}}
 .jb-notice-error{color:${C.deleted}}
 .jb-empty{color:${C.textDim};padding:16px;font-size:13px;background:${C.panel}}
-.jb-log{flex:1;min-width:0;display:flex;flex-direction:column;background:${C.panel}}
+.jb-log{flex:1;min-width:0;min-height:0;overflow:hidden;display:flex;background:${C.panel}}
+.jb-log-list{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;container:git-history-list / inline-size}
 .jb-loghead{flex:none;display:flex;align-items:center;height:28px;padding:0 10px;background:${C.gutter};border-bottom:1px solid ${C.border};color:${C.textDim};font-size:12px;white-space:nowrap}
 .jb-loghead .jb-col-graph{width:auto;min-width:40px}
 .jb-loghead .jb-col-msg{flex:1;min-width:0}
@@ -950,13 +963,28 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-logrow .jb-col-author{flex:none;width:150px;overflow:hidden;text-overflow:ellipsis;color:${C.textDim}}
 .jb-logrow .jb-col-date{flex:none;width:130px;text-align:right;color:${C.textDim}}
 .jb-logrow .jb-col-hash{flex:none;width:72px;text-align:right;color:${C.textDim};font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
-.jb-logdetail{flex:none;height:46%;min-height:220px;display:flex;flex-direction:column;border-top:1px solid ${C.border};background:${C.panel}}
-.jb-logdetail-head{flex:none;display:flex;align-items:center;gap:10px;min-height:34px;padding:0 14px;background:${C.gutter};border-bottom:1px solid ${C.border}}
-.jb-logdetail-subject{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${C.text};font-size:12.5px;font-weight:500}
-.jb-logdetail-meta{flex:none;padding:6px 14px 0;color:${C.textDim};font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.jb-detail-files{flex:none;max-height:130px;overflow:auto;margin:8px 14px 0;border:1px solid ${C.border};border-radius:6px}
-.jb-detail-fileshead{height:24px;padding:0 8px;display:flex;align-items:center;color:${C.textDim};font-size:11px;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid ${C.border}}
-.jb-dfile{display:flex;align-items:center;gap:8px;height:22px;padding:0 8px;font-size:12px}
+.jb-logdetail{flex:0 0 38%;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;border-left:1px solid ${C.border};background:${C.panel}}
+.jb-logdetail-head{flex:none;display:flex;align-items:center;gap:8px;min-height:34px;padding:4px 10px;flex-wrap:wrap;background:${C.gutter};border-bottom:1px solid ${C.border}}
+.jb-logdetail-subject{flex:1 1 100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${C.text};font-size:12.5px;font-weight:500}
+.jb-logdetail-meta{flex:none;padding:8px 10px;color:${C.textDim};font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jb-detail-files{flex:1;min-height:0;overflow:auto;border-top:1px solid ${C.border}}
+.jb-detail-fileshead{position:sticky;top:0;background:${C.panel};z-index:1;height:24px;padding:0 8px;display:flex;align-items:center;color:${C.textDim};font-size:11px;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid ${C.border}}
+.jb-dfile{width:100%;border:0;border-radius:0;background:transparent;color:${C.text};font:inherit;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;min-height:24px;padding:2px 8px;font-size:12px}
+.jb-dfile[data-selected=true]{background:${C.selection}}
+.jb-dfile:focus-visible,.jb-logrow:focus-visible{outline:1px solid ${C.accent};outline-offset:-1px}
+.jb-editor-source{display:contents}
+.jb-editor-source[hidden]{display:none}
+.jb-diff-marker{color:${C.textDim}}
+.jb-diff-mode{width:auto;flex:none;padding:0 8px;white-space:nowrap}
+.jb-split-labels{display:grid;grid-template-columns:1fr 1fr;flex:none;background:${C.gutter};border-bottom:1px solid ${C.border};color:${C.textDim};font-size:12px}
+.jb-split-labels>span{padding:4px 8px}
+.jb-split-labels>span+span{border-left:1px solid ${C.border}}
+.jb-split-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.jb-split-row>.jb-dline{min-width:0;border-right:1px solid ${C.border}}
+.jb-split-row>.jb-dline:last-child{border-right:0}
+.jb-split-diff .jb-dline-text{overflow-wrap:anywhere}
+.jb-split-diff .jb-dline-num{width:36px}
+.jb-commit-preview{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .jb-dfile:hover{background:${C.hover}}
 .jb-dfile-stats{flex:none;color:${C.textDim};font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px}
 .jb-dfile-path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -983,9 +1011,24 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-logrow .jb-col-author{grid-row:2;grid-column:2;width:auto}
 .jb-logrow .jb-col-date{grid-row:3;grid-column:2;width:auto;text-align:left}
 .jb-logrow .jb-col-hash{grid-row:2;grid-column:3;width:auto}
-.jb-logdetail{min-height:0;height:50%;overflow:auto}
+.jb-logdetail{flex-basis:42%}
+.jb-logdetail-head .jb-review-btn{font-size:11px;padding:0 6px}
+.jb-logdetail-meta{white-space:normal;overflow-wrap:anywhere}
 }
 
+@container git-history-list (max-width:680px){
+.jb-loghead .jb-col-author,.jb-logrow .jb-col-author{display:none}
+.jb-loghead .jb-col-date,.jb-logrow .jb-col-date{width:72px}
+.jb-loghead .jb-col-hash,.jb-logrow .jb-col-hash{width:64px}
+}
+@container git-history-list (max-width:400px){
+.jb-loghead{display:none}
+.jb-logrow{height:auto;min-height:44px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 8px;padding:4px 8px}
+.jb-logrow .jb-col-graph{grid-row:1/3;grid-column:1}
+.jb-logrow .jb-col-msg{grid-row:1;grid-column:2/4;white-space:normal;overflow-wrap:anywhere}
+.jb-logrow .jb-col-date{grid-row:2;grid-column:2;width:auto;text-align:left}
+.jb-logrow .jb-col-hash{grid-row:2;grid-column:3;width:auto}
+}
 `;
 
     // ------------------------------------------------------------- file icons
@@ -1145,15 +1188,19 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       if (untracked) {
         const content = text.replace(/\n$/, '');
         const parts = content.split('\n');
-        for (let i = 0; i < parts.length; i++) lines.push({ kind: 'add', old: null, new: i + 1, text: parts[i] });
+        for (let i = 0; i < parts.length; i++) lines.push({ kind: 'add', old: null, new: i + 1, text: parts[i], code: parts[i] });
         return lines;
       }
       let oldN = 0;
       let newN = 0;
+      let inHunk = false;
       for (const raw of text.split('\n')) {
-        if (raw.startsWith('@@')) {
+        if (raw.startsWith('diff --git ')) {
+          inHunk = false;
+          lines.push({ kind: 'file', old: null, new: null, text: raw });
+        } else if (raw.startsWith('@@')) {
           const match = /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(raw);
-          if (match) { oldN = Number(match[1]); newN = Number(match[3]); }
+          if (match) { oldN = Number(match[1]); newN = Number(match[3]); inHunk = true; }
           lines.push({ kind: 'hunk', old: null, new: null, text: raw });
         } else if (raw.startsWith('+++') || raw.startsWith('---')) {
           lines.push({ kind: 'file', old: null, new: null, text: raw });
@@ -1163,8 +1210,10 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           lines.push({ kind: 'del', old: oldN++, new: null, text: raw });
         } else if (raw.startsWith('\\')) {
           lines.push({ kind: 'meta', old: null, new: null, text: raw });
-        } else {
+        } else if (inHunk && raw.startsWith(' ')) {
           lines.push({ kind: 'ctx', old: oldN++, new: newN++, text: raw });
+        } else if (raw !== '') {
+          lines.push({ kind: 'meta', old: null, new: null, text: raw });
         }
       }
       return lines;
@@ -1230,7 +1279,54 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     // ------------------------------------------------------------- pieces
-    function DiffLines({ lines, selectable, codeSet, onToggle }) {
+    function DiffLines({ lines, selectable, codeSet, onToggle, split = false, path = '' }) {
+      const highlighted = useMemo(() => {
+        const output = { old: new Map(), new: new Map() };
+        let group = [];
+        const flush = () => {
+          for (const side of ['old', 'new']) {
+            const source = group.filter(({ line }) => side === 'old' ? line.kind !== 'add' : line.kind !== 'del');
+            const html = highlightSourceLines(source.map(({ line }) => line.code ?? line.text.slice(1)).join('\n'), path);
+            source.forEach(({ index }, row) => output[side].set(index, html[row]));
+          }
+          group = [];
+        };
+        lines.forEach((line, index) => {
+          if (['add', 'del', 'ctx'].includes(line.kind) && (line.old > 0 || line.new > 0)) group.push({ line, index });
+          else flush();
+        });
+        flush(); return output;
+      }, [lines, path]);
+      const code = (line, side, index) => {
+        const html = highlighted[side].get(index);
+        return html === undefined ? line.text || '\u00a0' : h(React.Fragment, null,
+          line.code === undefined ? h('span', { className: 'jb-diff-marker', 'aria-hidden': true }, line.text[0]) : null,
+          h('span', { dangerouslySetInnerHTML: { __html: html || '\u00a0' } }));
+      };
+      if (split) {
+        const rows = [];
+        const cell = (line, side, index) => h('div', {
+          key: side, className: 'jb-dline jb-dline-' + (line?.kind ?? 'empty') + (selectable && codeSet.some(item => item.id === String(index)) ? ' jb-dline-selected' : ''),
+          onClick: line && selectable ? () => onToggle({ id: String(index), text: line.text }) : undefined,
+          'data-new-line': side === 'new' ? line?.new ?? undefined : undefined,
+        }, h('span', { className: 'jb-dline-num' }, line?.[side] ?? ''), h('span', { className: 'jb-dline-text' }, line ? code(line, side, index) : '\u00a0'));
+        for (let index = 0; index < lines.length;) {
+          const line = lines[index];
+          if (line.kind === 'del' || line.kind === 'add') {
+            const before = [], after = [];
+            while (lines[index]?.kind === 'del') before.push({ line: lines[index], index: index++ });
+            while (lines[index]?.kind === 'add') after.push({ line: lines[index], index: index++ });
+            for (let offset = 0; offset < Math.max(before.length, after.length); offset++) {
+              rows.push(h('div', { className: 'jb-split-row', key: 'change-' + index + '-' + offset },
+                cell(before[offset]?.line, 'old', before[offset]?.index), cell(after[offset]?.line, 'new', after[offset]?.index)));
+            }
+          } else {
+            rows.push(h('div', { className: 'jb-split-row', key: index }, cell(line, 'old', index), cell(line, 'new', index)));
+            index++;
+          }
+        }
+        return h('div', { className: 'jb-diffbody jb-split-diff' }, rows);
+      }
       return h('div', { className: 'jb-diffbody' }, lines.map((line, index) => {
         const id = String(index);
         const selected = selectable && codeSet.some((item) => item.id === id);
@@ -1243,7 +1339,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         },
           h('span', { className: 'jb-dline-num' }, line.old === null ? '' : String(line.old)),
           h('span', { className: 'jb-dline-num2' }, line.new === null ? '' : String(line.new)),
-          h('span', { className: 'jb-dline-text' }, line.text === '' ? '\u00a0' : line.text));
+          h('span', { className: 'jb-dline-text' }, code(line, line.kind === 'del' ? 'old' : 'new', index)));
       }));
     }
 
@@ -1291,7 +1387,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       ];
     }
 
-    function DiffView({ path, tag, stats, diff, t, review, codeSet, onToggleCode, onReview, onReviewSend, onReviewClose, onClearCode, onReadSource }) {
+    function DiffView({ split = false, path, tag, stats, diff, t, review, codeSet, onToggleCode, onReview, onReviewSend, onReviewClose, onClearCode, onReadSource }) {
       if (diff === null) return h('div', { className: 'jb-diffempty' }, t('diff.select'));
       if (diff.binary) return h('div', { className: 'jb-diffempty' }, t('diff.binary'));
       const lines = diff.text === undefined ? [] : parseDiff(diff.text, diff.untracked === true);
@@ -1310,7 +1406,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           h('span', { className: 'jb-spacer' }),
           ...reviewActions(t, undefined, onReview)),
         review.open ? h(ReviewComposer, { t, intent: review.intent, sending: review.sending, sent: review.sent, error: review.error, code: codeSet, onSubmit: onReviewSend, onClearCode, onClose: onReviewClose }) : null,
-        h(DiffLines, { lines, selectable: review.open, codeSet, onToggle: onToggleCode }));
+        split ? h('div', { className: 'jb-split-labels' }, h('span', null, t('diff.before')), h('span', null, t('diff.after'))) : null,
+        h(DiffLines, { lines, selectable: review.open, codeSet, onToggle: onToggleCode, split, path }));
     }
 
     function ChangeTree({ tree, t, rootLabel, rootCount, selectedPath, onSelect, collapsed, toggle }) {
@@ -1342,14 +1439,13 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         rows);
     }
 
-    function CommitDetail({ detail, t, review, codeSet, onToggleCode, onReview, onReviewSend, onReviewClose, onClearCode }) {
-      if (detail === null) return null;
+    function CommitDetail({ detail, t, review, codeSet, selectedPath, onSelect, onReview, onReviewSend, onReviewClose, onClearCode }) {
+      if (detail === null) return h('div', { className: 'jb-logdetail' }, h('div', { className: 'jb-empty' }, t('log.pickCommit')));
       if (detail.found === false) {
         return h('div', { className: 'jb-logdetail' },
           h('div', { className: 'jb-logdetail-head' }, h('span', { className: 'jb-logdetail-subject' }, t('log.detail'))),
           h('div', { className: 'jb-empty' }, detail.error ?? t('diff.empty')));
       }
-      const lines = detail.diff === undefined || detail.diff === '' ? [] : parseDiff(detail.diff, false);
       return h('div', { className: 'jb-logdetail' },
         h('div', { className: 'jb-logdetail-head' },
           h('span', { className: 'jb-logdetail-subject', title: detail.subject }, detail.subject),
@@ -1362,11 +1458,36 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         detail.files.length > 0
           ? h('div', { className: 'jb-detail-files' },
             h('div', { className: 'jb-detail-fileshead' }, t('log.files', { n: String(detail.files.length) })),
-            detail.files.map((file) => h('div', { key: file.path, className: 'jb-dfile', title: file.path },
-              h('span', { className: 'jb-dfile-stats' }, `+${file.ins} −${file.del}`),
+            detail.files.map((file) => h('button', { key: file.path, type: 'button', className: 'jb-dfile', title: file.path, 'aria-pressed': selectedPath === file.path, 'data-selected': selectedPath === file.path, onClick: () => onSelect(file) },
+              fileIconGlyph(file.path, false),
+              h('span', { className: 'jb-dfile-stats' }, file.binary ? t('diff.binary') : `+${file.ins} −${file.del}`),
               h('span', { className: 'jb-dfile-path' }, file.path))))
-          : null,
-        lines.length > 0 ? h(DiffLines, { lines, selectable: review.open, codeSet, onToggle: onToggleCode }) : h('div', { className: 'jb-diffempty' }, t('diff.empty')));
+          : h('div', { className: 'jb-empty' }, t('diff.empty')));
+    }
+
+    /** Read a selected commit file without consulting or replacing working-tree source. */
+    function CommitFilePreview({ cwd, preview, t, onClose, review, codeSet, onToggleCode, onReview, onReviewSend, onReviewClose, onClearCode }) {
+      const [result, setResult] = useState(null);
+      const [split, setSplit] = useState(true);
+      useEffect(() => {
+        const controller = new AbortController();
+        setResult(null);
+        api(`/api/git.diff?${new URLSearchParams({ cwd, path: preview.file.path, commit: preview.hash })}`, { signal: controller.signal })
+          .then(data => { if (!controller.signal.aborted) setResult(data); })
+          .catch(error => { if (!controller.signal.aborted) setResult({ error: error.message }); });
+        return () => controller.abort();
+      }, [cwd, preview.hash, preview.file.path]);
+      return h('div', { className: 'jb-commit-preview', 'aria-label': t('log.diff', { hash: preview.short }),
+        onKeyDown: event => { if (event.key === 'Escape') { event.preventDefault(); onClose(); } } },
+        h('div', { className: 'jb-editor-title' }, fileIconGlyph(preview.file.path, false),
+          h('span', { className: 'jb-diffpath', title: preview.file.path }, preview.file.path),
+          h('span', { className: 'jb-loghash', title: preview.hash }, preview.short),
+          h('button', { type: 'button', className: 'jb-tb-btn jb-diff-mode', 'aria-pressed': split, onClick: () => setSplit(value => !value) }, t(split ? 'diff.split' : 'diff.unified')),
+          h('button', { type: 'button', className: 'jb-tb-btn', title: t('log.closeDiff'), 'aria-label': t('log.closeDiff'), onClick: onClose }, '×')),
+        result === null ? h('div', { className: 'jb-empty', role: 'status' }, t('loading'))
+          : result.error ? h('div', { className: 'jb-empty', role: 'alert' }, t('error.load', { message: result.error }))
+            : h(DiffView, { path: preview.file.path, tag: t('log.diff', { hash: preview.short }), stats: preview.file.binary ? null : preview.file,
+              diff: result, split, t, review, codeSet, onToggleCode, onReview, onReviewSend, onReviewClose, onClearCode }));
     }
 
     /** Memory cards sedimented by explain conversations: filter the folder, then read one card inline. */
@@ -1841,7 +1962,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Own source/diff requests and definition history independently of the conversation. */
-    function CodeBrowser({ cwd, changes, initialTarget, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t }) {
+    function CodeBrowser({ cwd, changes, initialTarget, commitPreview, onCloseCommitPreview, commitReview, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t }) {
       const [files, setFiles] = useState(null);
       const [filter, setFilter] = useState('');
       const filterInput = useRef(null), alive = useRef(true), copySequence = useRef(0);
@@ -1902,6 +2023,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         if (view === 'diff' && content && document.activeElement === document.body) diffRef.current?.focus();
       }, [view, content]);
       const visit = (destination, origin, mode = 'source') => {
+        onCloseCommitPreview?.();
         const remembered = remember(); retain(destination.path);
         destination = { folding: positions.current.get(destination.path)?.folding, ...destination };
         navigationRef.current?.abort();
@@ -2080,7 +2202,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           treeError ? h('div', { className: 'jb-notice' }, treeError) : files === null ? h('div', { className: 'jb-tree-hint' }, t('loading')) : h(WorkspaceTree, { files, changes, selectedPath: target?.path, onSelect: openFile, onMenu: fileMenu, filter, revealRevision, t })),
         h(PaneDivider, { layout: paneLayout, t }),
         h('div', { className: 'jb-reader-layout' }, h('div', { className: 'jb-reader-workspace', 'data-class-dock': classDock },
-        h('div', { ref: detailRef, tabIndex: -1, className: 'jb-detail', 'aria-busy': loading },
+        h('div', { ref: detailRef, tabIndex: -1, className: 'jb-detail', 'aria-busy': commitPreview ? undefined : loading },
+          commitPreview ? h(CommitFilePreview, { key: commitPreview.hash + ':' + commitPreview.file.path, cwd, preview: commitPreview, t, onClose: onCloseCommitPreview, ...commitReview }) : null,
+          h('div', { className: 'jb-editor-source', hidden: Boolean(commitPreview) },
           h(SourceTabs, { paths: openPaths, activePath: target?.path, labels: libraryLabels, panelId, t, onSelect: selectTab, onClose: closeTabs, onMenu: setMenu, onFindInFiles }),
           h('div', { className: 'jb-editor-title' }, (loaded?.path ?? target?.path) ? fileIconGlyph(loaded?.path ?? target.path, false) : null,
             h('span', { className: 'jb-diffpath', title: content?.displayPath ?? loaded?.path ?? target?.path }, content?.displayPath ?? loaded?.path ?? target?.path),
@@ -2101,7 +2225,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                           const line = event.target.closest('[data-new-line]')?.dataset.newLine;
                           if (line !== undefined) setHistory(old => ({ ...old, items: old.items.map((item, index) => index === old.index ? { ...item, line: Number(line) - 1, character: 0 } : item) }));
                           setView('source');
-                        } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {} })))),
+                        } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {}, path: loaded?.path ?? target?.path }))))),
         classSeed ? h(PaneDivider, { layout: paneLayout, t, pane: 'classes' }) : null,
         classSeed ? h(ClassGraphWindow, { cwd, seed: classSeed, currentPath: target?.path ?? null, files, external: target?.path?.startsWith('dsh-library://') === true, dock: classDock, onDock: setClassDock, onOpen: destination => visit(destination), onClose: () => { setClassSeed(null); reader.current?.focus(); }, t }) : null))),
         debugHost ? createPortal(h(DebugPane, { debug, t, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
@@ -2160,6 +2284,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const [logSelected, setLogSelected] = useState(null);
       const [detail, setDetail] = useState(null);
       const [detailLoading, setDetailLoading] = useState(false);
+      const [commitPreview, setCommitPreview] = useState(null);
+      const commitRequest = useRef(null);
+      const closeCommitPreview = useCallback(() => setCommitPreview(null), []);
       const [reviewOpen, setReviewOpen] = useState(false);
       const [reviewIntent, setReviewIntent] = useState('task');
       const [reviewTarget, setReviewTarget] = useState(null);
@@ -2211,6 +2338,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         setLog(null);
         setDiff(null);
         setSelected(null);
+        commitRequest.current?.abort();
+        setDetailLoading(false); setCommitPreview(null);
         setDetail(null);
         setLogSelected(null); setSearchScope('');
         setSourceTarget(props.previewRequest?.workspaceId === targetWorkspaceId ? props.previewRequest.target : null);
@@ -2223,7 +2352,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         setSourceTarget(props.previewRequest.target);
       }, [props.previewRequest]);
 
-      useEffect(() => () => abortRef.current?.abort(), []);
+      useEffect(() => () => { abortRef.current?.abort(); commitRequest.current?.abort(); }, []);
 
       const loadDiff = useCallback(async (entry) => {
         if (cwd === null) return;
@@ -2249,18 +2378,21 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
 
       const loadCommit = useCallback(async (hash) => {
         if (cwd === null) return;
+        commitRequest.current?.abort();
+        const controller = new AbortController(); commitRequest.current = controller;
+        setCommitPreview(null);
         setLogSelected(hash);
         setDetail(null);
         setDetailLoading(true);
         setReviewOpen(false);
         setReviewError(null);
         try {
-          const data = await api(`/api/git.commit?cwd=${encodeURIComponent(cwd)}&hash=${encodeURIComponent(hash)}`);
-          setDetail(data);
+          const data = await api(`/api/git.commit?cwd=${encodeURIComponent(cwd)}&hash=${encodeURIComponent(hash)}&summary=1`, { signal: controller.signal });
+          if (!controller.signal.aborted) setDetail(data);
         } catch (error) {
-          setDetail({ found: false, error: error.message });
+          if (!controller.signal.aborted) setDetail({ found: false, error: error.message });
         } finally {
-          setDetailLoading(false);
+          if (!controller.signal.aborted) setDetailLoading(false);
         }
       }, [cwd]);
 
@@ -2428,6 +2560,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                 })));
         const graph = log === null ? null : buildGraph(log);
         logContent = h('div', { className: 'jb-log' },
+          h('div', { className: 'jb-log-list' },
           logError !== null
             ? h('div', { className: 'jb-notice jb-notice-error' }, logError)
             : null,
@@ -2444,18 +2577,19 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
               : h('div', { className: 'jb-logbody' }, graph.rows.map((row, index) => {
                 const commit = row.commit;
                 const isHead = index === 0 && status.branch !== null;
-                return h('div', { key: commit.hash, className: 'jb-logrow', 'data-selected': logSelected === commit.hash, onClick: () => loadCommit(commit.hash) },
+                return h('div', { key: commit.hash, className: 'jb-logrow', role: 'button', tabIndex: 0, 'aria-pressed': logSelected === commit.hash, 'data-selected': logSelected === commit.hash, onClick: () => loadCommit(commit.hash), onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); loadCommit(commit.hash); } } },
                   graphRowSvg(row, graph.maxLanes, isHead ? status.branch : null),
                   h('span', { className: 'jb-col-msg', title: commit.subject }, commit.subject),
                   h('span', { className: 'jb-col-author', title: commit.email }, commit.author),
                   h('span', { className: 'jb-col-date' }, fmtDate(commit.date)),
                   h('span', { className: 'jb-col-hash', title: commit.hash }, commit.short));
-              })),
+              }))),
           detailLoading
             ? h('div', { className: 'jb-logdetail' }, h('div', { className: 'jb-empty' }, t('loading')))
             : h(CommitDetail, {
-              detail, t,
-              review: { open: reviewOpen && reviewTarget?.kind === 'commit', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
+              detail, t, selectedPath: commitPreview && commitPreview.hash === detail?.hash ? commitPreview.file.path : null,
+              onSelect: file => setCommitPreview({ hash: detail.hash, short: detail.short, file }),
+              review: { open: !commitPreview && reviewOpen && reviewTarget?.kind === 'commit', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
               codeSet: reviewCode,
               onToggleCode: toggleReviewCode,
               onReview: (intent) => openReview(intent, { kind: 'commit', detail }),
@@ -2471,7 +2605,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         reviewOpen && reviewTarget?.kind === 'workspace' ? h(ReviewComposer, { t, intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError, code: reviewCode, onSubmit: sendReview, onClearCode: clearReviewCode, onClose: closeReview }) : null,
         h('div', { className: 'jb-content' },
           status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat' },
-            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, debugHost, onShowDebug: showDebug, onFindInFiles: openFind,
+            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, commitPreview, onCloseCommitPreview: closeCommitPreview,
+              commitReview: { review: { open: reviewOpen && reviewTarget?.kind === 'commit', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
+                codeSet: reviewCode, onToggleCode: toggleReviewCode, onReview: intent => openReview(intent, { kind: 'commit', detail }), onReviewSend: sendReview, onReviewClose: closeReview, onClearCode: clearReviewCode }, debugHost, onShowDebug: showDebug, onFindInFiles: openFind,
               onExplain: path => openReview('explain', { kind: 'workspace', path }), desktopPaths: props.desktopPaths, t })) : notice),
         h('div', { className: 'jb-tools-window', hidden: tab === null, style: { height: tools.height } },
           h('div', { className: 'jb-tools-divider', ...tools.divider }),

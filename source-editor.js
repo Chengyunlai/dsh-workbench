@@ -105,6 +105,30 @@ export function highlightDocumentCode(text, info = '') {
   return result + escapeSource(text.slice(position));
 }
 
+/** Highlight contiguous source lines with balanced spans on every line, including multiline tokens.
+ * @param text - Literal source text, without diff markers.
+ * @param path - Source file name used to select the existing language parser.
+ * @returns One escaped HTML string per source line; unknown languages remain literal text.
+ */
+export function highlightSourceLines(text, path) {
+  const support = sourceLanguage(path);
+  const lines = text.split('\n').map(() => '');
+  let line = 0, position = 0;
+  const append = (value, classes) => {
+    const parts = value.split('\n');
+    for (let index = 0; index < parts.length; index++) {
+      if (index) line++;
+      const escaped = escapeSource(parts[index]);
+      lines[line] += classes && escaped ? '<span class="' + classes + '">' + escaped + '</span>' : escaped;
+    }
+  };
+  if (support.language) highlightTree(support.language.parser.parse(text), sourceHighlighting, (from, to, classes) => {
+    append(text.slice(position, from)); append(text.slice(from, to), classes); position = to;
+  });
+  append(text.slice(position));
+  return lines;
+}
+
 const debugEffect = StateEffect.define();
 const debugField = StateField.define({
   create: () => ({ breakpoints: [], currentLine: null, selectedLine: null }),
