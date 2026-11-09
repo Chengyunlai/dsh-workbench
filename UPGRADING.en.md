@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.4.5
+
+The file tree filter and toolbar stay visible while scrolling, with space reserved when revealing a file. This release also includes marked 18.1.3 and schemastery 3.19.0 updates. Reload or restart Harness after updating.
+
 ## 1.4.4
 
 Conversation links to Python, Go, Java, JavaScript, and TypeScript open in the workbench at the requested line. The file tree context menu can open a directory or reveal a file in the system file manager. Reload or restart Harness after updating.
