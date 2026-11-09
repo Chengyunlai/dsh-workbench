@@ -809,7 +809,8 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 @media(pointer:coarse){.jb-pane-divider[aria-orientation=vertical]{width:10px}.jb-pane-divider[aria-orientation=horizontal]{height:10px}}
 .jb-layout-notice{position:absolute;z-index:3;right:8px;bottom:8px;max-width:calc(100% - 16px);padding:6px 10px;background:${C.toolbar};color:${C.text};border:1px solid ${C.border};border-radius:4px;overflow-wrap:anywhere}
 .jb-tree{flex:none;width:340px;min-width:260px;overflow-y:auto;background:${C.panel};border-right:1px solid ${C.border};scrollbar-gutter:stable}
-.jb-tree-toolbar{display:flex;align-items:center;gap:2px;padding-right:6px;min-width:0}
+.jb-code-browser .jb-tree{scroll-padding-top:46px}
+.jb-tree-toolbar{position:sticky;top:0;z-index:2;background:${C.panel};display:flex;align-items:center;gap:2px;padding-right:6px;min-width:0}
 .jb-tree-toolbar .jb-filter{flex:1;min-width:0;margin-right:2px}
 .jb-tree-toolbar>.jb-tb-btn{flex:none}
 .jb-search-panel{display:flex;flex:1;min-width:0;flex-direction:column;min-height:0;height:100%;color:${C.text};font-size:12px}
