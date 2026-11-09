@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.6.0
+
+Drag file tabs to the reader edges to create two side-by-side or stacked groups, each retaining its tabs, caret, scroll and navigation history while sharing one debugger. Resize with the divider or keyboard; tab menus offer splitting and merging, and empty groups merge automatically. Assign a task and Explain it to me appear only in the top toolbar, retaining the current file, change or commit context. Reload or restart Harness after updating. Personal cards and project configuration need no migration.
+
 ## 1.5.0
 
 Python class nodes include fields, annotations, and field-type links; hierarchy rows navigate to referenced type definitions. Git history places commits on the left and changed files on the right. Selecting a file opens a syntax-highlighted side-by-side diff above, with unified mode available; closing it restores the source and caret. Reload or restart Harness after updating. Existing personal cards and project configuration need no migration.

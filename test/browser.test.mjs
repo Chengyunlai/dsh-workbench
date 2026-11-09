@@ -337,7 +337,7 @@ test('file tab menus close the clicked tab, keep it when closing others, and cle
  const menu = ui.dom.window.document.querySelector('[role=menu]');
  assert.ok(menu);
  const items = [...menu.querySelectorAll('[role=menuitem]')];
- assert.deepEqual(items.map(node => node.querySelector('span').textContent), ['关闭', '关闭其他标签', '关闭全部标签']);
+ assert.deepEqual(items.map(node => node.querySelector('span').textContent), ['关闭', '关闭其他标签', '关闭全部标签', '向右分屏', '向下分屏']);
  assert.equal(items[1].disabled, true);
  await act(async () => items[0].dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
  assert.equal(ui.dom.window.document.querySelector('[role=menu]'), null);
@@ -2022,4 +2022,79 @@ test('historical and working-tree diffs keep syntax colors in split and unified 
   assert.equal(preview.querySelector('.jb-syntax-keyword').textContent, 'class');
   assert.equal(preview.querySelector('.jb-dline-del .jb-syntax-string').textContent, '"before"');
   assert.ok(ui.container.querySelector('style').textContent.includes('.jb-diffbody .jb-syntax-keyword{color:var(--shiki-token-keyword)}'));
+});
+
+test('AI actions appear only in the top toolbar and retain source, change and commit context', async context => {
+  const sent = [], commit = { hash: 'd'.repeat(40), short: 'ddddddd', subject: 'Change model', author: 'Demo', date: '2026-11-09', parents: [] };
+  const ui = await panel(context, server((url, options) => {
+    if (url.pathname === '/api/git.log') return { ok: true, json: async () => ({ commits: [commit] }) };
+    if (url.pathname === '/api/git.commit') return { ok: true, json: async () => ({ ...commit, found: true, files: [{ path: 'src/main.ts', ins: 1, del: 1 }] }) };
+    if (url.pathname === '/api/git.dispatch') { sent.push(JSON.parse(options.body)); return { ok: true, json: async () => ({ ok: true, sessionId: 'explain' }) }; }
+  }));
+  const checkActions = () => {
+    for (const key of ['review.button.task', 'review.button.explain']) {
+      const buttons = [...ui.container.querySelectorAll('button')].filter(button => button.textContent === ui.t(key));
+      assert.equal(buttons.length, 1, key);
+      assert.equal(buttons[0].closest('.jb-toolbar'), ui.container.querySelector('.jb-toolbar'));
+    }
+  };
+  const send = async () => {
+    const input = ui.container.querySelector('.jb-review-input');
+    assert.ok(input);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(ui.dom.window.HTMLTextAreaElement.prototype, 'value').set.call(input, 'Explain this');
+      input.dispatchEvent(new ui.dom.window.Event('input', { bubbles: true }));
+    });
+    await ui.click('review.send');
+    await ui.click('review.cancel');
+  };
+  await ui.click('src'); await ui.click('main.ts'); checkActions();
+  await ui.click('review.button.explain'); await send();
+  assert.equal(sent.at(-1).target.path, 'src/main.ts');
+  await ui.click('tabs.changes');
+  await act(async () => ui.container.querySelector('[data-tool=changes] .jb-node[data-status=M]').click());
+  checkActions(); await ui.click('review.button.task'); await send();
+  assert.equal(sent.at(-1).target.path, 'src/main.ts');
+  assert.equal(sent.at(-1).target.tag, ui.t('diff.unstaged'));
+  await ui.click('tabs.log'); await act(async () => ui.container.querySelector('.jb-logrow').click());
+  checkActions(); await ui.click('review.button.explain'); await send();
+  assert.equal(sent.at(-1).target.path, commit.hash);
+  await act(async () => ui.container.querySelector('.jb-dfile').click());
+  checkActions(); await ui.click('review.button.task');
+  await act(async () => ui.container.querySelector('.jb-commit-preview .jb-dline-add').click());
+  await send();
+  assert.equal(sent.at(-1).target.path, commit.hash);
+  assert.deepEqual(sent.at(-1).code, ['+new']);
+});
+
+test('dragging tabs splits readers horizontally or vertically, preserves independent positions and merges them back', async context => {
+  const requests = [], ui = await panel(context, server(null, requests));
+  await ui.click('src'); await ui.click('main.ts'); await ui.caret(6); await ui.click('lib.ts'); await ui.caret(2);
+  const group = id => ui.container.querySelector(`[data-editor-group=${id}]`);
+  const editorFor = id => EditorView.findFromDOM(group(id).querySelector('.cm-content'));
+  const primaryEditor = editorFor('primary');
+  const transfer = { setData() {}, effectAllowed: '', dropEffect: '' };
+  const fire = async (node, type, x = 0, y = 0) => act(async () => {
+    const event = new ui.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y });
+    Object.defineProperty(event, 'dataTransfer', { value: transfer }); node.dispatchEvent(event);
+  });
+  group('primary').getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 400 });
+  const mainTab = group('primary').querySelector('[role=tab][aria-label="src/main.ts"]').closest('.jb-source-tab');
+  await fire(mainTab, 'dragstart'); await fire(group('primary'), 'dragover', 590, 200);
+  assert.equal(group('primary').querySelector('.jb-editor-drop').dataset.side, 'right');
+  await fire(group('primary'), 'drop', 590, 200);
+  assert.ok(group('secondary')); assert.equal(ui.container.querySelector('.jb-editors-split').dataset.axis, 'x');
+  assert.equal(editorFor('primary'), primaryEditor); assert.equal(primaryEditor.state.selection.main.head, 2);
+  const secondaryEditor = editorFor('secondary'); assert.equal(secondaryEditor.state.selection.main.head, 6);
+  assert.equal(requests.filter(request => request.name === '/api/git.debug.status').length, 1, 'both groups share one debugger');
+  await act(async () => secondaryEditor.dispatch({ selection: { anchor: 10 } }));
+  await ui.menu(group('secondary').querySelector('.jb-source-tab'), 'files.splitBelow');
+  assert.equal(ui.container.querySelector('.jb-editors-split').dataset.axis, 'y');
+  assert.equal(editorFor('secondary'), secondaryEditor); assert.equal(secondaryEditor.state.selection.main.head, 10);
+  assert.ok(ui.container.querySelector('.jb-pane-divider[data-pane=editor]'));
+  await fire(group('secondary').querySelector('.jb-source-tab'), 'dragstart');
+  await fire(group('primary').querySelector('.jb-source-tabs'), 'drop', 300, 200);
+  assert.equal(group('secondary'), null); assert.equal(ui.container.querySelectorAll('.cm-editor').length, 1);
+  assert.equal(editorFor('primary'), primaryEditor); assert.equal(primaryEditor.state.selection.main.head, 10);
+  assert.equal(group('primary').querySelectorAll('[role=tab]').length, 2);
 });

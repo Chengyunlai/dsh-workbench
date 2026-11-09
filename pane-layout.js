@@ -1,6 +1,6 @@
 /** Client-local pane sizes and accessible drag/keyboard dividers without editor remounts. */
 const storageKey = 'dsh.git-control.paneSizes';
-const sizeKeys = ['treeWidth', 'treeHeight', 'classWidth', 'classHeight'];
+const sizeKeys = ['treeWidth', 'treeHeight', 'classWidth', 'classHeight', 'editorWidth', 'editorHeight'];
 const variable = key => '--jb-' + key.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase());
 
 /** Create pane layout controls using the host React instance.
@@ -36,15 +36,16 @@ export function createPaneLayout(React) {
     const [dragging, setDragging] = useState(false);
     const geometry = () => {
       const parent = ref.current.parentElement;
-      const classes = pane === 'classes', element = parent.querySelector(classes ? '.jb-class-window' : '.jb-tree');
-      const vertical = window.getComputedStyle(parent).flexDirection !== 'column';
+      const classes = pane === 'classes', editors = pane === 'editor', element = parent.querySelector(editors ? ':scope > .jb-editor-primary' : classes ? '.jb-class-window' : '.jb-tree');
+      const direction = window.getComputedStyle(parent).flexDirection;
+      const vertical = !direction.startsWith('column');
       const axis = vertical ? 'x' : 'y', dimension = vertical ? 'width' : 'height';
       const available = parent.getBoundingClientRect()[dimension];
       const gap = ref.current.getBoundingClientRect()[dimension];
-      const preferred = classes ? (vertical ? 240 : 160) : (vertical ? 160 : 60);
+      const preferred = editors ? (vertical ? 160 : 100) : classes ? (vertical ? 240 : 160) : (vertical ? 160 : 60);
       const remaining = classes && vertical ? 280 : vertical ? 240 : 160;
-      const min = classes ? Math.min(preferred, available * .45) : vertical ? preferred : Math.min(preferred, available * .3);
-      return { axis, key: classes ? (vertical ? 'classWidth' : 'classHeight') : vertical ? 'treeWidth' : 'treeHeight', direction: classes ? -1 : 1,
+      const min = editors ? Math.min(preferred, available * .4) : classes ? Math.min(preferred, available * .45) : vertical ? preferred : Math.min(preferred, available * .3);
+      return { axis, key: editors ? (vertical ? 'editorWidth' : 'editorHeight') : classes ? (vertical ? 'classWidth' : 'classHeight') : vertical ? 'treeWidth' : 'treeHeight', direction: (classes ? -1 : 1) * (direction.endsWith('reverse') ? -1 : 1),
         min: Math.round(min), max: Math.round(Math.max(min, available - Math.min(remaining, available * .6) - gap)), value: Math.round(element?.getBoundingClientRect()[dimension] ?? 0) };
     };
     const finish = cancelled => {

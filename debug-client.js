@@ -11,7 +11,7 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
   const { useState, useEffect, useRef, useId } = React;
   const active = session => Boolean(session?.id && session.state !== 'ended');
   const enabled = (session, name) => name === 'stop' ? active(session) : name === 'pause' ? session?.state === 'running' : session?.state === 'paused';
-  function useDebugger(cwd, t, onLocation, readExpression) {
+  function useDebugger(cwd, t, onLocation, readExpression, pollingEnabled = true) {
     const [session, setSession] = useState(null), [breakpoints, setBreakpoints] = useState({});
     const [error, setError] = useState(null), [choices, setChoices] = useState(null), [busy, setBusy] = useState(false), [attach, setAttach] = useState(null);
     const [selectedFrameId, setSelectedFrameId] = useState(null);
@@ -58,6 +58,7 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
       finally { if (refs.current.pendingAction === cwd) delete refs.current.pendingAction; if (refs.current.cwd === cwd) setBusy(false); }
     };
     useEffect(() => {
+      if (!pollingEnabled) return undefined;
       let cancelled = false, timer, controller;
       const poll = async () => {
         controller = new AbortController();
@@ -75,7 +76,7 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
           .catch(error => { if (!cancelled) setError(t('debug.failed', { message: error.message })); });
       }
       return () => { cancelled = true; clearTimeout(timer); controller?.abort(); };
-    }, [cwd, session?.id, session?.state]);
+    }, [cwd, session?.id, session?.state, pollingEnabled]);
     useEffect(() => { setSession(null); setSelectedFrameId(null); setBreakpoints({}); setEvaluation(null); setChoices(null); setAttach(null); setError(null); }, [cwd]);
     useEffect(() => { if (session?.state !== 'paused') setEvaluation(null); }, [session?.state]);
     const start = async request => {

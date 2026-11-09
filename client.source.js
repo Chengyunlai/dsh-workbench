@@ -3,6 +3,7 @@ import { createTerminalDock } from './terminal-client.js';
 import { createDebugUI } from './debug-client.js';
 import { createSourceEditor, highlightSourceLines } from './source-editor.js';
 import { createMarkdownReader } from './markdown-reader.js';
+import { createEditorSplit } from './editor-split.js';
 import { createPaneLayout } from './pane-layout.js';
 import { createBottomTools } from './bottom-tools.js';
 import { createWorkspaceSearchUI } from './workspace-search-client.js';
@@ -27,6 +28,7 @@ window.__ModuleLoader__.load({
     const MarkdownReader = createMarkdownReader(React);
     const { usePaneLayout, PaneDivider } = createPaneLayout(React);
     const useBottomTools = createBottomTools(React);
+    const useEditorSplit = createEditorSplit(React);
     const WorkspaceSearch = createWorkspaceSearchUI(React, api);
 
     // Stable installation, locale and dock ids preserve existing profiles and open panes.
@@ -202,6 +204,9 @@ window.__ModuleLoader__.load({
       'document.preview': 'Reading preview', 'document.source': 'Source', 'document.mode': 'Document view',
       'document.metadataTags': 'Tags', 'document.metadataKind': 'Type', 'document.metadataSource': 'Source',
       'document.image': 'Image: {alt}', 'document.readOnly': 'Markdown · Read-only', 'document.linkFailed': 'This link cannot be opened inside the workspace.',
+      'layout.editorWidth': 'Editor split width', 'layout.editorHeight': 'Editor split height',
+      'files.dropCenter': 'Move to this group', 'files.dropLeft': 'Split left', 'files.dropRight': 'Split right', 'files.dropTop': 'Split above', 'files.dropBottom': 'Split below',
+      'files.splitRight': 'Split right', 'files.splitBelow': 'Split below', 'files.mergeGroups': 'Merge editor groups',
       'layout.treeWidth': 'File tree width', 'layout.treeHeight': 'File tree height',
       'layout.classWidth': 'Class diagram width', 'layout.classHeight': 'Class diagram height',
       'layout.resizeHint': 'Drag to resize · Arrow keys to adjust · Double-click or Enter to reset', 'layout.pixels': '{n} pixels',
@@ -448,6 +453,9 @@ window.__ModuleLoader__.load({
       'document.preview': '阅读预览', 'document.source': '源码', 'document.mode': '文档视图',
       'document.metadataTags': '标签', 'document.metadataKind': '类型', 'document.metadataSource': '来源',
       'document.image': '图片：{alt}', 'document.readOnly': 'Markdown · 只读', 'document.linkFailed': '无法在当前工作区内打开此链接',
+      'layout.editorWidth': '阅读分栏宽度', 'layout.editorHeight': '阅读分栏高度',
+      'files.dropCenter': '移到此分栏', 'files.dropLeft': '在左侧分屏', 'files.dropRight': '在右侧分屏', 'files.dropTop': '在上方分屏', 'files.dropBottom': '在下方分屏',
+      'files.splitRight': '向右分屏', 'files.splitBelow': '向下分屏', 'files.mergeGroups': '合并阅读分栏',
       'layout.treeWidth': '文件树宽度', 'layout.treeHeight': '文件树高度',
       'layout.classWidth': '类图宽度', 'layout.classHeight': '类图高度',
       'layout.resizeHint': '拖动调整尺寸 · 方向键微调 · 双击或 Enter 恢复默认', 'layout.pixels': '{n} 像素',
@@ -965,13 +973,25 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-logrow .jb-col-hash{flex:none;width:72px;text-align:right;color:${C.textDim};font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
 .jb-logdetail{flex:0 0 38%;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;border-left:1px solid ${C.border};background:${C.panel}}
 .jb-logdetail-head{flex:none;display:flex;align-items:center;gap:8px;min-height:34px;padding:4px 10px;flex-wrap:wrap;background:${C.gutter};border-bottom:1px solid ${C.border}}
-.jb-logdetail-subject{flex:1 1 100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${C.text};font-size:12.5px;font-weight:500}
+.jb-logdetail-subject{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${C.text};font-size:12.5px;font-weight:500}
 .jb-logdetail-meta{flex:none;padding:8px 10px;color:${C.textDim};font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jb-detail-files{flex:1;min-height:0;overflow:auto;border-top:1px solid ${C.border}}
 .jb-detail-fileshead{position:sticky;top:0;background:${C.panel};z-index:1;height:24px;padding:0 8px;display:flex;align-items:center;color:${C.textDim};font-size:11px;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid ${C.border}}
 .jb-dfile{width:100%;border:0;border-radius:0;background:transparent;color:${C.text};font:inherit;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;min-height:24px;padding:2px 8px;font-size:12px}
 .jb-dfile[data-selected=true]{background:${C.selection}}
 .jb-dfile:focus-visible,.jb-logrow:focus-visible{outline:1px solid ${C.accent};outline-offset:-1px}
+.jb-code-browser[data-pane-only=true]>.jb-code-workspace>.jb-tree{display:none}
+.jb-code-browser[data-pane-only=true]>.jb-code-workspace{min-width:0;min-height:0}
+.jb-editors-split{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
+.jb-editors-split[data-split=true]>.jb-editor-primary{flex:none;width:clamp(min(160px,40%),var(--jb-editor-width,50%),max(0px,calc(100% - 166px)))}
+.jb-editors-split[data-axis=y]{flex-direction:column}
+.jb-editors-split[data-axis=x][data-reverse=true]{flex-direction:row-reverse}
+.jb-editors-split[data-axis=y][data-reverse=true]{flex-direction:column-reverse}
+.jb-editors-split[data-split=true][data-axis=y]>.jb-editor-primary{width:auto;height:clamp(min(100px,40%),var(--jb-editor-height,50%),max(0px,calc(100% - 106px)))}
+.jb-editor-secondary{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
+.jb-editor-drop{position:absolute;inset:4px;pointer-events:none;z-index:4;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,${C.accent} 22%,transparent);border:2px solid ${C.accent};color:${C.text};font-size:13px}
+.jb-editor-drop[data-side=left]{right:50%}.jb-editor-drop[data-side=right]{left:50%}
+.jb-editor-drop[data-side=top]{bottom:50%}.jb-editor-drop[data-side=bottom]{top:50%}
 .jb-editor-source{display:contents}
 .jb-editor-source[hidden]{display:none}
 .jb-diff-marker{color:${C.textDim}}
@@ -1012,7 +1032,6 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-logrow .jb-col-date{grid-row:3;grid-column:2;width:auto;text-align:left}
 .jb-logrow .jb-col-hash{grid-row:2;grid-column:3;width:auto}
 .jb-logdetail{flex-basis:42%}
-.jb-logdetail-head .jb-review-btn{font-size:11px;padding:0 6px}
 .jb-logdetail-meta{white-space:normal;overflow-wrap:anywhere}
 }
 
@@ -1387,7 +1406,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       ];
     }
 
-    function DiffView({ split = false, path, tag, stats, diff, t, review, codeSet, onToggleCode, onReview, onReviewSend, onReviewClose, onClearCode, onReadSource }) {
+    function DiffView({ split = false, path, tag, stats, diff, t, review, codeSet, onToggleCode, onReviewSend, onReviewClose, onClearCode, onReadSource }) {
       if (diff === null) return h('div', { className: 'jb-diffempty' }, t('diff.select'));
       if (diff.binary) return h('div', { className: 'jb-diffempty' }, t('diff.binary'));
       const lines = diff.text === undefined ? [] : parseDiff(diff.text, diff.untracked === true);
@@ -1403,8 +1422,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           h('span', { className: 'jb-diffpath', title: path }, path),
           h('span', { className: 'jb-difftag' }, tag),
           stats !== null ? h('span', { className: 'jb-diffstats' }, `+${stats.ins} −${stats.del}`) : null,
-          h('span', { className: 'jb-spacer' }),
-          ...reviewActions(t, undefined, onReview)),
+          h('span', { className: 'jb-spacer' })),
         review.open ? h(ReviewComposer, { t, intent: review.intent, sending: review.sending, sent: review.sent, error: review.error, code: codeSet, onSubmit: onReviewSend, onClearCode, onClose: onReviewClose }) : null,
         split ? h('div', { className: 'jb-split-labels' }, h('span', null, t('diff.before')), h('span', null, t('diff.after'))) : null,
         h(DiffLines, { lines, selectable: review.open, codeSet, onToggle: onToggleCode, split, path }));
@@ -1439,7 +1457,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         rows);
     }
 
-    function CommitDetail({ detail, t, review, codeSet, selectedPath, onSelect, onReview, onReviewSend, onReviewClose, onClearCode }) {
+    function CommitDetail({ detail, t, review, codeSet, selectedPath, onSelect, onReviewSend, onReviewClose, onClearCode }) {
       if (detail === null) return h('div', { className: 'jb-logdetail' }, h('div', { className: 'jb-empty' }, t('log.pickCommit')));
       if (detail.found === false) {
         return h('div', { className: 'jb-logdetail' },
@@ -1450,8 +1468,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('div', { className: 'jb-logdetail-head' },
           h('span', { className: 'jb-logdetail-subject', title: detail.subject }, detail.subject),
           h('span', { className: 'jb-loghash', title: detail.hash }, detail.short),
-          h('span', { className: 'jb-spacer' }),
-          ...reviewActions(t, undefined, onReview)),
+          h('span', { className: 'jb-spacer' })),
         review.open ? h(ReviewComposer, { t, intent: review.intent, sending: review.sending, sent: review.sent, error: review.error, code: codeSet, onSubmit: onReviewSend, onClearCode, onClose: onReviewClose }) : null,
         h('div', { className: 'jb-logdetail-meta' },
           `${detail.author}${detail.email ? ` <${detail.email}>` : ''} · ${fmtDateTime(detail.date)}${detail.parents.length > 1 ? ` · ${t('log.parents', { n: String(detail.parents.length) })}` : ''}`),
@@ -1466,7 +1483,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Read a selected commit file without consulting or replacing working-tree source. */
-    function CommitFilePreview({ cwd, preview, t, onClose, review, codeSet, onToggleCode, onReview, onReviewSend, onReviewClose, onClearCode }) {
+    function CommitFilePreview({ cwd, preview, t, onClose, review, codeSet, onToggleCode, onReviewSend, onReviewClose, onClearCode }) {
       const [result, setResult] = useState(null);
       const [split, setSplit] = useState(true);
       useEffect(() => {
@@ -1487,7 +1504,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         result === null ? h('div', { className: 'jb-empty', role: 'status' }, t('loading'))
           : result.error ? h('div', { className: 'jb-empty', role: 'alert' }, t('error.load', { message: result.error }))
             : h(DiffView, { path: preview.file.path, tag: t('log.diff', { hash: preview.short }), stats: preview.file.binary ? null : preview.file,
-              diff: result, split, t, review, codeSet, onToggleCode, onReview, onReviewSend, onReviewClose, onClearCode }));
+              diff: result, split, t, review, codeSet, onToggleCode, onReviewSend, onReviewClose, onClearCode }));
     }
 
     /** Memory cards sedimented by explain conversations: filter the folder, then read one card inline. */
@@ -1918,7 +1935,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Persistent file tabs with keyboard activation and a shared close menu. */
-    function SourceTabs({ paths, activePath, labels, panelId, t, onSelect, onClose, onMenu, onFindInFiles }) {
+    function SourceTabs({ paths, activePath, labels, panelId, t, onSelect, onClose, onMenu, onFindInFiles, group, splitHost }) {
       const ref = useRef(null);
       const activeIndex = paths.indexOf(activePath);
       useLayoutEffect(() => {
@@ -1935,6 +1952,11 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             { id: 'close', label: t('files.tabClose'), run: () => close(path) },
             { id: 'others', label: t('files.tabCloseOthers'), disabled: paths.length < 2, run: () => onClose('others', path) },
             { id: 'all', label: t('files.tabCloseAll'), run: () => onClose('all') },
+            ...(splitHost ? [
+              { id: 'split-right', label: t('files.splitRight'), run: () => splitHost.open(group, path, 'x') },
+              { id: 'split-below', label: t('files.splitBelow'), run: () => splitHost.open(group, path, 'y') },
+              ...(splitHost.split ? [{ id: 'merge-editors', label: t('files.mergeGroups'), run: splitHost.merge }] : []),
+            ] : []),
           ] });
       };
       return h('div', { ref, role: 'tablist', 'aria-label': t('files.openTabs'), className: 'jb-source-tabs',
@@ -1950,7 +1972,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           const basename = path.split('/').at(-1);
           const displayPath = labels.get(path) ?? path;
           const label = paths.some(other => other !== path && other.split('/').at(-1) === basename) ? displayPath : basename;
-          return h('div', { key: path, className: 'jb-source-tab', 'data-active': path === activePath, 'data-tab-index': index, role: 'presentation',
+          return h('div', { key: path, className: 'jb-source-tab', 'data-active': path === activePath, 'data-tab-index': index, role: 'presentation', draggable: Boolean(splitHost),
+            onDragStart: event => splitHost?.drag(group, path, event), onDragEnd: () => splitHost?.clear(),
             onContextMenu: event => openMenu(path, event),
             onKeyDown: event => { if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) openMenu(path, event); },
             onKeyDownCapture: event => { if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'f') { event.preventDefault(); event.stopPropagation(); onFindInFiles(''); } },
@@ -1962,7 +1985,11 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Own source/diff requests and definition history independently of the conversation. */
-    function CodeBrowser({ cwd, changes, initialTarget, commitPreview, onCloseCommitPreview, commitReview, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t }) {
+    function CodeBrowser({ cwd, changes, initialTarget, commitPreview, onCloseCommitPreview, commitReview, onActiveFile, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t, paneOnly = false, groupHost, sharedDebug }) {
+      const ownGroups = useEditorSplit();
+      const splitHost = groupHost ?? ownGroups;
+      const group = paneOnly ? 'secondary' : 'primary';
+      const groupActive = splitHost.active === group;
       const [files, setFiles] = useState(null);
       const [filter, setFilter] = useState('');
       const filterInput = useRef(null), alive = useRef(true), copySequence = useRef(0);
@@ -1995,6 +2022,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }, [openPaths]);
       const panelId = React.useId();
       const target = history.items[history.index] ?? null;
+      useEffect(() => { if (groupActive) onActiveFile?.(target?.path ?? null); }, [target?.path, onActiveFile, groupActive]);
       const [view, setView] = useState('source');
       const [loaded, setLoaded] = useState(null);
       const content = loaded?.content;
@@ -2024,6 +2052,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }, [view, content]);
       const visit = (destination, origin, mode = 'source') => {
         onCloseCommitPreview?.();
+        splitHost.setActive(group);
         const remembered = remember(); retain(destination.path);
         destination = { folding: positions.current.get(destination.path)?.folding, ...destination };
         navigationRef.current?.abort();
@@ -2052,6 +2081,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         });
       };
       const openFile = path => {
+        if (!paneOnly && splitHost.active === 'secondary' && splitHost.groups.current.secondary) { splitHost.groups.current.secondary.receive({ path, line: 0, character: 0, focusSource: true }); return; }
         if (path === target?.path && !error) setReadRevision(value => value + 1);
         if (path === loaded?.path) remember();
         visit({ path, line: 0, character: 0, ...positions.current.get(path), focusSource: true });
@@ -2152,15 +2182,20 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => { controller.abort(); navigationRef.current?.abort(); };
       }, [cwd, target?.path, view, changes, readRevision]);
-      const controller = useDebugger(cwd, t, at => { visit(at); onShowDebug(); }, () => reader.current?.selectedText?.() ?? '');
-      const debug = { ...controller, run: (...args) => { onShowDebug(); return controller.run(...args); },
+      const localController = useDebugger(cwd, t, at => {
+        (splitHost.groups.current[splitHost.active] ?? splitHost.groups.current.primary)?.receive(at); onShowDebug();
+      }, () => splitHost.groups.current[splitHost.active]?.selectedText() ?? '', !paneOnly);
+      const controller = sharedDebug ?? localController;
+      const debug = { ...controller, run: (...args) => { controller.setPath(content?.external ? undefined : target?.path); onShowDebug(); return controller.run(...args); },
         start: (...args) => { onShowDebug(); return controller.start(...args); },
         openEvaluation: (...args) => { onShowDebug(); return controller.openEvaluation(...args); } };
+      if (!groupActive) { debug.attach = null; debug.choices = null; }
       const debugRef = useRef(debug); debugRef.current = debug;
       const closeEvaluation = useCallback(() => debugRef.current.closeEvaluation(), []);
       const paneLayout = usePaneLayout(t);
-      debug.cwd = cwd; debug.path = content?.external ? undefined : target?.path; debug.setPath(debug.path); debug.sourcePending = content?.external || loading || (Boolean(loaded) && !contentMatches);
+      debug.cwd = cwd; debug.path = content?.external ? undefined : target?.path; if (groupActive) debug.setPath(debug.path); debug.sourcePending = content?.external || loading || (Boolean(loaded) && !contentMatches);
       debug.report = error => setError(error.message);
+      debug.toggle = line => { controller.setPath(debug.path); return controller.toggle(line); };
       const define = async (line, character, typeContext) => {
         if (loading || !contentMatches) return;
         navigationRef.current?.abort();
@@ -2186,10 +2221,35 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           setNavigation({ busy: false, targets: [], message: t(key, { message: error.message }) });
         }
       };
-      return h('div', { ref: paneLayout.root, className: 'jb-changes jb-code-browser', style: paneLayout.style,
+      splitHost.groups.current[group] = { paths: openPaths, target,
+        snapshot: path => { if (path === target?.path) remember(); return { path, line: 0, character: 0, ...positions.current.get(path), focusSource: true }; },
+        receive: visit, remove: path => closeTabs('one', path), selectedText: () => reader.current?.selectedText?.() ?? '',
+      };
+      if (!paneOnly) {
+        splitHost.open = (source, path, axis) => {
+          const owner = splitHost.groups.current[source], destination = owner.snapshot(path);
+          if (!splitHost.split) {
+            ownGroups.openSplit({ axis, reverse: false, initial: destination });
+            if (owner.paths.length > 1) owner.remove(path);
+          } else { ownGroups.openSplit({ ...splitHost.split, axis, reverse: false }); splitHost.groups.current.secondary?.receive(destination); if (source !== 'secondary' && owner.paths.length > 1) owner.remove(path); }
+          splitHost.setActive('secondary');
+        };
+        splitHost.merge = () => {
+          const other = splitHost.groups.current.secondary;
+          if (other) { for (const path of other.paths) { const destination = other.snapshot(path); positions.current.set(path, destination); retain(path); } if (other.target) visit(other.snapshot(other.target.path)); }
+          splitHost.close();
+        };
+      }
+      useEffect(() => {
+        if (!openPaths.length && splitHost.split) { if (paneOnly) splitHost.close(); else splitHost.merge(); }
+      }, [paneOnly, openPaths.length, splitHost.split]);
+      useEffect(() => () => { delete splitHost.groups.current[group]; }, []);
+      return h('div', { ref: paneLayout.root, className: 'jb-changes jb-code-browser', 'data-pane-only': paneOnly, style: paneLayout.style,
+        onFocusCapture: event => { if (event.target.closest('[data-editor-group]')?.dataset.editorGroup === group && event.target.closest('.jb-code-browser') === event.currentTarget) splitHost.setActive(group); },
+        onPointerDownCapture: event => { if (event.target.closest('[data-editor-group]')?.dataset.editorGroup === group && event.target.closest('.jb-code-browser') === event.currentTarget) splitHost.setActive(group); },
         onAuxClick: event => { if (event.button === 3 || event.button === 4) { event.preventDefault(); event.stopPropagation(); } },
         onKeyDown: event => {
-          if (view !== 'diff') return;
+          if (view !== 'diff' || event.target.closest('.jb-code-browser') !== event.currentTarget) return;
           if (event.key === 'F4') { event.preventDefault(); event.stopPropagation(); setView('source'); }
           if ((event.metaKey || event.ctrlKey) && ['[', ']'].includes(event.key)) { event.preventDefault(); event.stopPropagation(); navigate(event.key === '[' ? -1 : 1); }
         } },
@@ -2200,12 +2260,13 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.locate'), 'aria-label': t('tree.locate'), disabled: !target || !files?.includes(target.path), onClick: () => { setFilter(''); setRevealRevision(value => value + 1); } }, lucideSvg([h('circle', { cx: 12, cy: 12, r: 6 }), h('path', { d: 'M12 2v6m0 8v6M2 12h6m8 0h6' })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.findDirectory'), 'aria-label': t('tree.findDirectory'), onClick: () => onFindInFiles('') }, searchGlyph(16))),
           treeError ? h('div', { className: 'jb-notice' }, treeError) : files === null ? h('div', { className: 'jb-tree-hint' }, t('loading')) : h(WorkspaceTree, { files, changes, selectedPath: target?.path, onSelect: openFile, onMenu: fileMenu, filter, revealRevision, t })),
-        h(PaneDivider, { layout: paneLayout, t }),
+        !paneOnly ? h(PaneDivider, { layout: paneLayout, t }) : null,
         h('div', { className: 'jb-reader-layout' }, h('div', { className: 'jb-reader-workspace', 'data-class-dock': classDock },
-        h('div', { ref: detailRef, tabIndex: -1, className: 'jb-detail', 'aria-busy': commitPreview ? undefined : loading },
+        h('div', { className: 'jb-editors-split', 'data-split': !paneOnly && Boolean(splitHost.split), 'data-axis': splitHost.split?.axis, 'data-reverse': splitHost.split?.reverse },
+        h('div', { ref: detailRef, tabIndex: -1, className: 'jb-detail jb-editor-primary', 'data-editor-group': group, ...splitHost.handlers(group), 'aria-busy': commitPreview ? undefined : loading },
           commitPreview ? h(CommitFilePreview, { key: commitPreview.hash + ':' + commitPreview.file.path, cwd, preview: commitPreview, t, onClose: onCloseCommitPreview, ...commitReview }) : null,
           h('div', { className: 'jb-editor-source', hidden: Boolean(commitPreview) },
-          h(SourceTabs, { paths: openPaths, activePath: target?.path, labels: libraryLabels, panelId, t, onSelect: selectTab, onClose: closeTabs, onMenu: setMenu, onFindInFiles }),
+          h(SourceTabs, { paths: openPaths, activePath: target?.path, labels: libraryLabels, panelId, t, group, splitHost, onSelect: selectTab, onClose: closeTabs, onMenu: setMenu, onFindInFiles }),
           h('div', { className: 'jb-editor-title' }, (loaded?.path ?? target?.path) ? fileIconGlyph(loaded?.path ?? target.path, false) : null,
             h('span', { className: 'jb-diffpath', title: content?.displayPath ?? loaded?.path ?? target?.path }, content?.displayPath ?? loaded?.path ?? target?.path),
             shownView === 'diff' ? h('span', null, t('files.diff')) : null),
@@ -2225,14 +2286,18 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                           const line = event.target.closest('[data-new-line]')?.dataset.newLine;
                           if (line !== undefined) setHistory(old => ({ ...old, items: old.items.map((item, index) => index === old.index ? { ...item, line: Number(line) - 1, character: 0 } : item) }));
                           setView('source');
-                        } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {}, path: loaded?.path ?? target?.path }))))),
+                        } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {}, path: loaded?.path ?? target?.path })))),
+        splitHost.over?.group === group ? h('div', { className: 'jb-editor-drop', 'data-side': splitHost.over.side, 'aria-hidden': true }, t('files.drop' + splitHost.over.side[0].toUpperCase() + splitHost.over.side.slice(1))) : null),
+        !paneOnly && splitHost.split ? h(PaneDivider, { layout: paneLayout, t, pane: 'editor' }) : null,
+        !paneOnly && splitHost.split ? h('div', { className: 'jb-editor-secondary' }, h(CodeBrowser, { key: 'secondary', cwd, changes, initialTarget: splitHost.split.initial, paneOnly: true, groupHost: splitHost, sharedDebug: controller,
+          onActiveFile, onShowDebug, onFindInFiles, onExplain, desktopPaths, t })) : null),
         classSeed ? h(PaneDivider, { layout: paneLayout, t, pane: 'classes' }) : null,
         classSeed ? h(ClassGraphWindow, { cwd, seed: classSeed, currentPath: target?.path ?? null, files, external: target?.path?.startsWith('dsh-library://') === true, dock: classDock, onDock: setClassDock, onOpen: destination => visit(destination), onClose: () => { setClassSeed(null); reader.current?.focus(); }, t }) : null))),
         debugHost ? createPortal(h(DebugPane, { debug, t, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
           { id: 'source', label: t('files.read'), shortcut: 'Enter / F4', disabled: !frame.path, run: () => debug.selectFrame(frame.id, true) },
           ...debugControlItems(debug, t),
         ] }) }), debugHost) : null,
-        debug.evaluation && debug.session?.state === 'paused' && debug.selectedFrameId != null ? h(EvaluationDialog, { key: `${cwd}:${debug.session.id}:${debug.session.pauseId}:${debug.selectedFrameId}`, debug, t, onClose: closeEvaluation }) : null,
+        !paneOnly && debug.evaluation && debug.session?.state === 'paused' && debug.selectedFrameId != null ? h(EvaluationDialog, { key: `${cwd}:${debug.session.id}:${debug.session.pauseId}:${debug.selectedFrameId}`, debug, t, onClose: closeEvaluation }) : null,
         manualCopy !== null ? h(CopyPathDialog, { value: manualCopy, t, onClose: closeCopy }) : null,
         localOpenError ? h('div', { className: 'jb-layout-notice', role: 'alert' }, t('tree.openLocalFailed')) : null,
         copyNotice ? h('div', { className: 'jb-layout-notice', role: 'status' }, copyNotice) : null,
@@ -2270,6 +2335,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const showDebug = useCallback(() => tools.show('debug'), [tools.show]);
       const toolsId = React.useId();
       const [sourceTarget, setSourceTarget] = useState(null);
+      const [activeFile, setActiveFile] = useState(null);
       const [searchScope, setSearchScope] = useState(''), [findRequest, setFindRequest] = useState(0);
       const openFind = useCallback(scope => { setSearchScope(scope); setFindRequest(value => value + 1); tools.show('find'); }, [tools.show]);
       const [status, setStatus] = useState(null);
@@ -2335,6 +2401,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
 
       useEffect(() => {
         setStatus(null);
+        setActiveFile(null);
         setLog(null);
         setDiff(null);
         setSelected(null);
@@ -2500,7 +2567,10 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
               : null)
           : null,
         h('span', { className: 'jb-spacer' }),
-        ...reviewActions(t, cwd === null || reviewSending, (intent) => openReview(intent, { kind: 'workspace' })),
+        ...reviewActions(t, cwd === null || reviewSending || (tab === 'log' && detailLoading), intent => openReview(intent,
+          commitPreview || (tab === 'log' && detail?.found) ? { kind: 'commit', detail }
+            : tab === 'changes' && selected ? { kind: 'diff', entry: selected }
+              : { kind: 'workspace', ...(activeFile ? { path: activeFile } : {}) })),
         h('button', { type: 'button', className: 'jb-tb-btn', title: t('panel'), disabled: statusLoading || cwd === null, onClick: () => reload() }, refreshGlyph()));
 
       const toolLabels = { find: t('search.title'), changes: t('tabs.changes'), log: t('tabs.log'), cards: t('cards.title'), debug: t('debug.title'), terminal: t('terminal.title') };
@@ -2553,7 +2623,6 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                   review: { open: reviewOpen && reviewTarget?.kind === 'diff', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
                   codeSet: reviewCode,
                   onToggleCode: toggleReviewCode,
-                  onReview: (intent) => openReview(intent, { kind: 'diff', entry: selectedEntry }),
                   onReviewSend: sendReview,
                   onReviewClose: closeReview,
                   onClearCode: clearReviewCode,
@@ -2592,7 +2661,6 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
               review: { open: !commitPreview && reviewOpen && reviewTarget?.kind === 'commit', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
               codeSet: reviewCode,
               onToggleCode: toggleReviewCode,
-              onReview: (intent) => openReview(intent, { kind: 'commit', detail }),
               onReviewSend: sendReview,
               onReviewClose: closeReview,
               onClearCode: clearReviewCode,
@@ -2605,9 +2673,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         reviewOpen && reviewTarget?.kind === 'workspace' ? h(ReviewComposer, { t, intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError, code: reviewCode, onSubmit: sendReview, onClearCode: clearReviewCode, onClose: closeReview }) : null,
         h('div', { className: 'jb-content' },
           status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat' },
-            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, commitPreview, onCloseCommitPreview: closeCommitPreview,
+            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, commitPreview, onCloseCommitPreview: closeCommitPreview, onActiveFile: setActiveFile,
               commitReview: { review: { open: reviewOpen && reviewTarget?.kind === 'commit', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
-                codeSet: reviewCode, onToggleCode: toggleReviewCode, onReview: intent => openReview(intent, { kind: 'commit', detail }), onReviewSend: sendReview, onReviewClose: closeReview, onClearCode: clearReviewCode }, debugHost, onShowDebug: showDebug, onFindInFiles: openFind,
+                codeSet: reviewCode, onToggleCode: toggleReviewCode, onReviewSend: sendReview, onReviewClose: closeReview, onClearCode: clearReviewCode }, debugHost, onShowDebug: showDebug, onFindInFiles: openFind,
               onExplain: path => openReview('explain', { kind: 'workspace', path }), desktopPaths: props.desktopPaths, t })) : notice),
         h('div', { className: 'jb-tools-window', hidden: tab === null, style: { height: tools.height } },
           h('div', { className: 'jb-tools-divider', ...tools.divider }),
