@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.5.0
+
+Python class nodes include fields, annotations, and field-type links; hierarchy rows navigate to referenced type definitions. Git history places commits on the left and changed files on the right. Selecting a file opens a syntax-highlighted side-by-side diff above, with unified mode available; closing it restores the source and caret. Reload or restart Harness after updating. Existing personal cards and project configuration need no migration.
+
 ## 1.4.6
 
 Fix definition navigation pointing to moved files after code reorganization. When a built-in language server returns a missing definition file, the workbench restarts that workspace’s server and retries once. Reload or restart Harness after updating.

@@ -305,6 +305,16 @@ async function handleDiff(ctx, request, signal) {
   const both = query.get('both') === '1';
   const untracked = query.get('untracked') === '1';
   await requireWorkspacePath(ctx, cwd, signal);
+  if (query.has('commit')) {
+    const hash = requireCommitHash(query.get('commit'));
+    const meta = await runGit(ctx, cwd, ['log', '-1', '--format=%P', hash], { signal });
+    const parents = meta.stdout.trim().split(' ').filter(Boolean);
+    const args = parents.length > 0
+      ? ['diff', '--no-ext-diff', '--no-renames', parents[0], hash, '--', path]
+      : ['show', '--no-ext-diff', '--no-renames', '--format=', hash, '--', path];
+    const result = await runGit(ctx, cwd, args, { signal });
+    return json({ text: result.stdout, binary: /^Binary files .* differ$/m.test(result.stdout) || /^GIT binary patch$/m.test(result.stdout) });
+  }
   if (untracked) {
     const target = await ctx.fs.resolve(path, { cwd, signal });
     const text = await ctx.fs.readText(target, signal);
@@ -361,27 +371,19 @@ async function handleCommit(ctx, request, signal) {
   });
   if (meta.stdout === '') return json({ found: false });
   const fields = meta.stdout.split('\x1f');
-  // `--numstat` replaces the patch, so stats and the diff text need two runs.
-  const statsOut = await runGit(ctx, cwd, ['show', '--no-ext-diff', '--numstat', '--format=', hash], {
-    allowed: [0, 128],
-    signal,
-  });
-  const files = [];
-  for (const line of statsOut.stdout.split('\n')) {
-    const match = /^(\d+)\t(\d+)\t(.+)$/.exec(line);
-    if (!match) continue;
-    let path = match[3];
-    const arrow = path.indexOf(' => ');
-    if (arrow !== -1) path = path.slice(arrow + 4);
-    if (path.startsWith('"') && path.endsWith('"') && path.length >= 2) {
-      try { path = JSON.parse(path); } catch { path = path.slice(1, -1); }
-    }
-    files.push({ path, ins: Number(match[1]), del: Number(match[2]) });
-  }
   const parents = (fields[6] ?? '').split(' ').filter(Boolean);
+  const statsArgs = parents.length > 0
+    ? ['diff', '--no-ext-diff', '--no-renames', '--numstat', '-z', parents[0], hash]
+    : ['show', '--no-ext-diff', '--no-renames', '--numstat', '-z', '--format=', hash];
+  const statsOut = await runGit(ctx, cwd, statsArgs, { signal });
+  const files = [];
+  for (const record of statsOut.stdout.split('\0')) {
+    const match = /^(\d+|-)\t(\d+|-)\t([\s\S]+)$/.exec(record);
+    if (match) files.push({ path: match[3], ins: Number(match[1]) || 0, del: Number(match[2]) || 0, ...(match[1] === '-' ? { binary: true } : {}) });
+  }
   // Patch: for a root commit use `git show`; otherwise diff against the first
   // parent (merge commits do not emit a usable combined patch by default).
-  const patchOut = parents.length > 0
+  const patchOut = query.get('summary') === '1' ? { stdout: '' } : parents.length > 0
     ? await runGit(ctx, cwd, ['diff', `${hash}^..${hash}`], { allowed: [0, 128], signal })
     : await runGit(ctx, cwd, ['show', '--no-ext-diff', '--format=', hash], { allowed: [0, 128], signal });
   return json({

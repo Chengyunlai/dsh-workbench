@@ -24,3 +24,13 @@ test('cyclic and dense class graphs terminate within the hierarchy row budget', 
  const dense=classHierarchyRows({nodes,edges},new Map());assert.equal(dense.rows.length,300);assert.equal(dense.limited,true);
  assert.deepEqual(classHierarchyRows({nodes:[],edges:[]},new Map()),{rows:[],limited:false});
 });
+
+test('field types remain distinct from inheritance and can target related source', () => {
+ const owner={...node('Message'),fields:[{name:'role',annotation:'Role',line:3,character:1}]};
+ const graph={nodes:[owner,node('Role')],edges:[{from:'Message',to:'Role',kind:'field',fields:['role']}]};
+ const result=classHierarchyRows(graph,new Map([['Message',true]]));
+ const field=result.rows.find(row=>row.kind==='field');
+ assert.equal(field.target.id,'Role');
+ assert.equal(field.member.name,'role');
+ assert.deepEqual(result.rows.filter(row=>row.kind==='class').map(row=>row.depth),[0,0]);
+});

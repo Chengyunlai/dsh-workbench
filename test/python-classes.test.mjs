@@ -151,3 +151,21 @@ test('class scanning includes workspace Python declaration files and resolves th
  const graph=await h.call('classes');assert.equal(graph.status,200);assert.equal(graph.total,2);
  assert.ok(graph.nodes.some(node=>node.path==='contracts.pyi'&&node.name==='Port'));assert.equal(graph.edges.length,1);
 });
+
+test('annotated fields connect local and imported types without adding inheritance', () => {
+ const graph=linkPythonClasses([
+  parsed('types.py','class Part: pass\n'),
+  parsed('message.py','from types import Part as Segment\nclass Role: pass\nclass Message:\n role: Role\n parts: tuple[Segment, ...]\n content: str\n'),
+ ]);
+ const byName=name=>graph.nodes.find(node=>node.name===name);
+ const message=byName('Message');
+ assert.deepEqual(message.fields.map(field=>[field.name,field.annotation]),[['role','Role'],['parts','tuple[Segment, ...]'],['content','str']]);
+ assert.deepEqual(graph.edges.map(edge=>[edge.kind,edge.from,edge.to,edge.fields]),[
+  ['field',message.id,byName('Role').id,['role']],['field',message.id,byName('Part').id,['parts']],
+ ]);
+ assert.equal(message.kind,'class');
+ assert.deepEqual(message.abstractMethods,[]);
+ const layout=classGraphLayout(graph,message.id);
+ assert.equal(layout.nodes.length,3);
+ assert.ok(layout.nodes.find(node=>node.id===message.id).height>=142);
+});

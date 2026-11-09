@@ -6,6 +6,7 @@
 export function classHierarchyRows(selection, expansion) {
   const nodes = new Map(selection.nodes.map(node => [node.id, node])), children = new Map(), parented = new Set();
   for (const edge of selection.edges) {
+    if (edge.kind === 'field') continue;
     if (!nodes.has(edge.from) || !nodes.has(edge.to)) continue;
     const list = children.get(edge.to) ?? []; list.push(edge); children.set(edge.to, list); parented.add(edge.from);
   }
@@ -18,12 +19,20 @@ export function classHierarchyRows(selection, expansion) {
   const visit = (node, depth, parentKey, edge) => {
     if (limited) return;
     const key = parentKey + '/' + node.id, reference = seen.has(node.id), derived = children.get(node.id) ?? [];
-    const expandable = !reference && Boolean(derived.length || node.methods.length || node.unresolved.length);
+    const expandable = !reference && Boolean(derived.length || node.fields?.length || node.methods.length || node.unresolved.length);
     const expanded = expandable && (expansion.get(node.id) ?? derived.length > 0);
     if (!add({ key, parentKey, node, depth, edge, reference, expandable, expanded, kind: 'class' })) return;
     seen.add(node.id);
     if (!expanded) return;
     for (const child of derived) visit(nodes.get(child.from), depth + 1, key, child);
+    for (const field of node.fields ?? []) {
+      const relations = selection.edges.filter(edge => edge.kind === 'field' && edge.from === node.id && edge.fields.includes(field.name));
+      const targets = relations.length ? relations.map(edge => nodes.get(edge.to)) : [null];
+      for (const target of targets) {
+        if (!add({ key: key + '/field:' + field.name + ':' + (target?.id ?? ''), parentKey: key, node, member: field, target,
+          name: field.name + ': ' + (targets.length > 1 ? target.qualified : field.annotation), depth: depth + 1, kind: 'field' })) break;
+      }
+    }
     for (const method of node.methods) if (!add({ key: key + '/method:' + method.line + ':' + method.character, parentKey: key, node, member: method, depth: depth + 1, kind: 'method' })) break;
     for (const name of node.unresolved) if (!add({ key: key + '/unresolved:' + name, parentKey: key, node, name, depth: depth + 1, kind: 'unresolved' })) break;
   };
@@ -44,7 +53,7 @@ export function createClassHierarchyUI(React) {
     const current = rows[index];
     const select = row => { setActive(row.key); if (row.kind === 'class') onSelect(row.node.id); };
     const toggle = (row, value = !row.expanded) => onExpansion(new Map(expansion).set(row.node.id, value));
-    const open = row => { if (row.kind !== 'unresolved') onOpen(row.node, row.member ?? row.node); };
+    const open = row => { if (row.kind !== 'unresolved') onOpen(row.target ?? row.node, row.target ?? row.member ?? row.node); };
     useLayoutEffect(() => { setActive(rows.find(row => row.node.id === focus)?.key ?? null); }, [revealKey]);
     useLayoutEffect(() => { root.current?.querySelector('[data-active=true]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [active]);
     return h('div', { className: 'jb-class-tree-seat', id: panelId, role: 'tabpanel', 'aria-labelledby': labelId }, limited ? h('div', { role: 'status', className: 'jb-class-hint' }, t('classes.treeLimited')) : null,
@@ -64,15 +73,15 @@ export function createClassHierarchyUI(React) {
             else { const parent = rows.find(row => row.key === current.parentKey); if (parent) select(parent); }
           } else if (key !== ' ') select(rows[key === 'Home' ? 0 : key === 'End' ? rows.length - 1 : Math.max(0, Math.min(rows.length - 1, index + (key === 'ArrowUp' ? -1 : 1)))]);
         } }, ...rows.map((row, at) => {
-          const { node, member } = row, label = row.kind === 'class' ? node.qualified : row.kind === 'method' ? member.name + '()' : row.name;
+          const { node, member } = row, label = row.kind === 'class' ? node.qualified : row.kind === 'field' ? row.name : row.kind === 'method' ? member.name + '()' : row.name;
           const title = row.kind === 'method' ? `${member.name}(${member.parameters ?? ''})${member.returns ? ' → ' + member.returns : ''}` : row.kind === 'unresolved' ? t('classes.unresolved') + ': ' + row.name : node.path + ':' + (node.line + 1);
           return h('div', { id: id + '-' + at, key: row.key, role: 'treeitem', className: 'jb-class-tree-row', 'data-active': at === index, 'data-kind': row.kind === 'class' ? node.kind : row.kind,
             'aria-label': label, 'aria-level': row.depth + 1, 'aria-selected': at === index, 'aria-expanded': row.expandable ? row.expanded : undefined, 'aria-disabled': row.kind === 'unresolved' || undefined,
             style: { paddingLeft: 5 + row.depth * 16 }, title,
-            onClick: () => { select(row); root.current?.focus({ preventScroll: true }); if (row.kind === 'method') open(row); },
+            onClick: () => { select(row); root.current?.focus({ preventScroll: true }); if (row.kind === 'method' || row.kind === 'field') open(row); },
             onDoubleClick: () => { if (row.kind === 'class') open(row); } },
             row.expandable ? h('button', { type: 'button', tabIndex: -1, className: 'jb-class-tree-toggle', 'aria-label': t(row.expanded ? 'classes.collapse' : 'classes.expand', { name: node.qualified }), onClick: event => { event.stopPropagation(); select(row); toggle(row); root.current?.focus({ preventScroll: true }); } }, row.expanded ? '▾' : '▸') : h('span', { className: 'jb-class-tree-toggle', 'aria-hidden': true }, row.reference ? '↗' : ''),
-            h('span', { className: 'jb-class-tree-symbol', 'aria-hidden': true }, row.kind === 'method' ? 'm' : row.kind === 'unresolved' ? '?' : node.kind === 'protocol' ? 'P' : ['abstract','abc'].includes(node.kind) ? 'A' : 'C'),
+            h('span', { className: 'jb-class-tree-symbol', 'aria-hidden': true }, row.kind === 'field' ? 'f' : row.kind === 'method' ? 'm' : row.kind === 'unresolved' ? '?' : node.kind === 'protocol' ? 'P' : ['abstract','abc'].includes(node.kind) ? 'A' : 'C'),
             h('span', { className: 'jb-class-tree-name' }, label),
             row.edge?.kind === 'factory' ? h('span', { className: 'jb-class-tree-badge', title: t('classes.factoryHint') }, t('classes.factoryShort')) : null,
             row.reference ? h('span', { className: 'jb-class-tree-badge', title: t('classes.reference') }, '↗') : null,

@@ -1939,3 +1939,87 @@ test('switching from Python to JavaScript cancels a pending class scan and ignor
  await act(async()=>complete(graph));
  const pane=ui.container.querySelector('.jb-class-window');assert.equal(pane.querySelector('.jb-class-card'),null);assert.equal(pane.querySelector('header strong').textContent,'JavaScript 类关系');
 });
+
+test('history keeps changed files beside commits and opens only the selected historical file above without replacing source', async context => {
+  const requests = [];
+  const commit = { hash: 'a'.repeat(40), short: 'aaaaaaa', subject: 'Separate message fields', author: 'Demo', email: 'demo@example.test', date: '2026-11-09T12:00:00Z', parents: [] };
+  const files = [{ path: 'src/main.ts', ins: 1, del: 1 }, { path: 'removed.py', ins: 0, del: 1 }];
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/git.log') return { ok: true, json: async () => ({ commits: [commit] }) };
+    if (url.pathname === '/api/git.commit') return { ok: true, json: async () => ({ ...commit, found: true, files, diff: '' }) };
+    if (url.pathname === '/api/git.diff' && url.searchParams.has('commit')) return { ok: true, json: async () => ({ text: url.searchParams.get('path') === 'removed.py' ? '@@ -1 +0,0 @@\n-removed historical line' : '@@ -1 +1 @@\n-old historical value\n+new historical value' }) };
+  }, requests));
+  await ui.click('src'); await ui.click('main.ts');
+  const editor = ui.editor(); await ui.caret(6);
+  await ui.click('tabs.log');
+  const row = ui.container.querySelector('.jb-logrow');
+  await act(async () => row.dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  const history = ui.container.querySelector('.jb-log');
+  assert.equal(history.firstElementChild.className, 'jb-log-list');
+  assert.equal(history.lastElementChild.className, 'jb-logdetail');
+  assert.equal(history.querySelector('.jb-diffbody'), null, 'history does not render an embedded patch');
+  assert.equal(requests.find(request => request.name === '/api/git.commit').params.get('summary'), '1');
+  assert.equal(requests.filter(request => request.name === '/api/git.diff').length, 0);
+  await act(async () => history.querySelector('.jb-dfile').click());
+  const preview = ui.container.querySelector('.jb-browser-seat .jb-commit-preview');
+  assert.ok(preview.textContent.includes('new historical value'));
+  const paired = preview.querySelector('.jb-dline-del').parentElement;
+  assert.equal(paired.firstElementChild.textContent, '1-old historical value');
+  assert.equal(paired.lastElementChild.textContent, '1+new historical value');
+  assert.equal(ui.editor(), editor, 'working-tree editor remains mounted');
+  assert.equal(ui.container.querySelector('.jb-editor-source').hidden, true);
+  assert.equal(requests.find(request => request.name === '/api/git.diff').params.get('commit'), commit.hash);
+  await ui.click('diff.split');
+  assert.equal(preview.querySelector('.jb-split-diff'), null);
+  await act(async () => history.querySelectorAll('.jb-dfile')[1].click());
+  assert.ok(ui.container.querySelector('.jb-commit-preview').textContent.includes('removed historical line'));
+  assert.equal(history.querySelectorAll('.jb-dfile')[1].getAttribute('aria-pressed'), 'true');
+  await ui.click('log.closeDiff');
+  assert.equal(ui.container.querySelector('.jb-editor-source').hidden, false);
+  assert.equal(ui.editor(), editor);
+  assert.equal(editor.state.selection.main.head, 6);
+  assert.equal(requests.filter(request => request.name === '/api/git.source' && request.params.get('path') === 'removed.py').length, 0);
+});
+
+test('a delayed commit response cannot replace a newer selection and closing a diff cancels its read', async context => {
+  const pending = new Map(), requests = [];
+  const commits = ['a', 'b'].map(letter => ({ hash: letter.repeat(40), short: letter.repeat(7), subject: letter, author: 'Demo', date: '2026-11-09', parents: [] }));
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/git.log') return { ok: true, json: async () => ({ commits }) };
+    if (url.pathname === '/api/git.commit') return new Promise(resolve => pending.set(url.searchParams.get('hash'), resolve));
+    if (url.pathname === '/api/git.diff') return new Promise(resolve => pending.set('diff', resolve));
+  }, requests));
+  await ui.click('tabs.log');
+  await act(async () => ui.container.querySelectorAll('.jb-logrow')[0].click());
+  await act(async () => ui.container.querySelectorAll('.jb-logrow')[1].click());
+  const response = commit => ({ ok: true, json: async () => ({ ...commit, found: true, files: [{ path: commit.subject + '.py', ins: 1, del: 0 }] }) });
+  await act(async () => pending.get(commits[1].hash)(response(commits[1])));
+  await act(async () => pending.get(commits[0].hash)(response(commits[0])));
+  assert.equal(ui.container.querySelector('.jb-dfile').title, 'b.py');
+  assert.equal(requests.find(request => request.name === '/api/git.commit').signal.aborted, true);
+  await act(async () => ui.container.querySelector('.jb-dfile').click());
+  await ui.click('log.closeDiff');
+  assert.equal(requests.find(request => request.name === '/api/git.diff').signal.aborted, true);
+  await act(async () => pending.get('diff')({ ok: true, json: async () => ({ text: '+stale' }) }));
+  assert.equal(ui.container.querySelector('.jb-commit-preview'), null);
+});
+
+test('historical and working-tree diffs keep syntax colors in split and unified views', async context => {
+  const commit = { hash: 'c'.repeat(40), short: 'ccccccc', subject: 'Update Python model', author: 'Demo', date: '2026-11-09', parents: [] };
+  const patch = '@@ -1,2 +1,2 @@\n class Message:\n-    content = "before"\n+    content = "<after>"';
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/git.log') return { ok: true, json: async () => ({ commits: [commit] }) };
+    if (url.pathname === '/api/git.commit') return { ok: true, json: async () => ({ ...commit, found: true, files: [{ path: 'src/message.py', ins: 1, del: 1 }] }) };
+    if (url.pathname === '/api/git.diff') return { ok: true, json: async () => ({ text: patch }) };
+  }));
+  await ui.click('tabs.log'); await act(async () => ui.container.querySelector('.jb-logrow').click());
+  await act(async () => ui.container.querySelector('.jb-dfile').click());
+  const preview = ui.container.querySelector('.jb-commit-preview');
+  assert.equal(preview.querySelector('.jb-syntax-keyword').textContent, 'class');
+  assert.equal(preview.querySelector('.jb-dline-add .jb-syntax-string').textContent, '"<after>"');
+  assert.equal(preview.querySelector('after'), null);
+  await ui.click('diff.split');
+  assert.equal(preview.querySelector('.jb-syntax-keyword').textContent, 'class');
+  assert.equal(preview.querySelector('.jb-dline-del .jb-syntax-string').textContent, '"before"');
+  assert.ok(ui.container.querySelector('style').textContent.includes('.jb-diffbody .jb-syntax-keyword{color:var(--shiki-token-keyword)}'));
+});
