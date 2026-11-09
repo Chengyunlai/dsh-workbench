@@ -3,6 +3,7 @@ import { createMessageConnection, StreamMessageReader, StreamMessageWriter } fro
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const LANGUAGES = { '.go': 'go', '.java': 'java', '.py': 'python', '.pyi': 'python' };
 const failure = (message, code = 'LANGUAGE_SERVER_FAILED', status = 502) => Object.assign(new Error(message), { code, status });
@@ -48,6 +49,15 @@ export function createLanguageServers(ctx, specs, config) {
   let disposed = false;
   const track = promise => {
     pending.add(promise); promise.then(() => pending.delete(promise), () => pending.delete(promise)); return promise;
+  };
+  const hasRemovedTarget = async (locations, signal) => {
+    for (const location of locations) {
+      const uri = new URL(location.uri);
+      if (uri.protocol !== 'file:') continue;
+      const file = await ctx.fs.resolve(fileURLToPath(uri), { signal });
+      if ((await ctx.fs.stat(file, signal))?.type !== 'file') return true;
+    }
+    return false;
   };
 
   async function start(language, source, signal) {
@@ -143,7 +153,15 @@ export function createLanguageServers(ctx, specs, config) {
         if (!entry.session || entry.session.dead) {
           await entry.session?.close(); entry.session = await start(language, source, signal);
         }
-        return entry.session.definition(source, position, signal, typeDefinition);
+        const locations = await entry.session.definition(source, position, signal, typeDefinition);
+        if (!await hasRemovedTarget(locations, signal)) return locations;
+        // Imported modules remain cached across document close/open without filesystem watchers.
+        await entry.session.close();
+        signal.throwIfAborted();
+        entry.session = await start(language, source, signal);
+        const refreshed = await entry.session.definition(source, position, signal, typeDefinition);
+        if (await hasRemovedTarget(refreshed, signal)) throw failure('language server returned a missing definition file', 'LANGUAGE_SERVER_PROTOCOL');
+        return refreshed;
       });
       // An aborted waiter must not allow later requests to overtake the active query.
       entry.tail = previous.then(() => query).then(() => {}, () => {});

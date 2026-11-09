@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.4.6
+
+Fix definition navigation pointing to moved files after code reorganization. When a built-in language server returns a missing definition file, the workbench restarts that workspace’s server and retries once. Reload or restart Harness after updating.
+
 ## 1.4.5
 
 The file tree filter and toolbar stay visible while scrolling, with space reserved when revealing a file. This release also includes marked 18.1.3 and schemastery 3.19.0 updates. Reload or restart Harness after updating.

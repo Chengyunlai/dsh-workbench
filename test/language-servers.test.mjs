@@ -80,3 +80,18 @@ test('unload aborts active server queries and waits for exit before removing Jav
   assert.equal((await query).status, 408);
   await assert.rejects(access(state), { code: 'ENOENT' });
 });
+
+test('Python navigation refreshes cached imports after a definition is moved', async t => {
+  const { mkdir, rename } = await import('node:fs/promises');
+  const h = await fixture(t);
+  await mkdir(join(h.root, 'pkg'));
+  await writeFile(join(h.root, 'pkg/__init__.py'), 'from .old import ModelMessage\n');
+  await writeFile(join(h.root, 'pkg/old.py'), 'class ModelMessage: pass\n');
+  await writeFile(join(h.root, 'main.py'), 'from pkg import ModelMessage\nModelMessage()\n');
+  assert.equal((await h.definition('main.py', 1, 'ModelMessage')).targets[0]?.path, 'pkg/old.py');
+  await rename(join(h.root, 'pkg/old.py'), join(h.root, 'pkg/new.py'));
+  await writeFile(join(h.root, 'pkg/__init__.py'), 'from .new import ModelMessage\n');
+  const result = await h.definition('main.py', 1, 'ModelMessage');
+  assert.equal(result.status, 200, JSON.stringify(result));
+  assert.equal(result.targets[0]?.path, 'pkg/new.py');
+});
