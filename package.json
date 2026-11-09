@@ -78,7 +78,7 @@
     }
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "3.18.5",
+    "@deepseek-ai/schemastery": "3.19.0",
     "@lezer/python": "1.1.19",
     "pyright": "1.1.414",
     "typescript": "6.0.3",
