@@ -95,3 +95,94 @@ test('Python navigation refreshes cached imports after a definition is moved', a
   assert.equal(result.status, 200, JSON.stringify(result));
   assert.equal(result.targets[0]?.path, 'pkg/new.py');
 });
+
+test('Python import navigation recovers a cached missing module after the file is created', async t => {
+  const { mkdir } = await import('node:fs/promises');
+  const h = await fixture(t);
+  await mkdir(join(h.root, 'pkg'));
+  await writeFile(join(h.root, 'pkg/__init__.py'), '');
+  await writeFile(join(h.root, 'main.py'), 'from pkg.transport import read\nread()\n');
+  let starts = 0;
+  const spawn = h.ctx.subprocess.spawn;
+  h.ctx.subprocess.spawn = spec => { if (spec.stdio.stdout === 'pipe') starts++; return spawn(spec); };
+  const missing = await h.definition('main.py', 0, 'transport');
+  assert.equal(missing.status, 200); assert.deepEqual(missing.targets, []);
+  assert.equal(starts, 2, 'a genuinely unresolved definition is retried only once');
+  await h.definition('main.py', 0, 'transport');
+  assert.equal(starts, 2, 'the same stable empty query does not repeatedly restart the server');
+  await writeFile(join(h.root, 'pkg/transport.py'), 'def read(): return 1\n');
+  let found;
+  const deadline = Date.now() + 5000;
+  do {
+    found = await h.definition('main.py', 0, 'transport');
+    if (found.targets?.[0]?.path === 'pkg/transport.py') break;
+    await new Promise(resolve => setTimeout(resolve, 20));
+  } while (Date.now() < deadline);
+  assert.equal(found.status, 200, JSON.stringify(found));
+  assert.equal(found.targets[0]?.path, 'pkg/transport.py');
+  assert.equal(starts, 3, 'the dependency change invalidates the cached empty import result');
+  assert.equal((await h.definition('main.py', 1, 'read')).targets[0]?.path, 'pkg/transport.py');
+});
+
+test('dependency edits invalidate an existing re-export target and definition line without deleting the old file', { timeout: 15000 }, async t => {
+  const { mkdir } = await import('node:fs/promises');
+  const h = await fixture(t);
+  await mkdir(join(h.root, 'pkg'));
+  await writeFile(join(h.root, 'pkg/__init__.py'), 'from .first import Model\n');
+  await writeFile(join(h.root, 'pkg/first.py'), 'class Model: pass\n');
+  await writeFile(join(h.root, 'pkg/second.py'), 'class Model: pass\n');
+  await writeFile(join(h.root, 'main.py'), 'from pkg import Model\nModel()\n');
+  assert.equal((await h.definition('main.py', 1, 'Model')).targets[0]?.path, 'pkg/first.py');
+  const reaches = async (path, line) => {
+    let result; const deadline = Date.now() + 5000;
+    do {
+      result = await h.definition('main.py', 1, 'Model');
+      if (result.targets?.[0]?.path === path && result.targets[0].line === line) return;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    } while (Date.now() < deadline);
+    assert.fail('dependency edit was not reflected: ' + JSON.stringify(result));
+  };
+  await writeFile(join(h.root, 'pkg/__init__.py'), 'from .second import Model\n');
+  await reaches('pkg/second.py', 0);
+  await writeFile(join(h.root, 'pkg/second.py'), '# moved down\n\nclass Model: pass\n');
+  await reaches('pkg/second.py', 2);
+});
+
+test('workspace refresh resets navigation even when the dependency directory is excluded from watching', async t => {
+  const { mkdir } = await import('node:fs/promises');
+  const h = await fixture(t, null, { navigationWatchExcludedDirectories: ['.git', 'pkg'] });
+  await mkdir(join(h.root, 'pkg'));
+  await writeFile(join(h.root, 'pkg/__init__.py'), 'from .first import Model\n');
+  await writeFile(join(h.root, 'pkg/first.py'), 'class Model: pass\n');
+  await writeFile(join(h.root, 'pkg/second.py'), 'class Model: pass\n');
+  await writeFile(join(h.root, 'main.py'), 'from pkg import Model\nModel()\n');
+  assert.equal((await h.definition('main.py', 1, 'Model')).targets[0]?.path, 'pkg/first.py');
+  await writeFile(join(h.root, 'pkg/__init__.py'), 'from .second import Model\n');
+  assert.equal((await h.definition('main.py', 1, 'Model')).targets[0]?.path, 'pkg/first.py', 'control: unchanged server retains its cached dependency');
+  const denied = await h.call('refresh', { cwd: h.base }, { method: 'POST' });
+  assert.equal(denied.status, 403);
+  assert.equal((await h.call('status')).capabilities.workspaceRefresh, true);
+  const refresh = await h.call('refresh', {}, { method: 'POST' });
+  assert.equal(refresh.status, 200); assert.equal(refresh.resetServices, 1);
+  assert.equal((await h.definition('main.py', 1, 'Model')).targets[0]?.path, 'pkg/second.py');
+});
+
+test('workspace refresh cancels and drains a running definition before resetting its service', { timeout: 10000 }, async t => {
+  const h = await fixture(t, null, { languageServers: { python: server('hang') } });
+  await writeFile(join(h.root, 'main.py'), 'example()');
+  let started; const ready = new Promise(resolve => { started = resolve; });
+  const spawn = h.ctx.subprocess.spawn;
+  h.ctx.subprocess.spawn = spec => {
+    const handle = spawn(spec);
+    if (spec.stdio.stdout === 'pipe') {
+      const reader = new StreamMessageReader(handle.stdout);
+      reader.listen(message => { if (message.method === 'test/queryStarted') started(); });
+      t.after(() => reader.dispose());
+    }
+    return handle;
+  };
+  const query = h.definition('main.py', 0, 'example'); await ready;
+  const refresh = await h.call('refresh', {}, { method: 'POST' });
+  assert.equal(refresh.status, 200);
+  assert.equal((await query).code, 'LANGUAGE_SERVER_REFRESHED');
+});

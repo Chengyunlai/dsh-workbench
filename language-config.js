@@ -35,6 +35,7 @@ export const Config = Schema.object({
   languageServers: Schema.dict(ServerConfig).default({}),
   useInstalledServers: Schema.boolean().default(true),
   navigationTimeoutMs: Schema.number().step(1).min(1000).max(2147483647).default(120000),
+  navigationWatchExcludedDirectories: Schema.array(Schema.string()).default(['.git', '.dsh', '.tools', 'node_modules', '.venv', 'venv', '__pycache__']),
   navigationMaxLibrarySources: Schema.number().step(1).min(1).max(4096).default(256),
   serverKillGraceMs: Schema.number().step(1).min(1).max(2147483647).default(1500),
 });

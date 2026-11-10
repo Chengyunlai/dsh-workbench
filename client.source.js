@@ -242,6 +242,10 @@ window.__ModuleLoader__.load({
       'files.serverTimeout': 'Code navigation timed out. Check the project and language-server configuration, or increase the navigation timeout in plugin settings.',
       'files.serverFailed': 'The language server could not complete navigation. Check the project configuration and try again: {message}',
       'files.changed': 'The file changed. Reopen it before navigating.',
+      'repo.refreshLimited': 'Files and Git were refreshed. This plugin backend cannot reset navigation caches; update or reload the plugin in Plugins to enable full recovery.',
+      'repo.refresh': 'Refresh workspace', 'repo.refreshing': 'Refreshing workspace…', 'repo.refreshFailed': 'Workspace refresh failed: {message}',
+      'files.workspaceChanged': 'Project files changed during navigation. Retry after the edits finish.',
+      'files.watchFailed': 'Could not monitor project changes. Check directory permissions or file watcher limits: {message}',
       'files.failed': 'Could not navigate: {message}',
       'files.more': 'Showing {shown} of {total} matching files. Refine the filter.',
       'files.read': 'Read source',
@@ -491,6 +495,10 @@ window.__ModuleLoader__.load({
       'files.serverTimeout': '代码导航超时，请检查项目与语言服务配置，或在插件设置中增加等待时间',
       'files.serverFailed': '语言服务未能完成跳转，请检查项目配置后重试：{message}',
       'files.changed': '文件已变化，请重新打开后再跳转。',
+      'repo.refreshLimited': '文件与 Git 已刷新；当前插件后端不支持重建导航缓存，可在插件管理中更新或重载插件以启用完整恢复。',
+      'repo.refresh': '刷新工作区', 'repo.refreshing': '正在刷新工作区…', 'repo.refreshFailed': '工作区刷新失败：{message}',
+      'files.workspaceChanged': '跳转过程中项目文件仍在变化，请等待整理完成后重试。',
+      'files.watchFailed': '无法监听项目变化，请检查目录权限或文件监听数量限制：{message}',
       'files.failed': '跳转失败：{message}',
       'files.more': '显示 {shown} / {total} 个匹配文件，请缩小过滤范围。',
       'files.read': '阅读源码',
@@ -1145,7 +1153,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       });
       let data = null;
       try { data = await response.json(); } catch { /* non-JSON */ }
-      if (!response.ok) throw Object.assign(new Error(data && typeof data.error === 'string' ? data.error : `HTTP ${response.status}`), { code: data?.code });
+      if (!response.ok) throw Object.assign(new Error(data && typeof data.error === 'string' ? data.error : `HTTP ${response.status}`), { code: data?.code, status: response.status });
       return data;
     }
 
@@ -1985,7 +1993,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Own source/diff requests and definition history independently of the conversation. */
-    function CodeBrowser({ cwd, changes, initialTarget, commitPreview, onCloseCommitPreview, commitReview, onActiveFile, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t, paneOnly = false, groupHost, sharedDebug }) {
+    function CodeBrowser({ cwd, changes, initialTarget, commitPreview, onCloseCommitPreview, commitReview, onActiveFile, refreshRevision = 0, refreshing = false, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t, paneOnly = false, groupHost, sharedDebug }) {
       const ownGroups = useEditorSplit();
       const splitHost = groupHost ?? ownGroups;
       const group = paneOnly ? 'secondary' : 'primary';
@@ -2047,6 +2055,22 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         }
       };
       const retain = path => setOpenPaths(paths => paths.includes(path) ? paths : [...paths, path]);
+      const refreshSeen = useRef(refreshRevision);
+      useEffect(() => {
+        if (!refreshing) return;
+        const remembered = remember();
+        if (remembered) setHistory(old => ({ ...old, items: old.items.map((item, index) => index === old.index ? { ...item, ...remembered } : item) }));
+        navigationRef.current?.abort();
+        setNavigation({ busy: false, targets: [], message: null });
+      }, [refreshing]);
+      useEffect(() => {
+        if (refreshSeen.current === refreshRevision) return;
+        refreshSeen.current = refreshRevision;
+        const remembered = remember();
+        if (remembered) setHistory(old => ({ ...old, items: old.items.map((item, index) => index === old.index ? { ...item, ...remembered } : item) }));
+        setReadRevision(value => value + 1);
+        setClassSeed(seed => seed ? { ...seed } : null);
+      }, [refreshRevision]);
       useEffect(() => {
         if (view === 'diff' && content && document.activeElement === document.body) diffRef.current?.focus();
       }, [view, content]);
@@ -2155,7 +2179,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           .then(data => { if (!controller.signal.aborted) setFiles(data.files); })
           .catch(error => { if (!controller.signal.aborted) setTreeError(error.message); });
         return () => controller.abort();
-      }, [cwd, changes]);
+      }, [cwd, changes, refreshRevision]);
       useEffect(() => { setNavigation({ busy: false, targets: [], message: target?.notice ?? null }); }, [target]);
       useEffect(() => {
         const controller = new AbortController();
@@ -2197,7 +2221,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       debug.report = error => setError(error.message);
       debug.toggle = line => { controller.setPath(debug.path); return controller.toggle(line); };
       const define = async (line, character, typeContext) => {
-        if (loading || !contentMatches) return;
+        if (refreshing || loading || !contentMatches) return;
         navigationRef.current?.abort();
         const controller = new AbortController(); navigationRef.current = controller;
         setNavigation({ busy: true, targets: [], message: null });
@@ -2215,7 +2239,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         } catch (error) {
           if (controller.signal.aborted) return;
           if (typeContext && !typeContext()) { setNavigation({ busy: false, targets: [], message: null }); return; }
-          const key = error.code === 'NAVIGATION_UNAVAILABLE' ? 'files.unavailable' : error.code === 'SOURCE_CHANGED' ? 'files.changed'
+          const key = error.code === 'LANGUAGE_SERVER_WORKSPACE_CHANGED' ? 'files.workspaceChanged' : error.code === 'LANGUAGE_SERVER_WATCH_FAILED' ? 'files.watchFailed' : error.code === 'NAVIGATION_UNAVAILABLE' ? 'files.unavailable' : error.code === 'SOURCE_CHANGED' ? 'files.changed'
             : error.code === 'LANGUAGE_SERVER_MISSING' ? 'files.serverMissing' : error.code === 'LANGUAGE_SERVER_TIMEOUT' ? 'files.serverTimeout'
               : typeof error.code === 'string' && error.code.startsWith('LANGUAGE_SERVER_') ? 'files.serverFailed' : 'files.failed';
           setNavigation({ busy: false, targets: [], message: t(key, { message: error.message }) });
@@ -2274,7 +2298,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             : navigation.busy || navigation.message ? h('div', { className: 'jb-source-notice', role: 'status' }, navigation.busy ? t('loading') : navigation.message) : null,
           h('div', { className: 'jb-source-panel', role: 'tabpanel', id: panelId, 'aria-labelledby': target ? `${panelId}-tab-${openPaths.indexOf(target.path)}` : undefined },
           !content ? h('div', { className: 'jb-diffempty', role: error ? 'alert' : undefined }, error ?? t(loading ? 'loading' : 'files.pick'))
-                : shownView === 'source' ? h(content.kind === 'image' ? ImageReader : SourceEditor, { ...(content.kind === 'image' ? { key: content.path + ':' + content.version } : {}), source: content, target: shownTarget, onClasses: setClassSeed, onDefinition: define, t, debug, busy: navigation.busy, blocked: loading || !contentMatches,
+                : shownView === 'source' ? h(content.kind === 'image' ? ImageReader : SourceEditor, { ...(content.kind === 'image' ? { key: content.path + ':' + content.version } : {}), source: content, target: shownTarget, onClasses: setClassSeed, onDefinition: define, t, debug, busy: navigation.busy, blocked: refreshing || loading || !contentMatches,
                   onReader: instance => { reader.current = instance; }, canBack: history.index > 0, canForward: history.index + 1 < history.items.length, onNavigate: navigate, onShowDiff: () => { if (!content.external) { remember(); setView('diff'); } },
                   onOpenDocument: destination => visit(destination),
                   definitions: navigation.targets, onChooseDefinition: item => visit({ ...item, focusSource: true }, navigation.origin) })
@@ -2290,7 +2314,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         splitHost.over?.group === group ? h('div', { className: 'jb-editor-drop', 'data-side': splitHost.over.side, 'aria-hidden': true }, t('files.drop' + splitHost.over.side[0].toUpperCase() + splitHost.over.side.slice(1))) : null),
         !paneOnly && splitHost.split ? h(PaneDivider, { layout: paneLayout, t, pane: 'editor' }) : null,
         !paneOnly && splitHost.split ? h('div', { className: 'jb-editor-secondary' }, h(CodeBrowser, { key: 'secondary', cwd, changes, initialTarget: splitHost.split.initial, paneOnly: true, groupHost: splitHost, sharedDebug: controller,
-          onActiveFile, onShowDebug, onFindInFiles, onExplain, desktopPaths, t })) : null),
+          onActiveFile, refreshRevision, refreshing, onShowDebug, onFindInFiles, onExplain, desktopPaths, t })) : null),
         classSeed ? h(PaneDivider, { layout: paneLayout, t, pane: 'classes' }) : null,
         classSeed ? h(ClassGraphWindow, { cwd, seed: classSeed, currentPath: target?.path ?? null, files, external: target?.path?.startsWith('dsh-library://') === true, dock: classDock, onDock: setClassDock, onOpen: destination => visit(destination), onClose: () => { setClassSeed(null); reader.current?.focus(); }, t }) : null))),
         debugHost ? createPortal(h(DebugPane, { debug, t, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
@@ -2341,6 +2365,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const [status, setStatus] = useState(null);
       const [statusError, setStatusError] = useState(null);
       const [statusLoading, setStatusLoading] = useState(false);
+      const [refreshRevision, setRefreshRevision] = useState(0), [refreshing, setRefreshing] = useState(false), [refreshError, setRefreshError] = useState(null), [refreshNotice, setRefreshNotice] = useState(null);
       const [log, setLog] = useState(null);
       const [logError, setLogError] = useState(null);
       const [filter, setFilter] = useState('');
@@ -2351,7 +2376,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const [detail, setDetail] = useState(null);
       const [detailLoading, setDetailLoading] = useState(false);
       const [commitPreview, setCommitPreview] = useState(null);
-      const commitRequest = useRef(null);
+      const commitRequest = useRef(null), diffRequest = useRef(null);
       const closeCommitPreview = useCallback(() => setCommitPreview(null), []);
       const [reviewOpen, setReviewOpen] = useState(false);
       const [reviewIntent, setReviewIntent] = useState('task');
@@ -2361,7 +2386,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const [reviewError, setReviewError] = useState(null);
       const [reviewCode, setReviewCode] = useState([]);
       const [collapsed, setCollapsed] = useState(() => new Set());
-      const abortRef = useRef(null);
+      const abortRef = useRef(null), refreshCapability = useRef(false);
 
       const toggleCollapse = useCallback((key) => {
         setCollapsed((prev) => {
@@ -2378,29 +2403,48 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         abortRef.current = controller;
         setStatusLoading(true);
         setStatusError(null);
+        if (opts.reset) { setRefreshing(true); setRefreshError(null); setRefreshNotice(null); diffRequest.current?.abort(); setDiffLoading(false); commitRequest.current?.abort(); setCommitPreview(null); setDetail(null); setLogSelected(null); setDetailLoading(false); setReviewOpen(false); }
+        let limited = false;
         try {
+          if (opts.reset) {
+            if (refreshCapability.current) {
+              try {
+                await api(`/api/git.refresh?${new URLSearchParams({ cwd })}`, { method: 'POST', signal: controller.signal });
+              } catch (error) {
+                if (error.status !== 404 || error.code) throw error;
+                refreshCapability.current = false; limited = true;
+              }
+            } else limited = true;
+            if (controller.signal.aborted) return;
+            setRefreshRevision(value => value + 1);
+          }
           const data = await api(`/api/git.status?cwd=${encodeURIComponent(cwd)}`, { signal: controller.signal });
+          if (controller.signal.aborted) return;
+          refreshCapability.current = data.capabilities?.workspaceRefresh === true;
           setStatus(data);
+          if (opts.reset && limited) setRefreshNotice(true);
           setSelected(null);
           setDiff(null);
           if (opts.loadLog !== false) {
             try {
               const logData = await api(`/api/git.log?cwd=${encodeURIComponent(cwd)}&limit=60`, { signal: controller.signal });
+              if (controller.signal.aborted) return;
               setLog(logData.commits ?? []);
               setLogError(null);
             } catch (error) {
-              if (error.name !== 'AbortError') setLogError(error.message);
+              if (!controller.signal.aborted && error.name !== 'AbortError') setLogError(error.message);
             }
           }
         } catch (error) {
-          if (error.name !== 'AbortError') setStatusError(error.message);
+          if (!controller.signal.aborted && error.name !== 'AbortError') { if (opts.reset) setRefreshError(error.message); else setStatusError(error.message); }
         } finally {
-          if (controller.signal.aborted === false) setStatusLoading(false);
+          if (controller.signal.aborted === false) { setStatusLoading(false); setRefreshing(false); }
         }
       }, [cwd]);
 
       useEffect(() => {
         setStatus(null);
+        setRefreshing(false); setRefreshError(null); setRefreshNotice(null); refreshCapability.current = false;
         setActiveFile(null);
         setLog(null);
         setDiff(null);
@@ -2419,10 +2463,12 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         setSourceTarget(props.previewRequest.target);
       }, [props.previewRequest]);
 
-      useEffect(() => () => { abortRef.current?.abort(); commitRequest.current?.abort(); }, []);
+      useEffect(() => () => { abortRef.current?.abort(); commitRequest.current?.abort(); diffRequest.current?.abort(); }, []);
 
       const loadDiff = useCallback(async (entry) => {
-        if (cwd === null) return;
+        if (cwd === null || refreshing) return;
+        diffRequest.current?.abort();
+        const controller = new AbortController(); diffRequest.current = controller;
         setSelected(entry);
         setDiff(null);
         setDiffLoading(true);
@@ -2434,14 +2480,14 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           if (entry.untracked) params.set('untracked', '1');
           else if (entry.staged && entry.unstagedToo) params.set('both', '1');
           else if (entry.staged) params.set('staged', '1');
-          const data = await api(`/api/git.diff?${params.toString()}`);
-          setDiff(data);
+          const data = await api(`/api/git.diff?${params.toString()}`, { signal: controller.signal });
+          if (!controller.signal.aborted) setDiff(data);
         } catch (error) {
-          setDiff({ error: error.message });
+          if (!controller.signal.aborted) setDiff({ error: error.message });
         } finally {
-          setDiffLoading(false);
+          if (!controller.signal.aborted) setDiffLoading(false);
         }
-      }, [cwd]);
+      }, [cwd, refreshing]);
 
       const loadCommit = useCallback(async (hash) => {
         if (cwd === null) return;
@@ -2567,11 +2613,11 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
               : null)
           : null,
         h('span', { className: 'jb-spacer' }),
-        ...reviewActions(t, cwd === null || reviewSending || (tab === 'log' && detailLoading), intent => openReview(intent,
+        ...reviewActions(t, cwd === null || refreshing || reviewSending || (tab === 'log' && detailLoading), intent => openReview(intent,
           commitPreview || (tab === 'log' && detail?.found) ? { kind: 'commit', detail }
             : tab === 'changes' && selected ? { kind: 'diff', entry: selected }
               : { kind: 'workspace', ...(activeFile ? { path: activeFile } : {}) })),
-        h('button', { type: 'button', className: 'jb-tb-btn', title: t('panel'), disabled: statusLoading || cwd === null, onClick: () => reload() }, refreshGlyph()));
+        h('button', { type: 'button', className: 'jb-tb-btn', title: t('repo.refresh'), 'aria-label': t('repo.refresh'), disabled: statusLoading || cwd === null, onClick: () => reload({ reset: true }) }, refreshGlyph()));
 
       const toolLabels = { find: t('search.title'), changes: t('tabs.changes'), log: t('tabs.log'), cards: t('cards.title'), debug: t('debug.title'), terminal: t('terminal.title') };
       const toolBar = h('div', { className: 'jb-tools-bar', role: 'toolbar', 'aria-label': t('tools.title') },
@@ -2670,10 +2716,11 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       return h('div', { className: 'jb-root' },
         h('style', null, css),
         toolbar,
+        refreshing || refreshError || refreshNotice ? h('div', { className: refreshError ? 'jb-notice jb-notice-error' : 'jb-notice', role: refreshError ? 'alert' : 'status' }, refreshError ? t('repo.refreshFailed', { message: refreshError }) : t(refreshing ? 'repo.refreshing' : 'repo.refreshLimited')) : null,
         reviewOpen && reviewTarget?.kind === 'workspace' ? h(ReviewComposer, { t, intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError, code: reviewCode, onSubmit: sendReview, onClearCode: clearReviewCode, onClose: closeReview }) : null,
         h('div', { className: 'jb-content' },
           status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat' },
-            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, commitPreview, onCloseCommitPreview: closeCommitPreview, onActiveFile: setActiveFile,
+            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, refreshRevision, refreshing, commitPreview, onCloseCommitPreview: closeCommitPreview, onActiveFile: setActiveFile,
               commitReview: { review: { open: reviewOpen && reviewTarget?.kind === 'commit', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
                 codeSet: reviewCode, onToggleCode: toggleReviewCode, onReviewSend: sendReview, onReviewClose: closeReview, onClearCode: clearReviewCode }, debugHost, onShowDebug: showDebug, onFindInFiles: openFind,
               onExplain: path => openReview('explain', { kind: 'workspace', path }), desktopPaths: props.desktopPaths, t })) : notice),

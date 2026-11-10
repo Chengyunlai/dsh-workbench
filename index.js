@@ -253,7 +253,7 @@ async function handleStatus(ctx, request, signal) {
   const cwd = queryOf(request).get('cwd') ?? '';
   await requireWorkspacePath(ctx, cwd, signal);
   const root = (await runGit(ctx, cwd, ['rev-parse', '--show-toplevel'], { allowed: [0, 128], signal })).stdout.replace(/\r?\n$/, '');
-  if (root === '') return json({ isRepo: false });
+  if (root === '') return json({ isRepo: false, capabilities: { workspaceRefresh: true } });
   const status = await readStatus(ctx, cwd, signal);
   // per-file line statistics (staged and unstaged separately, then merged)
   let stats = {};
@@ -284,6 +284,7 @@ async function handleStatus(ctx, request, signal) {
   const shown = Math.min(changes.length, MAX_CHANGES);
   return json({
     isRepo: true,
+    capabilities: { workspaceRefresh: true },
     root,
     branch: status.branch === 'HEAD' ? null : status.branch,
     detached: status.branch === 'HEAD',
@@ -779,6 +780,14 @@ function registerRoutes(ctx, config, languageServers) {
       fetch: (request) => run(ctx, request, handler),
     });
   };
+  route('/api/git.refresh', ['POST'], async (ctx, request, signal) => {
+    const cwd = queryOf(request).get('cwd') ?? '';
+    await requireWorkspacePath(ctx, cwd, signal);
+    const root = await ctx.fs.resolve(cwd, { signal });
+    const result = await languageServers.reset(root);
+    signal.throwIfAborted();
+    return json({ ok: true, ...result });
+  });
   route('/api/git.status', ['GET'], handleStatus);
   route('/api/git.diff', ['GET'], handleDiff);
   route('/api/git.log', ['GET'], handleLog);
