@@ -42,7 +42,7 @@ export function initialClassFocus(graph, seed) {
   return related?.id ?? publicClasses[0]?.id ?? local[0]?.id ?? factory?.to ?? graph.nodes[0]?.id ?? null;
 }
 
-/** Select a bounded connected component for both diagram and hierarchy presentations.
+/** Select ancestors, descendants and direct field types without traversing sibling branches.
  * @param graph - Class nodes and child-to-base edges.
  * @param focus - Selected class identifier, or null for all declarations.
  * @returns Visible nodes, edges and truncation state.
@@ -50,11 +50,18 @@ export function initialClassFocus(graph, seed) {
 export function classGraphSelection(graph, focus) {
   const included = new Set(focus ? [focus] : graph.nodes.map(n => n.id));
   if (focus) {
-    const queue = [focus];
-    for (let i = 0; i < queue.length; i++) for (const edge of graph.edges) {
-      const other = edge.from === queue[i] ? edge.to : edge.to === queue[i] ? edge.from : null;
-      if (other && !included.has(other)) { included.add(other); queue.push(other); }
+    // Walk each direction separately: reaching a shared base must not include its other children.
+    const relationships = graph.edges.filter(edge => edge.kind !== 'field');
+    for (const direction of ['ancestors', 'descendants']) {
+      const visited = new Set([focus]), queue = [focus];
+      for (let i = 0; i < queue.length; i++) for (const edge of relationships) {
+        const other = direction === 'ancestors'
+          ? edge.from === queue[i] ? edge.to : null
+          : edge.to === queue[i] ? edge.from : null;
+        if (other && !visited.has(other)) { visited.add(other); included.add(other); queue.push(other); }
+      }
     }
+    for (const edge of graph.edges) if (edge.kind === 'field' && edge.from === focus) included.add(edge.to);
   }
   const visible = new Set([...included].slice(0, 100));
   const nodes = graph.nodes.filter(node => visible.has(node.id)), ids = new Set(nodes.map(n => n.id));
@@ -117,6 +124,12 @@ export function createClassGraphUI(React, api) {
         .finally(() => { if (!controller.signal.aborted) setBusy(false); });
       return () => controller.abort();
     }, [cwd, seed, revision, context.supported]);
+    useEffect(() => {
+      if (!graph || !context.supported) return;
+      setFocus(initialClassFocus(graph, currentPath && currentPath !== seed?.path ? { path: currentPath } : seed));
+      setExpansion(new Map());
+      setTreeReveal(value => value + 1);
+    }, [currentPath, seed]);
     const selection = useMemo(() => graph ? classGraphSelection(graph, focus) : null, [graph, focus]);
     const layout = useMemo(() => graph && mode === 'graph' ? classGraphLayout(graph, focus) : null, [graph, focus, mode]);
     const selected = useRef(null); selected.current = focus;

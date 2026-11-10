@@ -137,6 +137,8 @@ The editor uses [CodeMirror](https://codemirror.net/) (MIT). Controls use Lucide
 
 ## Python class relationships
 
+The default view follows the current file’s class and shows its ancestors, descendants and direct field types. Shared bases do not expand sibling branches, and field dependencies are not traversed recursively. Switching files resets the focus; use All classes to browse the complete index.
+
 The pane identifies the active file’s language first, or the project file types when no file is open. Python (`.py`/`.pyi`) class relationships are in Beta. Unsupported types, including JavaScript and TypeScript, show a language-specific notice without scanning Python; select a Python file in mixed-language projects.
 
 Use the class-tree icon in the file tree toolbar or the Python source context menu to open a diagram beside the code. It splits to the right by default or can dock below; when the reading area's width is at most 660 pixels, the right preference automatically stacks below the code. Drag the divider to resize; arrow keys make small adjustments, Shift increases the step, Home/End select the minimum/maximum, and double-click or Enter restores the default. Width and height are stored separately on this device. Layout changes and smaller windows clamp the actual size while retaining code space; cancelled drags are not saved. The diagram stays within the workbench height and does not cover source. Navigation, resizing and closing retain the editor. The initial 80% zoom preserves readable labels; “Fit diagram to pane” scales the overview to available space, while manual zoom keeps its scale on resize. Short panes hide auxiliary descriptions, leaving the canvas independently scrollable and pannable.

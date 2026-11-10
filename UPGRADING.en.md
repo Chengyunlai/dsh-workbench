@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.6.2
+
+Python class relationships now focus on the current class’s ancestors, descendants and direct field types without expanding sibling branches through shared bases or recursive field dependencies. Switching files resets focus; All classes retains access to the complete index. Update through Harness plugin management; personal cards and project configuration need no migration.
+
 ## 1.6.1
 
 Fix definition navigation retaining old paths, line numbers, re-exports or empty results after project edits. Built-in Python, Go and Java services observe source and configuration changes and recreate services for subsequent queries. The top-right refresh cancels pending definitions, resets this workspace’s built-in navigation state, and rereads both editor groups, Git and class relationships while retaining tabs, layout and reading positions. Older backends still support basic refresh and explicitly report that navigation caches were not reset. Update through Harness plugin management; code activation follows the current HMR configuration. Ordinary workspace refresh neither restarts the host nor ends debugging or terminals.
