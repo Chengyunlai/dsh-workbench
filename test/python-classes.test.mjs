@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { writeFile, mkdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parsePythonClasses, linkPythonClasses } from '../python-class-graph.js';
-import { classGraphLayout, initialClassFocus } from '../class-graph-client.js';
+import { classGraphLayout, classGraphSelection, initialClassFocus } from '../class-graph-client.js';
 import { fixture } from './support/host.mjs';
 const parsed = (path, text) => parsePythonClasses(path, text, 'version');
 
@@ -98,7 +98,7 @@ test('annotated factories connect locally imported clients to Protocols and reta
  assert.deepEqual(byId(factories[0].from).overrides,[],'factory association never participates in inheritance/MRO');
  const focus=initialClassFocus(graph,{path:'pkg/clients.py',line:0});
  assert.equal(byId(focus).name,'OpenAI');
- assert.deepEqual(classGraphLayout(graph,focus).nodes.map(n=>n.name),['Port','Client','OpenAI','Anthropic']);
+ assert.deepEqual(classGraphLayout(graph,focus).nodes.map(n=>n.name),['Port','Client','OpenAI']);
  assert.equal(byId(initialClassFocus(graph,{path:'pkg/factory.py',line:0})).name,'Client');
  assert.equal(byId(initialClassFocus(graph,{path:'pkg/clients.py',line:2})).name,'OpenAI','caret inside class takes priority');
  assert.equal(byId(initialClassFocus(graph,{path:'pkg/clients.py',line:1})).name,'_NoRedirect','an explicit caret inside a helper takes priority');
@@ -168,4 +168,17 @@ test('annotated fields connect local and imported types without adding inheritan
  const layout=classGraphLayout(graph,message.id);
  assert.equal(layout.nodes.length,3);
  assert.ok(layout.nodes.find(node=>node.id===message.id).height>=142);
+});
+
+test('focused relationships exclude sibling branches and recursive field dependencies', () => {
+ const ids = ['focus', 'base', 'sibling', 'child', 'otherBase', 'field', 'fieldDependency'];
+ const graph = { nodes: ids.map(id => ({ id })), edges: [
+  { from: 'focus', to: 'base' }, { from: 'sibling', to: 'base' },
+  { from: 'child', to: 'focus' }, { from: 'child', to: 'otherBase' },
+  { from: 'focus', to: 'field', kind: 'field' },
+  { from: 'field', to: 'fieldDependency', kind: 'field' },
+  { from: 'base', to: 'base' },
+ ] };
+ assert.deepEqual(classGraphSelection(graph, 'focus').nodes.map(node => node.id), ['focus', 'base', 'child', 'field']);
+ assert.equal(classGraphSelection(graph, null).nodes.length, ids.length);
 });
