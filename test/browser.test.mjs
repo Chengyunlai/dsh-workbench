@@ -96,7 +96,7 @@ function server(override, requests = []) {
     const special = override?.(url, options); if (special) return special;
     let data;
     switch (url.pathname) {
-      case '/api/git.status': data = { isRepo: true, branch: 'main', changes: [{ path: 'src/main.ts', displayPath: 'src/main.ts', letter: 'M', key: 'status.m', ins: 1, del: 1 }], shown: 1, total: 1 }; break;
+      case '/api/git.status': data = { isRepo: true, capabilities: { workspaceRefresh: true }, branch: 'main', changes: [{ path: 'src/main.ts', displayPath: 'src/main.ts', letter: 'M', key: 'status.m', ins: 1, del: 1 }], shown: 1, total: 1 }; break;
       case '/api/git.log': data = { commits: [] }; break;
       case '/api/git.tree': data = { files: Object.keys(source) }; break;
       case '/api/git.source': data = { path: url.searchParams.get('path'), text: source[url.searchParams.get('path')], version: 'source-v1' }; break;
@@ -2097,4 +2097,83 @@ test('dragging tabs splits readers horizontally or vertically, preserves indepen
   assert.equal(group('secondary'), null); assert.equal(ui.container.querySelectorAll('.cm-editor').length, 1);
   assert.equal(editorFor('primary'), primaryEditor); assert.equal(primaryEditor.state.selection.main.head, 10);
   assert.equal(group('primary').querySelectorAll('[role=tab]').length, 2);
+});
+
+test('workspace refresh resets navigation before rereading both editor groups without losing tabs or carets', async context => {
+  let version = 1, finishRefresh, finishDefinition;
+  const requests = [];
+  const ui = await panel(context, server((url, options) => {
+    if (url.pathname === '/api/git.refresh') { assert.equal(options.method, 'POST'); return new Promise(resolve => { finishRefresh = () => { version = 2; resolve({ ok: true, json: async () => ({ ok: true, resetServices: 1 }) }); }; }); }
+    if (url.pathname === '/api/git.definition') return new Promise(resolve => { finishDefinition = resolve; });
+    if (url.pathname === '/api/git.source') return { ok: true, json: async () => ({ path: url.searchParams.get('path'), text: version === 1 ? source[url.searchParams.get('path')] : 'const refreshed = 123;\n', version: String(version) }) };
+  }, requests));
+  await ui.click('src'); await ui.click('main.ts'); await ui.caret(6); await ui.click('lib.ts');
+  const libTab = ui.container.querySelector('[role=tab][aria-label="src/lib.ts"]');
+  await ui.menu(libTab, 'files.splitRight');
+  const group = name => ui.container.querySelector(`[data-editor-group=${name}]`);
+  const primary = EditorView.findFromDOM(group('primary').querySelector('.cm-content'));
+  const secondary = EditorView.findFromDOM(group('secondary').querySelector('.cm-content'));
+  await act(async () => secondary.dispatch({ selection: { anchor: 5 } }));
+  await act(async () => group('primary').querySelector('.cm-content').dispatchEvent(new ui.dom.window.KeyboardEvent('keydown', { key: 'F12', bubbles: true })));
+  const oldDefinition = requests.find(request => request.name === '/api/git.definition');
+  assert.ok(oldDefinition);
+  const reads = requests.filter(request => request.name === '/api/git.source').length;
+  await ui.click('repo.refresh');
+  assert.equal(oldDefinition.signal.aborted, true);
+  assert.equal(ui.button('repo.refresh').disabled, true);
+  assert.equal(requests.filter(request => request.name === '/api/git.source').length, reads, 'do not read against the old service while reset is pending');
+  await act(async () => finishDefinition({ ok: true, json: async () => ({ targets: [{ path: 'stale.ts', line: 0, character: 0 }], external: 0 }) }));
+  await act(async () => finishRefresh());
+  assert.equal(primary.state.doc.toString(), 'const refreshed = 123;\n');
+  assert.equal(secondary.state.doc.toString(), 'const refreshed = 123;\n');
+  assert.equal(EditorView.findFromDOM(group('primary').querySelector('.cm-content')), primary);
+  assert.equal(EditorView.findFromDOM(group('secondary').querySelector('.cm-content')), secondary);
+  assert.equal(primary.state.selection.main.head, 6); assert.equal(secondary.state.selection.main.head, 5);
+  assert.equal(ui.container.querySelectorAll('.jb-source-tabs [role=tab]').length, 2);
+  assert.equal(requests.some(request => request.name === '/api/git.source' && request.params.get('path') === 'stale.ts'), false);
+  assert.equal(ui.button('repo.refresh').disabled, false);
+});
+
+test('a failed workspace reset preserves the reader, reports the error and can be retried', async context => {
+  let fail = true;
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/git.refresh') return fail ? { ok: false, status: 500, json: async () => ({ error: 'reset failed' }) } : { ok: true, json: async () => ({ ok: true, resetServices: 0 }) };
+  }));
+  await ui.click('src'); await ui.click('main.ts'); await ui.caret(6);
+  const editor = ui.editor(); await ui.click('repo.refresh');
+  assert.equal(ui.editor(), editor); assert.equal(editor.state.selection.main.head, 6);
+  assert.ok(ui.container.querySelector('[role=alert]').textContent.includes('reset failed'));
+  fail = false; await ui.click('repo.refresh');
+  assert.equal(ui.container.querySelector('[role=alert]'), null); assert.equal(ui.editor(), editor);
+});
+
+test('a missing refresh API still refreshes files and Git while identifying the unavailable navigation reset', async context => {
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/git.refresh') return { ok: false, status: 404, json: async () => { throw new SyntaxError('not JSON'); } };
+  }));
+  await ui.click('src'); await ui.click('main.ts'); await ui.caret(6);
+  const editor = ui.editor(); await ui.click('repo.refresh');
+  assert.equal(ui.container.querySelector('[role=alert]'), null);
+  const message = ui.container.querySelector('[role=status]').textContent;
+  assert.ok(message.includes('文件与 Git 已刷新')); assert.ok(message.includes('不支持重建导航缓存'));
+  assert.ok(!message.includes('HTTP 404'));
+  assert.equal(ui.editor(), editor); assert.equal(editor.state.selection.main.head, 6);
+  assert.equal(ui.button('repo.refresh').disabled, false);
+});
+
+test('an older backend without refresh capabilities keeps basic refresh usable without calling a missing route', async context => {
+  let version = 1;
+  const requests = [];
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/git.status') return { ok: true, json: async () => ({ isRepo: true, branch: 'main', changes: [], total: 0, shown: 0 }) };
+    if (url.pathname === '/api/git.source') return { ok: true, json: async () => ({ path: url.searchParams.get('path'), version: String(version), text: version === 1 ? source[url.searchParams.get('path')] : 'const updated = 42;' }) };
+    if (url.pathname === '/api/git.refresh') assert.fail('do not call an unadvertised capability');
+  }, requests));
+  await ui.click('src'); await ui.click('main.ts'); await ui.caret(6); const editor = ui.editor();
+  version = 2; await ui.click('repo.refresh');
+  assert.equal(ui.editor(), editor); assert.equal(editor.state.doc.toString(), 'const updated = 42;');
+  assert.equal(editor.state.selection.main.head, 6);
+  assert.equal(requests.some(request => request.name === '/api/git.refresh'), false);
+  assert.equal(ui.container.querySelector('[role=alert]'), null);
+  assert.ok(ui.container.querySelector('[role=status]').textContent.includes('不支持重建导航缓存'));
 });

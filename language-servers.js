@@ -2,8 +2,9 @@
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from 'vscode-jsonrpc/node';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, sep, extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { watch } from 'chokidar';
 
 const LANGUAGES = { '.go': 'go', '.java': 'java', '.py': 'python', '.pyi': 'python' };
 const failure = (message, code = 'LANGUAGE_SERVER_FAILED', status = 502) => Object.assign(new Error(message), { code, status });
@@ -58,6 +59,28 @@ export function createLanguageServers(ctx, specs, config) {
       if ((await ctx.fs.stat(file, signal))?.type !== 'file') return true;
     }
     return false;
+  };
+
+  const observe = (language, source) => {
+    const root = ctx.fs.processPath(source.root);
+    const ignored = new Set(config.navigationWatchExcludedDirectories);
+    const relevant = path => {
+      const name = basename(path), extension = extname(path).toLowerCase();
+      return language === 'python' ? ['.py', '.pyi', '.pth'].includes(extension) || ['pyproject.toml', 'pyrightconfig.json'].includes(name)
+        : language === 'go' ? extension === '.go' || ['go.mod', 'go.sum', 'go.work', 'go.work.sum'].includes(name)
+          : ['.java', '.gradle', '.classpath', '.project'].includes(extension) || ['pom.xml', '.classpath', '.project'].includes(name);
+    };
+    const state = { revision: 0, error: null };
+    const watcher = watch(root, { ignoreInitial: true, followSymlinks: false, atomic: false,
+      ignored: path => relative(root, path).split(sep).some(part => ignored.has(part)),
+    });
+    const ready = new Promise((resolve, reject) => {
+      watcher.once('ready', resolve);
+      watcher.on('error', error => { state.error = failure('workspace file watching failed: ' + error.message, 'LANGUAGE_SERVER_WATCH_FAILED'); reject(state.error); });
+    });
+    ready.catch(() => {});
+    watcher.on('all', (event, path) => { if (['add', 'change', 'unlink'].includes(event) && relevant(path)) state.revision++; });
+    return { watcher, ready, state };
   };
 
   async function start(language, source, signal) {
@@ -143,34 +166,68 @@ export function createLanguageServers(ctx, specs, config) {
   return {
     query(language, source, position, callerSignal, typeDefinition = false) {
       if (disposed) return Promise.reject(failure('language navigation has been disposed', 'LANGUAGE_SERVER_DISPOSED', 503));
-      const signal = AbortSignal.any([lifetime.signal, callerSignal]);
+      const caller = AbortSignal.any([lifetime.signal, callerSignal]);
+      if (caller.aborted) return Promise.reject(caller.reason);
       const key = language + ':' + ctx.fs.fileUrl(source.root);
       let entry = entries.get(key);
-      if (!entry) { entry = { tail: Promise.resolve(), session: null }; entries.set(key, entry); }
+      if (!entry) { entry = { language, root: source.root, rootUri: ctx.fs.fileUrl(source.root), epoch: new AbortController(), tail: Promise.resolve(), session: null, generation: -1, ...observe(language, source) }; entries.set(key, entry); }
+      const signal = AbortSignal.any([caller, entry.epoch.signal]);
       const previous = entry.tail;
       const query = abortable(previous, signal).then(async () => {
-        signal.throwIfAborted();
-        if (!entry.session || entry.session.dead) {
-          await entry.session?.close(); entry.session = await start(language, source, signal);
+        await abortable(entry.ready, signal);
+        for (let attempt = 0; attempt < 2; attempt++) {
+          signal.throwIfAborted();
+          if (entry.state.error) throw entry.state.error;
+          let generation = entry.state.revision;
+          if (!entry.session || entry.session.dead || entry.generation !== generation) {
+            await entry.session?.close();
+            entry.generation = generation;
+            entry.session = await start(language, source, signal);
+            generation = entry.state.revision; entry.generation = generation;
+          }
+          const locations = await entry.session.definition(source, position, signal, typeDefinition);
+          const missing = await hasRemovedTarget(locations, signal);
+          if (entry.state.error) throw entry.state.error;
+          const emptyKey = JSON.stringify([ctx.fs.fileUrl(source.file), source.version, position.line, position.character, generation]);
+          const checkEmpty = attempt === 0 && language === 'python' && !typeDefinition && locations.length === 0 && entry.emptyChecked !== emptyKey;
+          if (!missing && generation === entry.state.revision && !checkEmpty) return locations;
+          if (checkEmpty) entry.emptyChecked = emptyKey;
+          // Queries racing dependency edits must retry against a fresh workspace state.
+          entry.generation = -1;
+          if (attempt === 1) throw failure('workspace changed during navigation; retry after file changes finish', 'LANGUAGE_SERVER_WORKSPACE_CHANGED');
         }
-        const locations = await entry.session.definition(source, position, signal, typeDefinition);
-        if (!await hasRemovedTarget(locations, signal)) return locations;
-        // Imported modules remain cached across document close/open without filesystem watchers.
-        await entry.session.close();
-        signal.throwIfAborted();
-        entry.session = await start(language, source, signal);
-        const refreshed = await entry.session.definition(source, position, signal, typeDefinition);
-        if (await hasRemovedTarget(refreshed, signal)) throw failure('language server returned a missing definition file', 'LANGUAGE_SERVER_PROTOCOL');
-        return refreshed;
       });
       // An aborted waiter must not allow later requests to overtake the active query.
       entry.tail = previous.then(() => query).then(() => {}, () => {});
       return track(query);
     },
+    /** Reset owned services for one workspace, draining old queries and rebuilding watchers before returning. */
+    reset(root) {
+      if (disposed) return Promise.reject(failure('language navigation has been disposed', 'LANGUAGE_SERVER_DISPOSED', 503));
+      const rootUri = ctx.fs.fileUrl(root);
+      const tasks = [...entries.values()].filter(entry => entry.rootUri === rootUri).map(entry => {
+        entry.epoch.abort(failure('navigation cancelled by workspace refresh', 'LANGUAGE_SERVER_REFRESHED', 409));
+        entry.epoch = new AbortController();
+        const task = entry.tail.then(async () => {
+          await entry.session?.close();
+          await entry.watcher.close();
+          entry.session = null; entry.generation = -1; entry.emptyChecked = undefined;
+          lifetime.signal.throwIfAborted();
+          Object.assign(entry, observe(entry.language, { root: entry.root }));
+          await abortable(entry.ready, lifetime.signal);
+        }).catch(error => {
+          entry.state.error = failure('workspace navigation refresh failed: ' + error.message, 'LANGUAGE_SERVER_REFRESH_FAILED');
+          throw entry.state.error;
+        });
+        entry.tail = task.then(() => {}, () => {});
+        return task;
+      });
+      return track(Promise.all(tasks).then(() => ({ resetServices: tasks.length })));
+    },
     async dispose() {
       disposed = true; lifetime.abort();
       await Promise.allSettled([...pending]);
-      const results = await Promise.allSettled([...entries.values()].map(entry => entry.session?.close()));
+      const results = await Promise.allSettled([...entries.values()].flatMap(entry => [entry.session?.close(), entry.watcher.close()]));
       entries.clear();
       const errors = results.filter(result => result.status === 'rejected').map(result => result.reason);
       if (errors.length) throw new AggregateError(errors, 'language-server teardown failed');
