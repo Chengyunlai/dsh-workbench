@@ -26,6 +26,19 @@ test('tree includes tracked and new files plus ignored .dsh files within the cur
   assert.deepEqual(sub.files, ['.dsh/cards/note.md', 'main.ts', 'shapes.ts']);
 });
 
+test('tree can show ignored local configuration without dependency caches or changing Git ignore rules', async t => {
+ const h = await fixture(t);
+ await fs.appendFile(join(h.root, '.gitignore'), '\nconfig/*.local.json\nnode_modules/\n.venv/\n');
+ for (const dir of ['config','node_modules/pkg','.venv/lib']) await fs.mkdir(join(h.root, dir), { recursive: true });
+ for (const path of ['config/harness.local.json','node_modules/pkg/index.js','.venv/lib/module.py']) await fs.writeFile(join(h.root,path), '{}');
+ assert.ok(!(await h.call('tree')).files.includes('config/harness.local.json'));
+ const shown = await h.call('tree', { includeIgnored: '1' });
+ assert.ok(shown.files.includes('config/harness.local.json'));
+ assert.ok(!shown.files.includes('node_modules/pkg/index.js'));
+ assert.ok(!shown.files.includes('.venv/lib/module.py'));
+ assert.ok(!(await h.call('tree')).files.includes('config/harness.local.json'));
+});
+
 test('real compiler resolves imported alias, type, local shadowing, UTF-16 columns and JavaScript', async t => {
   const h = await fixture(t);
   let result = await h.definition('src/main.ts', 2, 'draw');

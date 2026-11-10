@@ -2177,3 +2177,19 @@ test('an older backend without refresh capabilities keeps basic refresh usable w
   assert.equal(ui.container.querySelector('[role=alert]'), null);
   assert.ok(ui.container.querySelector('[role=status]').textContent.includes('不支持重建导航缓存'));
 });
+
+test('file tree toggles ignored local configuration without changing the default listing', async context => {
+ const requests=[];
+ const ui=await panel(context,server(url=>{
+  if(url.pathname==='/api/git.tree') return {ok:true,json:async()=>({files:url.searchParams.get('includeIgnored')==='1'?['config/harness.local.json','README.md']:['README.md']})};
+ },requests));
+ const toggle=()=>ui.container.querySelector('button[aria-label="'+ui.t('tree.showIgnored')+'"]');
+ assert.equal(toggle().getAttribute('aria-pressed'),'false');
+ await ui.click('tree.showIgnored');
+ assert.equal(toggle().getAttribute('aria-pressed'),'true');
+ assert.ok(ui.container.textContent.includes('config'));
+ await ui.click('config');assert.ok(ui.container.textContent.includes('harness.local.json'));
+ await ui.click('tree.showIgnored');
+ assert.equal(toggle().getAttribute('aria-pressed'),'false');
+ assert.ok(!ui.container.textContent.includes('harness.local.json'));
+});

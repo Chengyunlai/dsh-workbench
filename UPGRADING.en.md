@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.6.3
+
+The file tree toolbar adds a Show Git-ignored files toggle for local configuration and other ignored files without changing Git ignore rules. Dependency and cache directories remain hidden, and the default listing is unchanged. Update through Harness plugin management; personal configuration and cards need no migration.
+
 ## 1.6.2
 
 Python class relationships now focus on the current class’s ancestors, descendants and direct field types without expanding sibling branches through shared bases or recursive field dependencies. Switching files resets focus; All classes retains access to the complete index. Update through Harness plugin management; personal cards and project configuration need no migration.

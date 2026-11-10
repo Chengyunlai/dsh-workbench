@@ -79,6 +79,7 @@ window.__ModuleLoader__.load({
       'debug.inspect': 'Inspect variable value', 'debug.hoverMissing': 'Not exposed in the selected frame', 'debug.hoverLimited': 'Variable limit reached; use Evaluate expression', 'debug.hoverInvalid': 'Invalid variable response', 'debug.hoverFailed': 'Could not inspect this variable: {message}',
       'debug.typeDefinition': 'Go to source type definition', 'debug.typeMissing': 'No source type definition found',
       "tree.locate": "Locate current file",
+      "tree.showIgnored": "Show Git-ignored files (excluding dependencies and caches)",
       "tree.findName": "Find by file name",
       "tree.findFile": "Find in file",
       "tree.findDirectory": "Find in directory",
@@ -332,6 +333,7 @@ window.__ModuleLoader__.load({
       'debug.inspect': '查看变量值', 'debug.hoverMissing': '当前栈帧未提供此变量', 'debug.hoverLimited': '已达到变量读取上限，请使用计算表达式', 'debug.hoverInvalid': '变量响应无效', 'debug.hoverFailed': '无法读取此变量：{message}',
       'debug.typeDefinition': '跳转到源码类型定义', 'debug.typeMissing': '未找到源码中的类型定义',
       "tree.locate": "定位当前文件",
+      "tree.showIgnored": "显示 Git 忽略文件（不含依赖与缓存目录）",
       "tree.findName": "按文件名查找",
       "tree.findFile": "在文件中查找",
       "tree.findDirectory": "在目录中查找内容",
@@ -840,7 +842,7 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-code-browser .jb-tree{scroll-padding-top:46px}
 .jb-tree-toolbar{position:sticky;top:0;z-index:2;background:${C.panel};display:flex;align-items:center;gap:2px;padding-right:6px;min-width:0}
 .jb-tree-toolbar .jb-filter{flex:1;min-width:0;margin-right:2px}
-.jb-tree-toolbar>.jb-tb-btn{flex:none}
+.jb-tree-toolbar>.jb-tb-btn{flex:none}.jb-tree-toolbar>.jb-tb-btn[aria-pressed=true]{color:${C.accent};background:${C.selection}}
 .jb-search-panel{display:flex;flex:1;min-width:0;flex-direction:column;min-height:0;height:100%;color:${C.text};font-size:12px}
 .jb-search-form{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px}
 .jb-search-form>input{flex:1;min-width:140px;background:${C.bg};color:${C.text};border:1px solid ${C.border};border-radius:4px;padding:5px 8px;font:inherit}
@@ -1999,6 +2001,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const group = paneOnly ? 'secondary' : 'primary';
       const groupActive = splitHost.active === group;
       const [files, setFiles] = useState(null);
+      const [includeIgnored, setIncludeIgnored] = useState(false);
       const [filter, setFilter] = useState('');
       const filterInput = useRef(null), alive = useRef(true), copySequence = useRef(0);
       const [filterFocus, setFilterFocus] = useState(0), [revealRevision, setRevealRevision] = useState(0);
@@ -2175,11 +2178,11 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }, [initialTarget]);
       useEffect(() => {
         const controller = new AbortController();
-        api(`/api/git.tree?${new URLSearchParams({ cwd })}`, { signal: controller.signal })
-          .then(data => { if (!controller.signal.aborted) setFiles(data.files); })
+        api(`/api/git.tree?${new URLSearchParams({ cwd, ...(includeIgnored ? { includeIgnored: '1' } : {}) })}`, { signal: controller.signal })
+          .then(data => { if (!controller.signal.aborted) { setFiles(data.files); setTreeError(null); } })
           .catch(error => { if (!controller.signal.aborted) setTreeError(error.message); });
         return () => controller.abort();
-      }, [cwd, changes, refreshRevision]);
+      }, [cwd, changes, refreshRevision, includeIgnored]);
       useEffect(() => { setNavigation({ busy: false, targets: [], message: target?.notice ?? null }); }, [target]);
       useEffect(() => {
         const controller = new AbortController();
@@ -2280,6 +2283,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('div', { ref: paneLayout.workspace, className: 'jb-code-workspace' }, h('div', { className: 'jb-tree' },
           h('div', { className: 'jb-tree-toolbar' },
             h('div', { className: 'jb-filter' }, searchGlyph(), h('input', { ref: filterInput, type: 'search', value: filter, 'aria-label': t('tree.findName'), placeholder: t('filter.placeholder'), onChange: event => setFilter(event.target.value) })),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.showIgnored'), 'aria-label': t('tree.showIgnored'), 'aria-pressed': includeIgnored, onClick: () => setIncludeIgnored(value => !value) }, lucideSvg([h('path', { d: 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z' }), h('circle', { cx: 12, cy: 12, r: 3 })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('classes.title'), 'aria-label': t('classes.title'), disabled: content?.external, onClick: () => setClassSeed({ path: target?.path, line: reader.current?.position?.().line ?? target?.line ?? 0 }) }, lucideSvg([h('rect', { x: 8, y: 2, width: 8, height: 6, rx: 1 }), h('path', { d: 'M12 8v5M5 13v3m14-3v3' }), h('rect', { x: 2, y: 16, width: 6, height: 6, rx: 1 }), h('rect', { x: 16, y: 16, width: 6, height: 6, rx: 1 })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.locate'), 'aria-label': t('tree.locate'), disabled: !target || !files?.includes(target.path), onClick: () => { setFilter(''); setRevealRevision(value => value + 1); } }, lucideSvg([h('circle', { cx: 12, cy: 12, r: 6 }), h('path', { d: 'M12 2v6m0 8v6M2 12h6m8 0h6' })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.findDirectory'), 'aria-label': t('tree.findDirectory'), onClick: () => onFindInFiles('') }, searchGlyph(16))),
