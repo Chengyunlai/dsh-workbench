@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.6.5
+
+Edit existing UTF-8 text files directly in source view and save with `⌘S` / `Ctrl+S`. Drafts survive tab switches, and save conflicts let you inspect the current disk version. Restoring the original text leaves the caret at the current edit position.
+
 ## 1.6.4
 
 Browse and preview files in workspaces without Git. The file tree fills the available space whenever no preview is open.

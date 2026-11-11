@@ -796,6 +796,7 @@ function registerRoutes(ctx, config, languageServers) {
   ctx.effect(() => () => navigation.dispose(), 'workbench: library source references');
   route('/api/git.tree', ['GET'], navigation.tree);
   route('/api/git.source', ['GET'], navigation.source);
+  route('/api/git.source.save', ['POST'], navigation.save);
   route('/api/git.definition', ['GET'], navigation.definition);
   route('/api/git.classes', ['GET'], createPythonClassGraph({ runGit, requireWorkspacePath, requireRelativePath, json, config }));
   route('/api/git.search', ['GET'], createWorkspaceSearch({ runGit, requireWorkspacePath, requireRelativePath, json, config }));

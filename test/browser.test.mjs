@@ -2207,3 +2207,57 @@ test('a non-Git workspace starts with a full file tree and opens a preview on se
   assert.equal(workspace().dataset.treeOnly, 'false');
   assert.ok(ui.container.querySelector('.jb-source-tab'));
 });
+
+test('the source editor accepts input, saves in place, and retains a conflicting draft', async context => {
+  let writes = 0, disk = 'first, second', revision = 'first';
+  const ui = await panel(context, server((url, options) => {
+    if (url.pathname === '/api/git.source' && url.searchParams.get('path') === 'src/main.ts') {
+      return { ok: true, json: async () => ({ path: 'src/main.ts', text: disk, version: revision, writeVersion: revision }) };
+    }
+    if (url.pathname === '/api/git.source.save') {
+      const request = JSON.parse(options.body);
+      if (++writes === 1) {
+        assert.equal(request.writeVersion, 'first');
+        disk = request.text;
+        revision = 'saved';
+        return { ok: true, json: async () => ({ version: revision, writeVersion: revision }) };
+      }
+      assert.equal(request.writeVersion, 'saved');
+      disk = 'disk version';
+      return { ok: false, status: 409, json: async () => ({ code: 'SOURCE_SAVE_CONFLICT', error: 'changed' }) };
+    }
+  }), { platform: 'Linux x86_64' });
+  await ui.click('src');
+  await ui.click('main.ts');
+  const editor = ui.editor();
+  assert.equal(editor.contentDOM.getAttribute('contenteditable'), 'true');
+  await act(async () => editor.dispatch({ changes: { from: 5, to: 6 }, selection: { anchor: 5 } }));
+  await act(async () => editor.dispatch({ changes: { from: 5, insert: ',' }, selection: { anchor: 6 } }));
+  assert.equal(editor.state.doc.toString(), disk);
+  assert.equal(editor.state.selection.main.head, 6);
+  assert.equal(writes, 0);
+
+  await act(async () => editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: 'saved change' } }));
+  assert.equal(ui.editor(), editor);
+  assert.ok(!editor.dom.closest('.jb-sourcebody').hasAttribute('inert'));
+  await ui.key('s', { ctrlKey: true });
+  assert.equal(disk, 'saved change');
+  assert.equal(ui.editor(), editor);
+  assert.equal(editor.state.doc.toString(), 'saved change');
+  await act(async () => editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: 'my draft' } }));
+  await ui.click('edit.save');
+  await ui.click('edit.latest');
+  assert.equal(ui.container.querySelector('.jb-edit-latest').textContent, 'disk version');
+  assert.equal(editor.state.doc.toString(), 'my draft');
+  assert.equal(ui.container.querySelector('dialog'), null);
+  await ui.click('lib.ts');
+  assert.equal(ui.container.querySelector('.jb-inline-editor').hidden, true);
+  await ui.click('main.ts');
+  assert.equal(ui.container.querySelector('.jb-inline-editor').hidden, false);
+  assert.equal(ui.editor().state.doc.toString(), 'my draft');
+  await act(async () => ui.container.querySelector('.jb-source-tab[data-active=true] .jb-source-tab-close').click());
+  assert.ok(ui.container.querySelector('.jb-inline-editor'));
+  await ui.click('edit.discard');
+  assert.equal(ui.container.querySelector('.jb-inline-editor'), null);
+  assert.equal(writes, 2);
+});

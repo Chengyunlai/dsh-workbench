@@ -232,3 +232,35 @@ test('a registered directory without Git can list and preview workspace files', 
   assert.deepEqual(await h.call('tree', { cwd }), { status: 200, files: ['nested/note.md'] });
   assert.equal((await h.call('source', { cwd, path: 'nested/note.md' })).text, '# Note');
 });
+
+test('saving an existing text file preserves concurrent changes and uses a conditional host write', async t => {
+  const h = await fixture(t);
+  const path = 'src/main.ts', absolute = join(h.root, path);
+  const stat = h.ctx.fs.stat;
+  let revision = 'first', writes = 0, race = false;
+  h.ctx.fs.stat = async target => ({ ...await stat(target), version: revision });
+  h.ctx.fs.writeText = async (target, text, expected) => {
+    assert.equal(target.targetKey, absolute);
+    assert.deepEqual(expected, { kind: 'replaceIfVersion', version: revision });
+    if (race) {
+      await fs.writeFile(absolute, 'concurrent change');
+      throw Object.assign(new Error('changed'), { code: 'FS_STALE_VERSION' });
+    }
+    await fs.writeFile(absolute, text);
+    writes++;
+    revision = 'saved';
+    return { version: revision };
+  };
+  const save = (base, text) => h.call('source.save', { path }, { method: 'POST', body: JSON.stringify({
+    version: base.version, writeVersion: base.writeVersion, text,
+  }) });
+  const first = await h.call('source', { path });
+  assert.equal((await save(first, 'new text\r\n')).writeVersion, 'saved');
+  assert.equal(await fs.readFile(absolute, 'utf8'), 'new text\r\n');
+  assert.equal((await save(first, 'old draft')).status, 409);
+  const saved = await h.call('source', { path });
+  race = true;
+  assert.equal((await save(saved, 'new draft')).code, 'SOURCE_SAVE_CONFLICT');
+  assert.equal(await fs.readFile(absolute, 'utf8'), 'concurrent change');
+  assert.equal(writes, 1);
+});

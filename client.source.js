@@ -12,9 +12,9 @@ import { parsePreviewAddress, previewPatterns, resolveDocumentPreview } from './
 /**
  * DSH Workbench — code, documents, Git inspection and debugging beside chat.
  *
- * A project workbench with file browsing, read-only source and documents,
+ * A project workbench with file browsing, source and document previews,
  * definitions, Git inspection, and explicit launch/attach debugging.
- * Source and Git operations are read-only; debugged programs execute normally.
+ * Text editing uses explicit saves. Git inspection remains read-only.
  * The client shares React and theme variables with the Harness host.
  */
 window.__ModuleLoader__.load({
@@ -80,6 +80,19 @@ window.__ModuleLoader__.load({
       'debug.typeDefinition': 'Go to source type definition', 'debug.typeMissing': 'No source type definition found',
       "tree.locate": "Locate current file",
       "tree.truncated": "File listing reached its limit.",
+      "edit.open": "File changes",
+      "edit.save": "Save",
+      "edit.saving": "Saving…",
+      "edit.close": "Discard changes",
+      "edit.resume": "Return to draft",
+      "edit.dirty": "Unsaved changes",
+      "edit.discard": "Discard draft",
+      "edit.keep": "Keep editing",
+      "edit.confirm": "Discard unsaved changes?",
+      "edit.conflict": "The file changed on disk. Your draft is still open.",
+      "edit.latest": "View disk version",
+      "edit.failed": "Could not save: {message}",
+      "edit.diskFailed": "Could not read disk version: {message}",
       "tree.showIgnored": "Show Git-ignored files (excluding dependencies and caches)",
       "tree.findName": "Find by file name",
       "tree.findFile": "Find in file",
@@ -335,6 +348,19 @@ window.__ModuleLoader__.load({
       'debug.typeDefinition': '跳转到源码类型定义', 'debug.typeMissing': '未找到源码中的类型定义',
       "tree.locate": "定位当前文件",
       "tree.truncated": "文件列表已达到显示上限。",
+      "edit.open": "文件改动",
+      "edit.save": "保存",
+      "edit.saving": "正在保存…",
+      "edit.close": "放弃改动",
+      "edit.resume": "返回草稿",
+      "edit.dirty": "有未保存的改动",
+      "edit.discard": "丢弃草稿",
+      "edit.keep": "继续编辑",
+      "edit.confirm": "要丢弃未保存的改动吗？",
+      "edit.conflict": "磁盘上的文件已变化，草稿仍保留。",
+      "edit.latest": "查看磁盘版本",
+      "edit.failed": "保存失败：{message}",
+      "edit.diskFailed": "无法读取磁盘版本：{message}",
       "tree.showIgnored": "显示 Git 忽略文件（不含依赖与缓存目录）",
       "tree.findName": "按文件名查找",
       "tree.findFile": "在文件中查找",
@@ -774,6 +800,11 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 .jb-debug-hover .jb-variable-row{flex-wrap:wrap;white-space:pre-wrap;overflow-wrap:anywhere}
 .jb-debug-hover .jb-variable-value{white-space:pre-wrap;overflow-wrap:anywhere}
 
+.jb-inline-editor{display:flex;flex:none;max-height:45%;overflow:auto;flex-direction:column;background:${C.panel};color:${C.text}}
+.jb-inline-editor[hidden]{display:none}
+.jb-tb-btn.jb-edit-button{width:auto;flex:none;padding-inline:8px;white-space:nowrap}
+.jb-edit-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px}
+.jb-edit-latest{margin:8px 0;max-height:30%;overflow:auto;white-space:pre-wrap}
 .jb-reader-layout{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden;container-type:inline-size;container-name:workbench-reader}
 .jb-reader-workspace{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
 .jb-reader-workspace[data-class-dock=bottom]{flex-direction:column}
@@ -1794,7 +1825,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
 
     /** A single editor owns caret, selection, scrolling and contextual navigation for its source. */
     function SourceEditor(props) {
-      const { source, target, t, definitions, debug, blocked } = props;
+      const { source, target, t, definitions, debug, blocked, positionBlocked = blocked } = props;
       const parent = useRef(null); const editor = useRef(null); const callbacks = useRef(props);
       const documentRef = useRef(null), modeRef = useRef(null), mounted = useRef(true);
       const [hover, setHover] = useState(null), [inspectRequest, setInspectRequest] = useState(0);
@@ -1842,7 +1873,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       useLayoutEffect(() => {
         mounted.current = true;
         const instance = createSourceEditor(parent.current, {
-          text: source.text, path: source.path, version: source.version, position: target, label: t('files.source'), colors: C,
+          text: source.text, path: source.path, version: source.version, position: target, label: t('files.source'), colors: C, writable: props.writable,
+          onChange: text => callbacks.current.onTextChange?.(text),
+          onSave: () => callbacks.current.onSave?.(),
           searchPhrases: { 'current match': t('find.current'), 'on line': t('find.onLine'), Find: t('find.label'), next: t('find.next'), previous: t('find.previous'), all: t('find.all'), 'match case': t('find.case'), regexp: t('find.regexp'), 'by word': t('find.word'), close: t('find.close') },
           foldPhrases: { 'Fold line': t('files.fold'), 'Unfold line': t('files.unfold'), 'folded code': t('files.foldedCode'), unfold: t('files.unfold'), 'Folded lines': t('files.foldedLines'), 'Unfolded lines': t('files.unfoldedLines'), to: t('files.rangeTo') },
           takeFocus: document.activeElement === document.body || (parent.current.closest('.jb-changes')?.contains(document.activeElement) && document.activeElement.closest('.jb-filebutton') !== null),
@@ -1863,10 +1896,14 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }, []);
       useLayoutEffect(() => {
         if (applied.current.path !== source.path || applied.current.text !== source.text) {
-          editor.current.setSource(source, target); applied.current = source;
+          const normalized = source.text.replace(/\r\n?|\n/g, '\n');
+          if (applied.current.path !== source.path || editor.current.text() !== normalized) editor.current.setSource(source, target);
+          applied.current = source;
         }
       }, [source.path, source.text]);
-      useLayoutEffect(() => { if (!blocked) { editor.current?.reveal(target); if (mode === 'source') { editor.current?.measure(); if (target.focusSource) editor.current?.focus(); if (target.find) editor.current?.find(); } } }, [target, blocked, mode]);
+      useLayoutEffect(() => { editor.current?.setVersion(source.version); }, [source.version]);
+      useLayoutEffect(() => { editor.current?.setWritable(Boolean(props.writable) && mode === 'source'); }, [props.writable, mode]);
+      useLayoutEffect(() => { if (!positionBlocked) { editor.current?.reveal(target); if (mode === 'source') { editor.current?.measure(); if (target.focusSource) editor.current?.focus(); if (target.find) editor.current?.find(); } } }, [target, positionBlocked, mode]);
       useLayoutEffect(() => { editor.current?.setInspection(inspectionKey); }, [inspectionKey]);
       useEffect(() => {
         editor.current?.setInlineValues(null, []);
@@ -1909,12 +1946,12 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         })) });
       }, [definitions]);
       return h(React.Fragment, null,
-        markdown ? h('div', { className: 'jb-document-toolbar', role: 'group', 'aria-label': t('document.mode') }, ...['preview', 'source'].map(value => h('button', { key: value, type: 'button', 'aria-pressed': mode === value, disabled: blocked, onClick: () => setDocumentView({ path: source.path, target, mode: value }) }, t('document.' + value)))) : null,
-        h('div', { ref: parent, className: 'jb-sourcebody', hidden: mode === 'preview', inert: blocked || mode === 'preview' || undefined, 'aria-description': t('files.hint') }),
-        markdown ? h('div', { className: 'jb-document-seat', hidden: mode !== 'preview' }, h(MarkdownReader, { source, target, scrollRef: documentRef, t, blocked: blocked || mode !== 'preview', onOpen: props.onOpenDocument, onNavigate: delta => props.onNavigate(delta) })) : null,
+        markdown ? h('div', { className: 'jb-document-toolbar', role: 'group', 'aria-label': t('document.mode') }, ...['preview', 'source'].map(value => h('button', { key: value, type: 'button', 'aria-pressed': mode === value, disabled: blocked && !props.writable, onClick: () => setDocumentView({ path: source.path, target, mode: value }) }, t('document.' + value)))) : null,
+        h('div', { ref: parent, className: 'jb-sourcebody', hidden: mode === 'preview', inert: (blocked && !props.writable) || mode === 'preview' || undefined, 'aria-description': t('files.hint') }),
+        markdown ? h('div', { className: 'jb-document-seat', hidden: mode !== 'preview' }, h(MarkdownReader, { source: mode === 'preview' && props.writable && editor.current ? { ...source, text: editor.current.text() } : source, target, scrollRef: documentRef, t, blocked: blocked || mode !== 'preview', onOpen: props.onOpenDocument, onNavigate: delta => props.onNavigate(delta) })) : null,
         h('div', { className: 'jb-editor-status' },
           mode === 'source' ? h('span', null, t('files.position', { line: String(position.line + 1), column: String(position.character + 1) })) : null,
-          h('span', null, t(source.external ? 'files.library' : mode === 'preview' ? 'document.readOnly' : 'files.readOnly'))),
+          h('span', null, mode === 'source' && props.writable ? 'UTF-8' : t(source.external ? 'files.library' : mode === 'preview' ? 'document.readOnly' : 'files.readOnly'))),
         menu ? h(EditorMenu, { menu, onClose: closeMenu }) : null,
         hover && hover.key === inspectionKey ? createPortal(h(DebugHover, { debug, expression: hover.expression, variable: hover.variable, t,
           onTypeDefinition: debug.session.frames.find(frame => frame.id === debug.selectedFrameId)?.path === source.path ? () => jumpToType(hover.at) : undefined,
@@ -1949,7 +1986,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Persistent file tabs with keyboard activation and a shared close menu. */
-    function SourceTabs({ paths, activePath, labels, panelId, t, onSelect, onClose, onMenu, onFindInFiles, group, splitHost }) {
+    function SourceTabs({ paths, activePath, labels, panelId, t, onSelect, onClose, onMenu, onFindInFiles, group, splitHost, draftPath, draftDirty, lockMerge }) {
       const ref = useRef(null);
       const activeIndex = paths.indexOf(activePath);
       useLayoutEffect(() => {
@@ -1967,9 +2004,9 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             { id: 'others', label: t('files.tabCloseOthers'), disabled: paths.length < 2, run: () => onClose('others', path) },
             { id: 'all', label: t('files.tabCloseAll'), run: () => onClose('all') },
             ...(splitHost ? [
-              { id: 'split-right', label: t('files.splitRight'), run: () => splitHost.open(group, path, 'x') },
-              { id: 'split-below', label: t('files.splitBelow'), run: () => splitHost.open(group, path, 'y') },
-              ...(splitHost.split ? [{ id: 'merge-editors', label: t('files.mergeGroups'), run: splitHost.merge }] : []),
+              { id: 'split-right', label: t('files.splitRight'), disabled: path === draftPath, run: () => splitHost.open(group, path, 'x') },
+              { id: 'split-below', label: t('files.splitBelow'), disabled: path === draftPath, run: () => splitHost.open(group, path, 'y') },
+              ...(splitHost.split ? [{ id: 'merge-editors', label: t('files.mergeGroups'), disabled: lockMerge, run: splitHost.merge }] : []),
             ] : []),
           ] });
       };
@@ -1986,24 +2023,29 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           const basename = path.split('/').at(-1);
           const displayPath = labels.get(path) ?? path;
           const label = paths.some(other => other !== path && other.split('/').at(-1) === basename) ? displayPath : basename;
-          return h('div', { key: path, className: 'jb-source-tab', 'data-active': path === activePath, 'data-tab-index': index, role: 'presentation', draggable: Boolean(splitHost),
+          return h('div', { key: path, className: 'jb-source-tab', 'data-active': path === activePath, 'data-tab-index': index, role: 'presentation', draggable: Boolean(splitHost) && path !== draftPath,
             onDragStart: event => splitHost?.drag(group, path, event), onDragEnd: () => splitHost?.clear(),
             onContextMenu: event => openMenu(path, event),
             onKeyDown: event => { if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) openMenu(path, event); },
             onKeyDownCapture: event => { if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'f') { event.preventDefault(); event.stopPropagation(); onFindInFiles(''); } },
             onAuxClick: event => { if (event.button === 1) { event.preventDefault(); event.stopPropagation(); close(path); } } },
             h('button', { type: 'button', role: 'tab', id: `${panelId}-tab-${index}`, 'aria-controls': panelId, 'aria-haspopup': 'menu', 'aria-selected': path === activePath, 'aria-label': displayPath, tabIndex: index === activeIndex ? 0 : -1, title: displayPath,
-              onClick: () => onSelect(path, true) }, fileIconGlyph(path, false), h('span', null, label), labels.has(path) ? h('small', null, t('files.libraryShort')) : null),
+              onClick: () => onSelect(path, true) }, fileIconGlyph(path, false), h('span', null, label), draftDirty && path === draftPath ? h('small', { title: t('edit.dirty'), 'aria-label': t('edit.dirty') }, '•') : null, labels.has(path) ? h('small', null, t('files.libraryShort')) : null),
             h('button', { type: 'button', className: 'jb-source-tab-close', tabIndex: path === activePath ? 0 : -1, 'aria-label': t('files.closeTab', { path: displayPath }), title: t('files.closeTab', { path: displayPath }), onClick: () => close(path) }, '×'));
         }));
     }
 
     /** Own source/diff requests and definition history independently of the conversation. */
     const EMPTY_CHANGES = [];
-    function CodeBrowser({ cwd, changes, isRepo = true, initialTarget, commitPreview, onCloseCommitPreview, commitReview, onActiveFile, refreshRevision = 0, refreshing = false, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t, paneOnly = false, groupHost, sharedDebug }) {
+    function CodeBrowser({ cwd, changes, onEdit, editDraft, onEditSaved, editSaving, setEditSaving, isRepo = true, initialTarget, commitPreview, onCloseCommitPreview, commitReview, onActiveFile, refreshRevision = 0, refreshing = false, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t, paneOnly = false, groupHost, sharedDebug }) {
       const ownGroups = useEditorSplit();
       const splitHost = groupHost ?? ownGroups;
       const group = paneOnly ? 'secondary' : 'primary';
+      const draftGroup = splitHost.split ? editDraft?.group : 'primary';
+      const localDraft = editDraft?.cwd === cwd && draftGroup === group ? editDraft : null;
+      const draftControls = useRef(null), closeTabsAction = useRef(null);
+      const [draftDirty, setDraftDirty] = useState(false);
+
       const groupActive = splitHost.active === group;
       const [files, setFiles] = useState(null);
       const [includeIgnored, setIncludeIgnored] = useState(false);
@@ -2040,12 +2082,15 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       }, [openPaths]);
       const panelId = React.useId();
       const target = history.items[history.index] ?? null;
+      const editing = localDraft?.path === target?.path && Boolean(localDraft);
       useEffect(() => { if (groupActive) onActiveFile?.(target?.path ?? null); }, [target?.path, onActiveFile, groupActive]);
       const [view, setView] = useState('source');
       const [loaded, setLoaded] = useState(null);
       const content = loaded?.content;
       const contentMatches = loaded?.path === target?.path && loaded?.view === view;
       const shownTarget = contentMatches ? target : loaded?.target;
+      const draftSource = editing && view === 'source' ? { ...localDraft, text: localDraft.currentText } : null;
+      const shownSource = draftSource ?? content;
       const shownView = loaded?.view ?? view;
       const [readRevision, setReadRevision] = useState(0);
       const [error, setError] = useState(null);
@@ -2124,10 +2169,15 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         if (path === target?.path && view === 'source') { if (focusSource && !loading) reader.current?.focus(); return; }
         visit({ path, line: 0, character: 0, ...positions.current.get(path), focusSource });
       };
-      const closeTabs = (action, path) => {
+      const closeTabs = (action, path, confirmed = false) => {
         if (action !== 'all' && !openPaths.includes(path)) return;
         const remaining = action === 'all' ? [] : action === 'others' ? [path] : openPaths.filter(item => item !== path);
         if (remaining.length === openPaths.length) return;
+        if (!confirmed && localDraft && !remaining.includes(localDraft.path)) {
+          selectTab(localDraft.path, false);
+          draftControls.current?.close(() => closeTabsAction.current(action, path, true));
+          return;
+        }
         closingTabs.current = true;
         setOpenPaths(remaining);
         if (!remaining.length) {
@@ -2139,6 +2189,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         if (loaded && !remaining.includes(loaded.path)) setLoaded(null);
         for (const closed of openPaths) if (!remaining.includes(closed)) positions.current.delete(closed);
       };
+      closeTabsAction.current = closeTabs;
       const copy = value => {
         const sequence = ++copySequence.current;
         setCopyNotice(null);
@@ -2269,6 +2320,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           splitHost.setActive('secondary');
         };
         splitHost.merge = () => {
+          if (editDraft?.cwd === cwd && editDraft.group === 'secondary') return;
           const other = splitHost.groups.current.secondary;
           if (other) { for (const path of other.paths) { const destination = other.snapshot(path); positions.current.set(path, destination); retain(path); } if (other.target) visit(other.snapshot(other.target.path)); }
           splitHost.close();
@@ -2302,16 +2354,37 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('div', { ref: detailRef, tabIndex: -1, className: 'jb-detail jb-editor-primary', 'data-editor-group': group, ...splitHost.handlers(group), 'aria-busy': commitPreview ? undefined : loading },
           commitPreview ? h(CommitFilePreview, { key: commitPreview.hash + ':' + commitPreview.file.path, cwd, preview: commitPreview, t, onClose: onCloseCommitPreview, ...commitReview }) : null,
           h('div', { className: 'jb-editor-source', hidden: Boolean(commitPreview) },
-          h(SourceTabs, { paths: openPaths, activePath: target?.path, labels: libraryLabels, panelId, t, group, splitHost, onSelect: selectTab, onClose: closeTabs, onMenu: setMenu, onFindInFiles }),
+          h(SourceTabs, { paths: openPaths, activePath: target?.path, labels: libraryLabels, panelId, t, group, splitHost, onSelect: selectTab, onClose: closeTabs, onMenu: setMenu, onFindInFiles, draftPath: localDraft?.path, draftDirty, lockMerge: editDraft?.cwd === cwd && editDraft.group === 'secondary' }),
           h('div', { className: 'jb-editor-title' }, (loaded?.path ?? target?.path) ? fileIconGlyph(loaded?.path ?? target.path, false) : null,
             h('span', { className: 'jb-diffpath', title: content?.displayPath ?? loaded?.path ?? target?.path }, content?.displayPath ?? loaded?.path ?? target?.path),
             shownView === 'diff' ? h('span', null, t('files.diff')) : null),
           loaded && (loading || error) ? h('div', { className: 'jb-source-notice', role: error ? 'alert' : 'status' }, error ? t('files.openFailed', { path: target.displayPath ?? libraryLabels.get(target.path) ?? target.path, message: error }) : t('files.opening', { path: target.displayPath ?? libraryLabels.get(target.path) ?? target.path }))
             : navigation.busy || navigation.message ? h('div', { className: 'jb-source-notice', role: 'status' }, navigation.busy ? t('loading') : navigation.message) : null,
           h('div', { className: 'jb-source-panel', role: 'tabpanel', id: panelId, 'aria-labelledby': target ? `${panelId}-tab-${openPaths.indexOf(target.path)}` : undefined },
-          !content ? h('div', { className: 'jb-diffempty', role: error ? 'alert' : undefined }, error ?? t(loading ? 'loading' : 'files.pick'))
-                : shownView === 'source' ? h(content.kind === 'image' ? ImageReader : SourceEditor, { ...(content.kind === 'image' ? { key: content.path + ':' + content.version } : {}), source: content, target: shownTarget, onClasses: setClassSeed, onDefinition: define, t, debug, busy: navigation.busy, blocked: refreshing || loading || !contentMatches,
-                  onReader: instance => { reader.current = instance; }, canBack: history.index > 0, canForward: history.index + 1 < history.items.length, onNavigate: navigate, onShowDiff: isRepo ? () => { if (!content.external) { remember(); setView('diff'); } } : undefined,
+          localDraft ? h(InlineEditControls, { draft: localDraft, hidden: !editing, controls: draftControls, t,
+            saving: editSaving, setSaving: setEditSaving, onDirty: setDraftDirty, onClose: () => onEdit(null), onSaved: (savedCwd, saved) => {
+              const position = target?.path === localDraft.path ? remember() : null;
+              if (position) setHistory(old => ({ ...old, items: old.items.map((item, index) => index === old.index && item.path === localDraft.path ? { ...item, ...position } : item) }));
+              setLoaded(previous => previous?.path === localDraft.path && previous.view === 'source'
+                ? { ...previous, content: { ...previous.content, ...saved } } : previous);
+              onEditSaved(savedCwd);
+            } }) : null,
+          !shownSource ? h('div', { className: 'jb-diffempty', role: error ? 'alert' : undefined }, error ?? t(loading ? 'loading' : 'files.pick'))
+                : draftSource || shownView === 'source' ? h(shownSource.kind === 'image' ? ImageReader : SourceEditor, { ...(shownSource.kind === 'image' ? { key: shownSource.path + ':' + shownSource.version } : {}), source: shownSource,
+                  writable: Boolean(draftSource) || (!loading && !refreshing && contentMatches && Boolean(content.writeVersion) && typeof content.text === 'string'
+                    && !/\r(?!\n)/.test(content.text) && !(content.text.includes('\r\n') && /(?<!\r)\n/.test(content.text))
+                    && !editDraft),
+                  onTextChange: text => {
+                    const original = localDraft?.text ?? content.text;
+                    const currentText = original.includes('\r\n') ? text.replaceAll('\n', '\r\n') : text;
+                    if (editing) {
+                      localDraft.currentText = currentText;
+                      draftControls.current?.update();
+                    } else if (currentText !== original) onEdit({ ...content, cwd, group, currentText });
+                  },
+                  onSave: () => { if (editing) draftControls.current?.save(); },
+                  target: draftSource ? target : shownTarget, onClasses: setClassSeed, onDefinition: define, t, debug, busy: navigation.busy, positionBlocked: refreshing || loading || !contentMatches, blocked: refreshing || loading || !contentMatches || (editing && draftDirty),
+                  onReader: instance => { reader.current = instance; }, canBack: history.index > 0, canForward: history.index + 1 < history.items.length, onNavigate: navigate, onShowDiff: isRepo && !draftSource ? () => { if (!content.external) { remember(); setView('diff'); } } : undefined,
                   onOpenDocument: destination => visit(destination),
                   definitions: navigation.targets, onChooseDefinition: item => visit({ ...item, focusSource: true }, navigation.origin) })
                   : content.binary ? h('div', { className: 'jb-diffempty' }, t('diff.binary'))
@@ -2326,7 +2399,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         splitHost.over?.group === group ? h('div', { className: 'jb-editor-drop', 'data-side': splitHost.over.side, 'aria-hidden': true }, t('files.drop' + splitHost.over.side[0].toUpperCase() + splitHost.over.side.slice(1))) : null),
         !paneOnly && splitHost.split ? h(PaneDivider, { layout: paneLayout, t, pane: 'editor' }) : null,
         !paneOnly && splitHost.split ? h('div', { className: 'jb-editor-secondary' }, h(CodeBrowser, { key: 'secondary', cwd, changes, isRepo, initialTarget: splitHost.split.initial, paneOnly: true, groupHost: splitHost, sharedDebug: controller,
-          onActiveFile, refreshRevision, refreshing, onShowDebug, onFindInFiles, onExplain, desktopPaths, t })) : null),
+          onActiveFile, refreshRevision, refreshing, onShowDebug, onFindInFiles, onExplain, onEdit, editDraft, onEditSaved, editSaving, setEditSaving, desktopPaths, t })) : null),
         classSeed ? h(PaneDivider, { layout: paneLayout, t, pane: 'classes' }) : null,
         classSeed ? h(ClassGraphWindow, { cwd, seed: classSeed, currentPath: target?.path ?? null, files, external: target?.path?.startsWith('dsh-library://') === true, dock: classDock, onDock: setClassDock, onOpen: destination => visit(destination), onClose: () => { setClassSeed(null); reader.current?.focus(); }, t }) : null))),
         debugHost ? createPortal(h(DebugPane, { debug, t, onMenu: (anchor, frame) => setMenu({ ...anchor, title: frame.name + ' · ' + (frame.path ? frame.path + ':' + frame.line : t('debug.external')), items: [
@@ -2342,7 +2415,76 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     // ------------------------------------------------------------- panel
+    function InlineEditControls({ draft, hidden, controls, saving, setSaving, onDirty, onClose, onSaved, t }) {
+      const [dirty, setDirty] = useState(() => draft.currentText !== draft.text);
+      const [confirm, setConfirm] = useState(null), [error, setError] = useState(null);
+      const [latest, setLatest] = useState(null);
+      const conflict = draft.conflict === true;
+      const params = new URLSearchParams({ cwd: draft.cwd, path: draft.path });
+      const close = (afterClose = null) => {
+        if (draft.pending) return;
+        if (draft.currentText !== draft.text) setConfirm(() => afterClose ?? (() => {}));
+        else { onClose(); afterClose?.(); }
+      };
+      const save = async () => {
+        const text = draft.currentText;
+        if (draft.pending || conflict || text === draft.text) return;
+        draft.pending = true;
+        setSaving(true);
+        setConfirm(null);
+        setError(null);
+        try {
+          const { version, writeVersion } = draft;
+          const saved = await api('/api/git.source.save?' + params, { method: 'POST', body: { text, version, writeVersion } });
+          Object.assign(draft, saved, { text });
+          setDirty(draft.currentText !== text);
+          onSaved(draft.cwd, { ...saved, text });
+          if (draft.currentText === text) onClose();
+        } catch (failure) {
+          const changed = failure.code === 'SOURCE_SAVE_CONFLICT';
+          draft.conflict = changed;
+          setError(changed ? t('edit.conflict') : t('edit.failed', { message: failure.message }));
+        } finally {
+          draft.pending = false;
+          setSaving(false);
+        }
+      };
+      controls.current = { close, save, update: () => setDirty(draft.currentText !== draft.text) };
+      useEffect(() => () => { controls.current = null; }, [controls]);
+      useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
+      const readLatest = async () => {
+        try {
+          const file = await api('/api/git.source?' + params);
+          if (typeof file?.text !== 'string') throw new Error(t('files.pick'));
+          setLatest(file.text);
+        } catch (failure) { setError(t('edit.diskFailed', { message: failure.message })); }
+      };
+      return h('section', { className: 'jb-inline-editor', hidden, 'aria-label': t('edit.open') },
+        h('div', { className: 'jb-edit-actions' },
+          dirty ? h('span', { role: 'status' }, t('edit.dirty')) : null,
+          h('button', { type: 'button', className: 'jb-tb-btn jb-edit-button', disabled: !dirty || saving || conflict, onClick: save }, t(saving ? 'edit.saving' : 'edit.save')),
+          h('button', { type: 'button', className: 'jb-tb-btn jb-edit-button', disabled: saving, onClick: () => close() }, t('edit.close'))),
+        error ? h('div', { className: 'jb-edit-actions', role: 'alert' }, error) : null,
+        conflict ? h('div', { className: 'jb-edit-actions' }, error === null ? t('edit.conflict') : null, h('button', { type: 'button', className: 'jb-tb-btn jb-edit-button', onClick: readLatest }, t('edit.latest'))) : null,
+        confirm ? h('div', { className: 'jb-edit-actions' }, h('span', null, t('edit.confirm')),
+          h('button', { type: 'button', className: 'jb-tb-btn jb-edit-button', onClick: () => setConfirm(null) }, t('edit.keep')),
+          h('button', { type: 'button', className: 'jb-tb-btn jb-edit-button', onClick: () => { onClose(); confirm(); } }, t('edit.discard'))) : null,
+        latest === null ? null : h('pre', { className: 'jb-edit-latest', 'aria-label': t('edit.latest') }, latest));
+    }
+
     function WorkbenchPanel(props) {
+      const [editDraft, setEditDraft] = useState(null);
+      const [editSaving, setEditSaving] = useState(false);
+      useEffect(() => {
+        if (!editDraft) return;
+        const protect = event => {
+          if (!editDraft.pending && editDraft.currentText === editDraft.text) return;
+          event.preventDefault();
+          event.returnValue = '';
+        };
+        window.addEventListener('beforeunload', protect);
+        return () => window.removeEventListener('beforeunload', protect);
+      }, [editDraft]);
       const { useWorkspaces, useSessions, t, openSession, sessionId, getLocale } = props;
       const workspaces = useWorkspaces((state) => state.items);
       const sessions = useSessions((state) => state.byId ?? {});
@@ -2364,6 +2506,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       const targetWorkspaceId = overrideId ?? boundWorkspace?.workspaceId ?? (sessionId === undefined ? workspaces[0]?.workspaceId : null) ?? null;
       const workspace = workspaces.find((item) => item.workspaceId === targetWorkspaceId) ?? null;
       const cwd = workspace ? workspace.path : null;
+      const currentEditWorkspace = useRef(cwd);
+      currentEditWorkspace.current = cwd;
 
       const tools = useBottomTools(currentSession?.id ?? null, t);
       const tab = tools.active;
@@ -2610,7 +2754,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           ? h('span', { className: 'jb-selectwrap' },
             h('span', { className: 'jb-tool-icon', style: { color: C.textDim } }, folderGlyph()),
             h('select', {
-              className: 'jb-select', value: targetWorkspaceId ?? '', disabled: statusLoading,
+              className: 'jb-select', value: targetWorkspaceId ?? '', disabled: statusLoading || editSaving,
               onChange: (event) => setOverrideId(event.target.value),
               title: t('repo.select'),
             }, workspaces.map((item) => h('option', { key: item.workspaceId, value: item.workspaceId },
@@ -2625,6 +2769,13 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
               : null)
           : null,
         h('span', { className: 'jb-spacer' }),
+        editDraft && editDraft.cwd !== cwd ? h('button', { type: 'button', className: 'jb-tb-btn jb-edit-button', onClick: () => {
+          const original = workspaces.find(item => item.path === editDraft.cwd);
+          if (!original) return;
+          editDraft.group = 'primary';
+          setOverrideId(original.workspaceId);
+          setSourceTarget({ path: editDraft.path, line: 0, character: 0, focusSource: true });
+        } }, t('edit.resume')) : null,
         ...reviewActions(t, cwd === null || refreshing || reviewSending || (tab === 'log' && detailLoading), intent => openReview(intent,
           commitPreview || (tab === 'log' && detail?.found) ? { kind: 'commit', detail }
             : tab === 'changes' && selected ? { kind: 'diff', entry: selected }
@@ -2732,7 +2883,11 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         reviewOpen && reviewTarget?.kind === 'workspace' ? h(ReviewComposer, { t, intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError, code: reviewCode, onSubmit: sendReview, onClearCode: clearReviewCode, onClose: closeReview }) : null,
         h('div', { className: 'jb-content' },
           status && cwd && !statusError ? h('div', { className: 'jb-browser-seat' },
-            h(CodeBrowser, { key: cwd, cwd, changes: status.changes ?? EMPTY_CHANGES, isRepo: status.isRepo, initialTarget: sourceTarget, refreshRevision, refreshing, commitPreview, onCloseCommitPreview: closeCommitPreview, onActiveFile: setActiveFile,
+            h(CodeBrowser, { key: cwd, cwd, onEdit: setEditDraft, editDraft, editSaving, setEditSaving, onEditSaved: savedCwd => {
+              if (savedCwd !== currentEditWorkspace.current) return;
+              setRefreshRevision(value => value + 1);
+              void reload({ loadLog: false });
+            }, changes: status.changes ?? EMPTY_CHANGES, isRepo: status.isRepo, initialTarget: sourceTarget, refreshRevision, refreshing, commitPreview, onCloseCommitPreview: closeCommitPreview, onActiveFile: setActiveFile,
               commitReview: { review: { open: reviewOpen && reviewTarget?.kind === 'commit', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
                 codeSet: reviewCode, onToggleCode: toggleReviewCode, onReviewSend: sendReview, onReviewClose: closeReview, onClearCode: clearReviewCode }, debugHost, onShowDebug: showDebug, onFindInFiles: openFind,
               onExplain: path => openReview('explain', { kind: 'workspace', path }), desktopPaths: props.desktopPaths, t })) : notice),
