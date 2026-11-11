@@ -107,7 +107,7 @@ Configure a debug adapter separately. Then set a breakpoint and press `F5` in so
 
 ## Scope
 
-- File reading, search, and Git inspection are read-only. Make source changes through the agent in your conversation or in your editor.
+- Edit existing text files directly in source view and save with `⌘S` / `Ctrl+S`. Review the resulting Git diff in Changes.
 - Terminal and debugging execute real commands or programs. The explanation conversation writes cards into the project, where workspace permissions and Git rules apply.
 - CI covers Linux and macOS core checks, package installation, and real language servers and debuggers. Desktop interaction has been tested on macOS. Windows and Linux desktop interaction remain unverified.
 

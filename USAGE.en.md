@@ -137,6 +137,8 @@ The editor uses [CodeMirror](https://codemirror.net/) (MIT). Controls use Lucide
 
 Browse and preview files in ordinary workspaces as well as Git repositories. When no preview is open, the file tree fills the available space. Git changes and history are available in Git repositories.
 
+Edit an existing UTF-8 workspace file directly in source view. For Markdown, switch from reading preview to source. The draft stays with the file when you switch tabs. Use **Save** or `⌘S` / `Ctrl+S` to write the file and refresh the preview and Git changes. The editor supports undo and asks before discarding an unsaved draft. If the disk version changed, the draft stays open and you can view the disk version. Editing supports text files up to 512 KiB with consistent LF or CRLF line endings.
+
 ## Python class relationships
 
 The default view follows the current file’s class and shows its ancestors, descendants and direct field types. Shared bases do not expand sibling branches, and field dependencies are not traversed recursively. Switching files resets the focus; use All classes to browse the complete index.

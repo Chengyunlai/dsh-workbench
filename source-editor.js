@@ -1,7 +1,7 @@
 /** Continuous, read-only source editor with JetBrains-style pointer and keyboard navigation. */
-import { EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
+import { Compartment, EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
 import { EditorView, Decoration, WidgetType, gutter, GutterMarker, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, hoverTooltip, tooltips, closeHoverTooltips, hasHoverTooltips, activateHover } from '@codemirror/view';
-import { defaultKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { highlightSelectionMatches, search, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { LanguageSupport, StreamLanguage, syntaxTree, syntaxHighlighting, bracketMatching, foldGutter, foldKeymap, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language';
 import { javascript } from '@codemirror/lang-javascript';
@@ -328,11 +328,16 @@ export function createSourceEditor(parent, options) {
     const box = view.coordsAtPos(view.state.selection.main.head);
     options.onContextMenu({ x: box?.left ?? 8, y: box?.bottom ?? 8 }, positionAt(view)); return true;
   };
+  const editability = new Compartment();
+  let writable = Boolean(options.writable);
+  const editingExtensions = enabled => [
+    EditorState.readOnly.of(!enabled), EditorView.editable.of(enabled),
+    EditorView.contentAttributes.of({ tabindex: '0', 'aria-label': options.label, 'aria-readonly': String(!enabled) }),
+  ];
   const createState = (text, path) => EditorState.create({ doc: text, extensions: [
-    EditorState.readOnly.of(true), EditorState.tabSize.of(2), EditorView.editable.of(false),
+    editability.of(editingExtensions(writable)), EditorState.tabSize.of(2), history(),
     EditorState.phrases.of(options.foldPhrases),
     EditorState.phrases.of(options.searchPhrases ?? {}),
-    EditorView.contentAttributes.of({ tabindex: '0', 'aria-label': options.label, 'aria-readonly': 'true' }),
     debugField, debugLines, inlineValues, inspection, tooltips({ parent: document.body, position: 'fixed' }),
     gutter({ class: 'jb-breakpoints', lineMarker: (view, line) => { const number = view.state.doc.lineAt(line.from).number, value = view.state.field(debugField); const point = value.breakpoints.find(item => item.line === number); return new BreakpointMarker(Boolean(point), point?.verified === true, value.currentLine === number, options.breakpointLabel); }, lineMarkerChange: update => update.transactions.some(transaction => transaction.effects.some(effect => effect.is(debugEffect))), domEventHandlers: { mousedown: (view, line, event) => { event.preventDefault(); options.onToggleBreakpoint(view.state.doc.lineAt(line.from).number); return true; } } }),
     lineNumbers(), foldGutter(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(), bracketMatching(),
@@ -342,6 +347,7 @@ export function createSourceEditor(parent, options) {
     syntaxHighlighting(sourceHighlighting), sourceLanguage(path),
     linkField,
     Prec.highest(keymap.of([
+      { key: 'Mod-s', run: () => { if (!writable) return false; options.onSave?.(); return true; }, stopPropagation: true },
       { key: 'Escape', run: view => { if (!hasHoverTooltips(view.state)) return false; view.dispatch({ effects: closeHoverTooltips }); return true; }, stopPropagation: true },
       { key: 'Mod-b', run: define, stopPropagation: true },
       { key: 'F9', run: view => { options.onToggleBreakpoint(positionAt(view).line + 1); return true; }, stopPropagation: true },
@@ -355,8 +361,8 @@ export function createSourceEditor(parent, options) {
       { key: 'Ctrl-Alt-ArrowRight', mac: 'Meta-Alt-ArrowRight', run: view => { options.onForward(positionAt(view)); return true; }, stopPropagation: true },
     ])),
     keymap.of(foldKeymap.map(binding => ({ ...binding, stopPropagation: true }))),
-    keymap.of(defaultKeymap),
-    EditorView.updateListener.of(update => { if (update.selectionSet) options.onPosition(positionAt(update.view)); }),
+    keymap.of([...historyKeymap, ...defaultKeymap]),
+    EditorView.updateListener.of(update => { if (update.selectionSet) options.onPosition(positionAt(update.view)); if (update.docChanged && writable) options.onChange?.(update.state.doc.toString()); }),
     EditorView.domEventHandlers({
       mousedown(event, view) {
         if (event.button === 3 || event.button === 4) {
@@ -489,6 +495,13 @@ export function createSourceEditor(parent, options) {
         foldedRanges(view.state).between(position, position, (from, to) => { if (from < position && position < to) effects.push(unfoldEffect.of({ from, to })); });
       }
       view.dispatch({ effects });
+    },
+    text: () => view.state.doc.toString(),
+    setVersion: version => { sourceVersion = version; },
+    setWritable: enabled => {
+      if (writable === enabled) return;
+      writable = enabled;
+      view.dispatch({ effects: editability.reconfigure(editingExtensions(enabled)) });
     },
     setSource: (source, position) => { clearTimeout(hoverTimer); hoverTarget = null; sourceVersion = source.version; view.setState(createState(source.text, source.path)); restoreFolds(position); reveal(position, true); },
     snapshot: () => {

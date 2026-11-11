@@ -11,6 +11,7 @@ const TYPESCRIPT_EXT = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
 const LIBRARY_SOURCE = /\.(?:pyi?|go|java|[cm]?[jt]sx?)$/i;
 const LIBRARY_PREFIX = 'dsh-library://';
 const failure = (message, code, status = 400) => Object.assign(new Error(message), { code, status });
+const editablePath = (path, file) => !imageMime(path) && !path.toLowerCase().split('/').includes('.git') && !file.targetKey.toLowerCase().split(/[\\/]/).includes('.git');
 const versionOf = text => createHash('sha256').update(text).digest('hex');
 
 function pythonReceiverType(locations, sourceUri, lines, line, character) {
@@ -56,7 +57,7 @@ async function readSourceFile(ctx, root, file, signal) {
   let text;
   try { text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); }
   catch (error) { throw failure('source must be UTF-8', 'SOURCE_ENCODING', 415); }
-  return { root, file, text, version: versionOf(text) };
+  return { root, file, text, version: versionOf(text), writeVersion: stat.version };
 }
 
 /**
@@ -112,7 +113,7 @@ async function listPlainWorkspace(ctx, cwd, signal) {
 /**
  * Create authenticated route handlers using the plugin's workspace and Git validation.
  * @param dependencies - Shared Git runner, registered-workspace/path validators, and JSON response writer.
- * @returns Tree, source/image and definition handlers, plus disposal of workspace-scoped library references.
+ * @returns Tree, source/image, save and definition handlers, plus disposal of workspace-scoped library references.
  */
 export function navigationHandlers({ runGit, requireWorkspacePath, requireRelativePath, json, languageServers, imagePreviewMaxBytes, navigationMaxLibrarySources }) {
   const libraries = new Map(); let disposed = false;
@@ -172,7 +173,32 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
       requireRelativePath(path);
       if (imageMime(path)) return json(await readImagePreview(ctx, cwd, path, signal, imagePreviewMaxBytes));
       const source = await readWorkspaceSource(ctx, cwd, path, signal);
-      return json({ path, text: source.text, version: source.version });
+      return json({ path, text: source.text, version: source.version, writeVersion: editablePath(path, source.file) ? source.writeVersion : undefined });
+    },
+    save: async (ctx, request, signal) => {
+      const { cwd, query } = await readQuery(ctx, request, signal);
+      const path = requireRelativePath(query.get('path'));
+      let payload;
+      try { payload = await request.json(); } catch { throw failure('invalid save payload', 'INVALID_SAVE_PAYLOAD'); }
+      if (typeof payload?.text !== 'string' || typeof payload.writeVersion !== 'string' || !payload.writeVersion || typeof payload.version !== 'string' || payload.text.includes('\0') || !payload.text.isWellFormed()) {
+        throw failure('invalid save payload', 'INVALID_SAVE_PAYLOAD');
+      }
+      if (Buffer.byteLength(payload.text) > MAX_SOURCE_BYTES) throw failure('source exceeds 512 KiB', 'SOURCE_TOO_LARGE', 413);
+      let source;
+      try { source = await readWorkspaceSource(ctx, cwd, path, signal); }
+      catch (error) {
+        if (error.status === 404 || error.status === 413 || error.status === 415) throw failure('file changed on disk', 'SOURCE_SAVE_CONFLICT', 409);
+        throw error;
+      }
+      if (!editablePath(path, source.file)) throw failure('file cannot be edited', 'SOURCE_NOT_EDITABLE', 403);
+      if (source.writeVersion !== payload.writeVersion || source.version !== payload.version) throw failure('file changed on disk', 'SOURCE_SAVE_CONFLICT', 409);
+      try {
+        const saved = await ctx.fs.writeText(source.file, payload.text, { kind: 'replaceIfVersion', version: source.writeVersion }, signal);
+        return json({ version: versionOf(payload.text), writeVersion: saved.version });
+      } catch (error) {
+        if (error.code === 'FS_STALE_VERSION') throw failure('file changed on disk', 'SOURCE_SAVE_CONFLICT', 409);
+        throw error;
+      }
     },
     definition: async (ctx, request, signal) => {
       const { query, cwd } = await readQuery(ctx, request, signal);
