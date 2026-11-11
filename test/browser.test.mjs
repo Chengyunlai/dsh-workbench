@@ -349,7 +349,8 @@ test('file tab menus close the clicked tab, keep it when closing others, and cle
  await ui.menu(tab('src/lib.ts'), 'files.tabCloseAll');
  assert.equal(tabs().length, 0);
  assert.equal(ui.container.querySelector('.cm-content'), null);
- assert.equal(ui.dom.window.document.activeElement, ui.container.querySelector('.jb-detail'));
+ assert.equal(ui.container.querySelector('.jb-code-workspace').dataset.treeOnly, 'true');
+ assert.ok(ui.dom.window.document.activeElement.matches('.jb-tree-toolbar input'));
  await ui.click('main.ts');
  assert.equal(ui.editor().state.selection.main.head, 0);
 });
@@ -2192,4 +2193,17 @@ test('file tree toggles ignored local configuration without changing the default
  await ui.click('tree.showIgnored');
  assert.equal(toggle().getAttribute('aria-pressed'),'false');
  assert.ok(!ui.container.textContent.includes('harness.local.json'));
+});
+
+test('a non-Git workspace starts with a full file tree and opens a preview on selection', async context => {
+  const ui = await panel(context, server(url => {
+    if (url.pathname === '/api/git.status') return { ok: true, json: async () => ({ isRepo: false }) };
+    if (url.pathname === '/api/git.tree') return { ok: true, json: async () => ({ files: ['note.md'] }) };
+    if (url.pathname === '/api/git.source') return { ok: true, json: async () => ({ path: 'note.md', text: '# Note', version: '1' }) };
+  }));
+  const workspace = () => ui.container.querySelector('.jb-code-workspace');
+  assert.equal(workspace().dataset.treeOnly, 'true');
+  await ui.click('note.md');
+  assert.equal(workspace().dataset.treeOnly, 'false');
+  assert.ok(ui.container.querySelector('.jb-source-tab'));
 });

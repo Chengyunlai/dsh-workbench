@@ -135,6 +135,8 @@ Tests cover real Git file enumeration, real compiler and Pyright cross-file/type
 
 The editor uses [CodeMirror](https://codemirror.net/) (MIT). Controls use Lucide icons (ISC); file-type icons originate from vscode-icons (MIT).
 
+Browse and preview files in ordinary workspaces as well as Git repositories. When no preview is open, the file tree fills the available space. Git changes and history are available in Git repositories.
+
 ## Python class relationships
 
 The default view follows the current file’s class and shows its ancestors, descendants and direct field types. Shared bases do not expand sibling branches, and field dependencies are not traversed recursively. Switching files resets the focus; use All classes to browse the complete index.

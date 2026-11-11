@@ -215,3 +215,20 @@ test('compiler navigation supports both case-sensitive and case-insensitive file
     assert.equal(await exited, 0);
   }
 });
+
+test('a registered directory without Git can list and preview workspace files', async t => {
+  const h = await fixture(t);
+  const cwd = join(h.base, 'plain');
+  await fs.mkdir(join(cwd, 'nested'), { recursive: true });
+  await fs.writeFile(join(cwd, 'nested', 'note.md'), '# Note');
+  await fs.symlink(h.root, join(cwd, 'outside'), 'junction');
+  h.ctx.workspaceRegistry.list = async () => [{ path: cwd, id: 'plain' }];
+  h.ctx.fs.listDir = async directory => Promise.all((await fs.readdir(directory.targetKey, { withFileTypes: true })).map(async entry => ({
+    name: entry.name,
+    type: entry.isFile() ? 'file' : 'directory',
+    target: await h.ctx.fs.resolve(entry.name, { cwd: directory.targetKey }),
+  })));
+  assert.equal((await h.call('status', { cwd })).isRepo, false);
+  assert.deepEqual(await h.call('tree', { cwd }), { status: 200, files: ['nested/note.md'] });
+  assert.equal((await h.call('source', { cwd, path: 'nested/note.md' })).text, '# Note');
+});

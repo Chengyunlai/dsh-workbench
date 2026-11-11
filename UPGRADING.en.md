@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.6.4
+
+Browse and preview files in workspaces without Git. The file tree fills the available space whenever no preview is open.
+
 ## 1.6.3
 
 The file tree toolbar adds a Show Git-ignored files toggle for local configuration and other ignored files without changing Git ignore rules. Dependency and cache directories remain hidden, and the default listing is unchanged. Update through Harness plugin management; personal configuration and cards need no migration.
