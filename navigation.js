@@ -84,6 +84,31 @@ export async function typescriptDefinitions(data, signal) {
   }
 }
 
+const TREE_CACHE_DIRS = ['node_modules', '.venv', 'venv', '__pycache__', '.cache', '.tools'];
+
+async function listPlainWorkspace(ctx, cwd, signal) {
+  const root = await ctx.fs.resolve(cwd, { signal });
+  const files = [];
+  const pending = [{ target: root, prefix: '' }];
+  const seen = new Set([root.targetKey]);
+  let visited = 0;
+  while (pending.length) {
+    signal.throwIfAborted();
+    const { target, prefix } = pending.pop();
+    for (const entry of await ctx.fs.listDir(target, signal)) {
+      signal.throwIfAborted();
+      if (++visited > 20_000) return { files: files.sort(), truncated: true };
+      if (!ctx.fs.contains(root, entry.target)) continue;
+      const path = prefix + entry.name;
+      if (entry.type === 'file') files.push(path);
+      if (entry.type !== 'directory' || entry.name === '.git' || TREE_CACHE_DIRS.includes(entry.name) || seen.has(entry.target.targetKey)) continue;
+      seen.add(entry.target.targetKey);
+      pending.push({ target: entry.target, prefix: path + '/' });
+    }
+  }
+  return { files: files.sort() };
+}
+
 /**
  * Create authenticated route handlers using the plugin's workspace and Git validation.
  * @param dependencies - Shared Git runner, registered-workspace/path validators, and JSON response writer.
@@ -126,11 +151,13 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
   return {
     dispose: () => { disposed = true; libraries.clear(); },
     tree: async (ctx, request, signal) => {
-      const { cwd } = await readQuery(ctx, request, signal);
+      const { cwd, query } = await readQuery(ctx, request, signal);
+      const probe = await runGit(ctx, cwd, ['rev-parse', '--is-inside-work-tree', '--show-prefix'], { allowed: [0, 128], signal });
+      if (!probe.stdout.startsWith('true\n') && !probe.stdout.startsWith('true\r\n')) return json(await listPlainWorkspace(ctx, cwd, signal));
       const result = await runGit(ctx, cwd, ['ls-files', '--cached', '--others', '--exclude-standard', '--full-name', '-z'], { signal });
-      const includeIgnored = new URL(request.url).searchParams.get('includeIgnored') === '1';
-      const ignoredDsh = await runGit(ctx, cwd, ['ls-files', '--others', '--ignored', '--exclude-standard', '--full-name', '-z', '--', ...(includeIgnored ? ['.', ...['node_modules', '.venv', 'venv', '__pycache__', '.cache', '.tools'].map(name => ':(exclude,glob)**/' + name + '/**')] : ['.dsh/'])], { signal });
-      const prefix = (await runGit(ctx, cwd, ['rev-parse', '--show-prefix'], { signal })).stdout.replace(/\r?\n$/, '');
+      const includeIgnored = query.get('includeIgnored') === '1';
+      const ignoredDsh = await runGit(ctx, cwd, ['ls-files', '--others', '--ignored', '--exclude-standard', '--full-name', '-z', '--', ...(includeIgnored ? ['.', ...TREE_CACHE_DIRS.map(name => ':(exclude,glob)**/' + name + '/**')] : ['.dsh/'])], { signal });
+      const prefix = probe.stdout.replace(/^true\r?\n/, '').replace(/\r?\n$/, '');
       const files = [...new Set([result, ignoredDsh].flatMap(({ stdout }) => stdout.split('\0'))
         .filter(path => path && path.startsWith(prefix)).map(path => path.slice(prefix.length)))].sort();
       return json({ files });

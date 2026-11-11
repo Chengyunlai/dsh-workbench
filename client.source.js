@@ -79,6 +79,7 @@ window.__ModuleLoader__.load({
       'debug.inspect': 'Inspect variable value', 'debug.hoverMissing': 'Not exposed in the selected frame', 'debug.hoverLimited': 'Variable limit reached; use Evaluate expression', 'debug.hoverInvalid': 'Invalid variable response', 'debug.hoverFailed': 'Could not inspect this variable: {message}',
       'debug.typeDefinition': 'Go to source type definition', 'debug.typeMissing': 'No source type definition found',
       "tree.locate": "Locate current file",
+      "tree.truncated": "File listing reached its limit.",
       "tree.showIgnored": "Show Git-ignored files (excluding dependencies and caches)",
       "tree.findName": "Find by file name",
       "tree.findFile": "Find in file",
@@ -333,6 +334,7 @@ window.__ModuleLoader__.load({
       'debug.inspect': '查看变量值', 'debug.hoverMissing': '当前栈帧未提供此变量', 'debug.hoverLimited': '已达到变量读取上限，请使用计算表达式', 'debug.hoverInvalid': '变量响应无效', 'debug.hoverFailed': '无法读取此变量：{message}',
       'debug.typeDefinition': '跳转到源码类型定义', 'debug.typeMissing': '未找到源码中的类型定义',
       "tree.locate": "定位当前文件",
+      "tree.truncated": "文件列表已达到显示上限。",
       "tree.showIgnored": "显示 Git 忽略文件（不含依赖与缓存目录）",
       "tree.findName": "按文件名查找",
       "tree.findFile": "在文件中查找",
@@ -824,6 +826,8 @@ ${Object.entries(C.syntax).map(([role,color]) => '.jb-document .jb-syntax-' + ro
 @media(pointer:coarse){.jb-goto input{font-size:16px}}
 .jb-changes{flex:1;min-width:0;display:flex}
 .jb-code-browser{position:relative;min-height:0;overflow:hidden}
+.jb-code-browser .jb-code-workspace[data-tree-only=true]>.jb-tree{width:100%;flex:1;max-height:none;border:0}
+.jb-code-workspace[data-tree-only=true]>:not(.jb-tree){display:none}
 .jb-code-workspace{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
 .jb-code-browser .jb-code-workspace>.jb-tree{box-sizing:border-box;width:clamp(160px,var(--jb-tree-width,340px),calc(100% - 246px));min-width:0}
 .jb-pane-divider{position:relative;flex:none;align-self:stretch;background:${C.bg};touch-action:none;user-select:none;outline:none}
@@ -1830,7 +1834,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         { id: 'definition', label: t('files.definition'), shortcut: 'F12', disabled: callbacks.current.busy, run: () => callbacks.current.onDefinition(at.line, at.character) },
         { id: 'find', label: t('tree.findFile'), shortcut: '⌘F / Ctrl F', run: () => editor.current.find() },
         { id: 'line', label: t('files.goLine'), shortcut: '⌘L / Ctrl G', run: () => setGoLine(true) },
-        { id: 'diff', label: t('files.diff'), disabled: source.external, run: () => callbacks.current.onShowDiff() },
+        { id: 'diff', label: t('files.diff'), disabled: source.external || !callbacks.current.onShowDiff, run: () => callbacks.current.onShowDiff?.() },
         { id: 'back', label: t('files.back'), disabled: !callbacks.current.canBack, run: () => callbacks.current.onNavigate(-1, editor.current.position()) },
         { id: 'forward', label: t('files.forward'), disabled: !callbacks.current.canForward, run: () => callbacks.current.onNavigate(1, editor.current.position()) },
         ] });
@@ -1995,7 +1999,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
     }
 
     /** Own source/diff requests and definition history independently of the conversation. */
-    function CodeBrowser({ cwd, changes, initialTarget, commitPreview, onCloseCommitPreview, commitReview, onActiveFile, refreshRevision = 0, refreshing = false, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t, paneOnly = false, groupHost, sharedDebug }) {
+    const EMPTY_CHANGES = [];
+    function CodeBrowser({ cwd, changes, isRepo = true, initialTarget, commitPreview, onCloseCommitPreview, commitReview, onActiveFile, refreshRevision = 0, refreshing = false, debugHost, onShowDebug, onFindInFiles, onExplain, desktopPaths, t, paneOnly = false, groupHost, sharedDebug }) {
       const ownGroups = useEditorSplit();
       const splitHost = groupHost ?? ownGroups;
       const group = paneOnly ? 'secondary' : 'primary';
@@ -2021,6 +2026,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
       useLayoutEffect(() => { if (filterFocus) { filterInput.current.focus(); filterInput.current.setSelectionRange?.(filter.length, filter.length); } }, [filterFocus]);
       const [treeError, setTreeError] = useState(null);
+      const [treeTruncated, setTreeTruncated] = useState(false);
       const [history, setHistory] = useState(() => ({ items: initialTarget ? [initialTarget] : [], index: initialTarget ? 0 : -1 }));
       const [openPaths, setOpenPaths] = useState(() => initialTarget ? [initialTarget.path] : []);
       const [libraryLabels, setLibraryLabels] = useState(() => new Map());
@@ -2029,7 +2035,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         if (!closingTabs.current) return;
         closingTabs.current = false;
         const detail = detailRef.current;
-        (detail?.querySelector('.jb-source-tabs [aria-selected=true]') ?? detail)?.focus();
+        const treeOnly = paneLayout.workspace.current?.dataset.treeOnly === 'true';
+        (treeOnly ? filterInput.current : detail?.querySelector('.jb-source-tabs [aria-selected=true]') ?? detail)?.focus();
       }, [openPaths]);
       const panelId = React.useId();
       const target = history.items[history.index] ?? null;
@@ -2153,12 +2160,12 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
             { id: 'expand', label: t('tree.expand'), run: entry.expand },
             { id: 'collapse', label: t('tree.collapse'), run: entry.collapse },
             { id: 'find-name', label: t('tree.findName'), run: () => { setFilter(path + '/'); setFilterFocus(value => value + 1); } },
-            { id: 'find-directory', label: t('tree.findDirectory'), shortcut: '⌘⇧F / Ctrl Shift F', run: () => onFindInFiles(path) },
+            { id: 'find-directory', label: t('tree.findDirectory'), shortcut: '⌘⇧F / Ctrl Shift F', disabled: !isRepo, run: () => onFindInFiles(path) },
           ] : [
             { id: 'source', label: t('files.read'), run: () => openFile(path) },
             { id: 'explain', label: t('review.button.explain'), run: () => onExplain(path) },
             { id: 'find-file', label: t('tree.findFile'), shortcut: '⌘F / Ctrl F', disabled: /\.(?:png|jpe?g|gif|webp|bmp|ico|icns|avif)$/i.test(path), run: () => visit({ path, line: 0, character: 0, documentMode: 'source', focusSource: true, find: true }) },
-            { id: 'diff', label: t('files.diff'), run: () => visit({ path, line: 0, character: 0 }, null, 'diff') },
+            { id: 'diff', label: t('files.diff'), disabled: !isRepo, run: () => visit({ path, line: 0, character: 0 }, null, 'diff') },
           ]),
           ...(canOpenLocal ? [{ id: 'open-local', label: t(directory ? 'tree.openLocal' : 'tree.revealLocal'), run: async () => {
             setLocalOpenError(false);
@@ -2179,7 +2186,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
       useEffect(() => {
         const controller = new AbortController();
         api(`/api/git.tree?${new URLSearchParams({ cwd, ...(includeIgnored ? { includeIgnored: '1' } : {}) })}`, { signal: controller.signal })
-          .then(data => { if (!controller.signal.aborted) { setFiles(data.files); setTreeError(null); } })
+          .then(data => { if (!controller.signal.aborted) { setFiles(data.files); setTreeTruncated(data.truncated === true); setTreeError(null); } })
           .catch(error => { if (!controller.signal.aborted) setTreeError(error.message); });
         return () => controller.abort();
       }, [cwd, changes, refreshRevision, includeIgnored]);
@@ -2280,13 +2287,14 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           if (event.key === 'F4') { event.preventDefault(); event.stopPropagation(); setView('source'); }
           if ((event.metaKey || event.ctrlKey) && ['[', ']'].includes(event.key)) { event.preventDefault(); event.stopPropagation(); navigate(event.key === '[' ? -1 : 1); }
         } },
-        h('div', { ref: paneLayout.workspace, className: 'jb-code-workspace' }, h('div', { className: 'jb-tree' },
+        h('div', { ref: paneLayout.workspace, className: 'jb-code-workspace', 'data-tree-only': !paneOnly && !target && !commitPreview && !splitHost.split && !classSeed }, h('div', { className: 'jb-tree' },
           h('div', { className: 'jb-tree-toolbar' },
             h('div', { className: 'jb-filter' }, searchGlyph(), h('input', { ref: filterInput, type: 'search', value: filter, 'aria-label': t('tree.findName'), placeholder: t('filter.placeholder'), onChange: event => setFilter(event.target.value) })),
-            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.showIgnored'), 'aria-label': t('tree.showIgnored'), 'aria-pressed': includeIgnored, onClick: () => setIncludeIgnored(value => !value) }, lucideSvg([h('path', { d: 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z' }), h('circle', { cx: 12, cy: 12, r: 3 })], 16)),
-            h('button', { type: 'button', className: 'jb-tb-btn', title: t('classes.title'), 'aria-label': t('classes.title'), disabled: content?.external, onClick: () => setClassSeed({ path: target?.path, line: reader.current?.position?.().line ?? target?.line ?? 0 }) }, lucideSvg([h('rect', { x: 8, y: 2, width: 8, height: 6, rx: 1 }), h('path', { d: 'M12 8v5M5 13v3m14-3v3' }), h('rect', { x: 2, y: 16, width: 6, height: 6, rx: 1 }), h('rect', { x: 16, y: 16, width: 6, height: 6, rx: 1 })], 16)),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.showIgnored'), 'aria-label': t('tree.showIgnored'), 'aria-pressed': includeIgnored, disabled: !isRepo, onClick: () => setIncludeIgnored(value => !value) }, lucideSvg([h('path', { d: 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z' }), h('circle', { cx: 12, cy: 12, r: 3 })], 16)),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('classes.title'), 'aria-label': t('classes.title'), disabled: !isRepo || content?.external, onClick: () => setClassSeed({ path: target?.path, line: reader.current?.position?.().line ?? target?.line ?? 0 }) }, lucideSvg([h('rect', { x: 8, y: 2, width: 8, height: 6, rx: 1 }), h('path', { d: 'M12 8v5M5 13v3m14-3v3' }), h('rect', { x: 2, y: 16, width: 6, height: 6, rx: 1 }), h('rect', { x: 16, y: 16, width: 6, height: 6, rx: 1 })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.locate'), 'aria-label': t('tree.locate'), disabled: !target || !files?.includes(target.path), onClick: () => { setFilter(''); setRevealRevision(value => value + 1); } }, lucideSvg([h('circle', { cx: 12, cy: 12, r: 6 }), h('path', { d: 'M12 2v6m0 8v6M2 12h6m8 0h6' })], 16)),
-            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.findDirectory'), 'aria-label': t('tree.findDirectory'), onClick: () => onFindInFiles('') }, searchGlyph(16))),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.findDirectory'), 'aria-label': t('tree.findDirectory'), disabled: !isRepo, onClick: () => onFindInFiles('') }, searchGlyph(16))),
+          treeTruncated ? h('div', { className: 'jb-tree-hint', role: 'status' }, t('tree.truncated')) : null,
           treeError ? h('div', { className: 'jb-notice' }, treeError) : files === null ? h('div', { className: 'jb-tree-hint' }, t('loading')) : h(WorkspaceTree, { files, changes, selectedPath: target?.path, onSelect: openFile, onMenu: fileMenu, filter, revealRevision, t })),
         !paneOnly ? h(PaneDivider, { layout: paneLayout, t }) : null,
         h('div', { className: 'jb-reader-layout' }, h('div', { className: 'jb-reader-workspace', 'data-class-dock': classDock },
@@ -2303,7 +2311,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
           h('div', { className: 'jb-source-panel', role: 'tabpanel', id: panelId, 'aria-labelledby': target ? `${panelId}-tab-${openPaths.indexOf(target.path)}` : undefined },
           !content ? h('div', { className: 'jb-diffempty', role: error ? 'alert' : undefined }, error ?? t(loading ? 'loading' : 'files.pick'))
                 : shownView === 'source' ? h(content.kind === 'image' ? ImageReader : SourceEditor, { ...(content.kind === 'image' ? { key: content.path + ':' + content.version } : {}), source: content, target: shownTarget, onClasses: setClassSeed, onDefinition: define, t, debug, busy: navigation.busy, blocked: refreshing || loading || !contentMatches,
-                  onReader: instance => { reader.current = instance; }, canBack: history.index > 0, canForward: history.index + 1 < history.items.length, onNavigate: navigate, onShowDiff: () => { if (!content.external) { remember(); setView('diff'); } },
+                  onReader: instance => { reader.current = instance; }, canBack: history.index > 0, canForward: history.index + 1 < history.items.length, onNavigate: navigate, onShowDiff: isRepo ? () => { if (!content.external) { remember(); setView('diff'); } } : undefined,
                   onOpenDocument: destination => visit(destination),
                   definitions: navigation.targets, onChooseDefinition: item => visit({ ...item, focusSource: true }, navigation.origin) })
                   : content.binary ? h('div', { className: 'jb-diffempty' }, t('diff.binary'))
@@ -2317,7 +2325,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
                         } }, h(DiffLines, { lines: parseDiff(content.text, content.untracked === true), selectable: false, codeSet: [], onToggle: () => {}, path: loaded?.path ?? target?.path })))),
         splitHost.over?.group === group ? h('div', { className: 'jb-editor-drop', 'data-side': splitHost.over.side, 'aria-hidden': true }, t('files.drop' + splitHost.over.side[0].toUpperCase() + splitHost.over.side.slice(1))) : null),
         !paneOnly && splitHost.split ? h(PaneDivider, { layout: paneLayout, t, pane: 'editor' }) : null,
-        !paneOnly && splitHost.split ? h('div', { className: 'jb-editor-secondary' }, h(CodeBrowser, { key: 'secondary', cwd, changes, initialTarget: splitHost.split.initial, paneOnly: true, groupHost: splitHost, sharedDebug: controller,
+        !paneOnly && splitHost.split ? h('div', { className: 'jb-editor-secondary' }, h(CodeBrowser, { key: 'secondary', cwd, changes, isRepo, initialTarget: splitHost.split.initial, paneOnly: true, groupHost: splitHost, sharedDebug: controller,
           onActiveFile, refreshRevision, refreshing, onShowDebug, onFindInFiles, onExplain, desktopPaths, t })) : null),
         classSeed ? h(PaneDivider, { layout: paneLayout, t, pane: 'classes' }) : null,
         classSeed ? h(ClassGraphWindow, { cwd, seed: classSeed, currentPath: target?.path ?? null, files, external: target?.path?.startsWith('dsh-library://') === true, dock: classDock, onDock: setClassDock, onOpen: destination => visit(destination), onClose: () => { setClassSeed(null); reader.current?.focus(); }, t }) : null))),
@@ -2723,8 +2731,8 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         refreshing || refreshError || refreshNotice ? h('div', { className: refreshError ? 'jb-notice jb-notice-error' : 'jb-notice', role: refreshError ? 'alert' : 'status' }, refreshError ? t('repo.refreshFailed', { message: refreshError }) : t(refreshing ? 'repo.refreshing' : 'repo.refreshLimited')) : null,
         reviewOpen && reviewTarget?.kind === 'workspace' ? h(ReviewComposer, { t, intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError, code: reviewCode, onSubmit: sendReview, onClearCode: clearReviewCode, onClose: closeReview }) : null,
         h('div', { className: 'jb-content' },
-          status?.isRepo && !statusError ? h('div', { className: 'jb-browser-seat' },
-            h(CodeBrowser, { key: cwd, cwd, changes: status.changes, initialTarget: sourceTarget, refreshRevision, refreshing, commitPreview, onCloseCommitPreview: closeCommitPreview, onActiveFile: setActiveFile,
+          status && cwd && !statusError ? h('div', { className: 'jb-browser-seat' },
+            h(CodeBrowser, { key: cwd, cwd, changes: status.changes ?? EMPTY_CHANGES, isRepo: status.isRepo, initialTarget: sourceTarget, refreshRevision, refreshing, commitPreview, onCloseCommitPreview: closeCommitPreview, onActiveFile: setActiveFile,
               commitReview: { review: { open: reviewOpen && reviewTarget?.kind === 'commit', intent: reviewIntent, sending: reviewSending, sent: reviewSent, error: reviewError },
                 codeSet: reviewCode, onToggleCode: toggleReviewCode, onReviewSend: sendReview, onReviewClose: closeReview, onClearCode: clearReviewCode }, debugHost, onShowDebug: showDebug, onFindInFiles: openFind,
               onExplain: path => openReview('explain', { kind: 'workspace', path }), desktopPaths: props.desktopPaths, t })) : notice),
