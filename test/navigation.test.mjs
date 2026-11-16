@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
@@ -37,6 +38,19 @@ test('tree can show ignored local configuration without dependency caches or cha
  assert.ok(!shown.files.includes('node_modules/pkg/index.js'));
  assert.ok(!shown.files.includes('.venv/lib/module.py'));
  assert.ok(!(await h.call('tree')).files.includes('config/harness.local.json'));
+});
+
+test('show ignored lists files inside an ignored embedded repository', async t => {
+ const h = await fixture(t);
+ const nested = join(h.root, 'local-project');
+ await fs.mkdir(nested);
+ execFileSync('git', ['init', '-q', nested]);
+ await fs.writeFile(join(nested, 'notes.md'), '# Local notes');
+ await fs.appendFile(join(h.root, '.gitignore'), '\nlocal-project/\n');
+ assert.ok(!(await h.call('tree')).files.includes('local-project/notes.md'));
+ const shown = await h.call('tree', { includeIgnored: '1' });
+ assert.ok(shown.files.includes('local-project/notes.md'));
+ assert.equal((await h.call('source', { path: 'local-project/notes.md' })).text, '# Local notes');
 });
 
 test('real compiler resolves imported alias, type, local shadowing, UTF-16 columns and JavaScript', async t => {
@@ -238,8 +252,13 @@ test('saving an existing text file preserves concurrent changes and uses a condi
   const path = 'src/main.ts', absolute = join(h.root, path);
   const stat = h.ctx.fs.stat;
   let revision = 'first', writes = 0, race = false;
+  const get = h.ctx.get;
+  h.ctx.get = name => name === 'sandboxPolicy'
+    ? { resolve: () => ({ mode: 'workspace-write', workspaceRoot: h.base }) }
+    : get(name);
   h.ctx.fs.stat = async target => ({ ...await stat(target), version: revision });
-  h.ctx.fs.writeText = async (target, text, expected) => {
+  h.ctx.fs.writeText = async (target, text, expected, _signal, policy) => {
+    assert.deepEqual(policy, { mode: 'workspace-write', workspaceRoot: h.root });
     assert.equal(target.targetKey, absolute);
     assert.deepEqual(expected, { kind: 'replaceIfVersion', version: revision });
     if (race) {

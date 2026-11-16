@@ -137,9 +137,6 @@ test('TypeScript source maps bind original source lines and step through typed c
   await writeFile(join(h.root, 'main.js'), built.outputText);
   await writeFile(join(h.root, 'main.js.map'), built.sourceMapText);
   const started = await request(h, { action: 'start', currentFile: 'main.ts', breakpoints: { 'main.ts': [3] } });
-  const entry = await status(h, started.id, data => data.state === 'paused' && data.frames[0]?.path === 'main.ts');
-  assert.equal(entry.frames[0].line, 2);
-  await request(h, { action: 'continue', id: started.id });
   const paused = await status(h, started.id, data => data.state === 'paused' && data.frames[0]?.path === 'main.ts' && data.frames[0].line === 3);
   assert.equal(paused.frames[0].line, 3);
   await request(h, { action: 'next', id: started.id });

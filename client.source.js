@@ -82,6 +82,7 @@ window.__ModuleLoader__.load({
       "tree.truncated": "File listing reached its limit.",
       "edit.open": "File changes",
       "edit.save": "Save",
+      "edit.denied": "The workspace permissions denied this save. Your draft is still open.",
       "edit.saving": "Saving…",
       "edit.close": "Discard changes",
       "edit.resume": "Return to draft",
@@ -194,7 +195,8 @@ window.__ModuleLoader__.load({
       "debug.breakpoint": "Toggle breakpoint",
       "debug.choose": "Choose debug configuration",
       "debug.openFile": "Open a Python, Go or Node.js entry file; use .dsh/debug.json for custom project arguments.",
-      "debug.tsBuild": "Build this TypeScript file with source maps first. For a custom output path, add a launch configuration in .dsh/debug.json.",
+      "debug.tsBuild": "Build this TypeScript file with source maps, install the project’s tsx dependency, or set a launch target in .dsh/debug.json.",
+      "debug.nodeMissing": "Node.js is unavailable on the Harness PATH. Set an absolute runtimeExecutable in .dsh/debug.json.",
       "debug.language": "Language", "debug.kind": "Attach using", "debug.port": "Local debugger port", "debug.pid": "Go process ID",
       "debug.attachPrompt": "Enter to attach · Esc to cancel", "debug.invalidAttach": "Enter a positive process ID or a port from 1 to 65535.",
       "debug.pythonPort": "Use the debugpy listen port, not a Python process ID.",
@@ -350,6 +352,7 @@ window.__ModuleLoader__.load({
       "tree.truncated": "文件列表已达到显示上限。",
       "edit.open": "文件改动",
       "edit.save": "保存",
+      "edit.denied": "当前工作区权限不允许保存，草稿仍保留。",
       "edit.saving": "正在保存…",
       "edit.close": "放弃改动",
       "edit.resume": "返回草稿",
@@ -462,7 +465,8 @@ window.__ModuleLoader__.load({
       "debug.breakpoint": "切换断点",
       "debug.choose": "选择调试配置",
       "debug.openFile": "请先打开 Python、Go 或 Node.js 入口文件；项目自定义参数可写入 .dsh/debug.json",
-      "debug.tsBuild": "请先生成该 TypeScript 文件的 JS 和 source map；输出路径较复杂时，可在 .dsh/debug.json 中配置启动入口",
+      "debug.tsBuild": "请生成该 TypeScript 文件的 JS 和 source map、安装项目的 tsx 依赖，或在 .dsh/debug.json 中配置启动入口",
+      "debug.nodeMissing": "Harness 的 PATH 中找不到 Node.js。可在 .dsh/debug.json 中配置 runtimeExecutable 的绝对路径。",
       "debug.language": "语言", "debug.kind": "接入方式", "debug.port": "本机调试端口", "debug.pid": "Go 进程 ID",
       "debug.attachPrompt": "Enter 接入 · Esc 取消", "debug.invalidAttach": "请输入正整数进程 ID，或 1～65535 的端口",
       "debug.pythonPort": "填写 debugpy 的监听端口，不能直接填写 Python 进程 ID",
@@ -2048,7 +2052,16 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
 
       const groupActive = splitHost.active === group;
       const [files, setFiles] = useState(null);
-      const [includeIgnored, setIncludeIgnored] = useState(false);
+      const [includeIgnored, setIncludeIgnored] = useState(() => {
+        try { return window.localStorage.getItem('dsh.workbench.showIgnored') === '1'; }
+        catch { return false; }
+      });
+      const toggleIgnored = () => {
+        const next = !includeIgnored;
+        setIncludeIgnored(next);
+        try { window.localStorage.setItem('dsh.workbench.showIgnored', next ? '1' : '0'); }
+        catch { /* The toggle still works when storage is unavailable. */ }
+      };
       const [filter, setFilter] = useState('');
       const filterInput = useRef(null), alive = useRef(true), copySequence = useRef(0);
       const [filterFocus, setFilterFocus] = useState(0), [revealRevision, setRevealRevision] = useState(0);
@@ -2342,7 +2355,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         h('div', { ref: paneLayout.workspace, className: 'jb-code-workspace', 'data-tree-only': !paneOnly && !target && !commitPreview && !splitHost.split && !classSeed }, h('div', { className: 'jb-tree' },
           h('div', { className: 'jb-tree-toolbar' },
             h('div', { className: 'jb-filter' }, searchGlyph(), h('input', { ref: filterInput, type: 'search', value: filter, 'aria-label': t('tree.findName'), placeholder: t('filter.placeholder'), onChange: event => setFilter(event.target.value) })),
-            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.showIgnored'), 'aria-label': t('tree.showIgnored'), 'aria-pressed': includeIgnored, disabled: !isRepo, onClick: () => setIncludeIgnored(value => !value) }, lucideSvg([h('path', { d: 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z' }), h('circle', { cx: 12, cy: 12, r: 3 })], 16)),
+            h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.showIgnored'), 'aria-label': t('tree.showIgnored'), 'aria-pressed': includeIgnored, disabled: !isRepo, onClick: toggleIgnored }, lucideSvg([h('path', { d: 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z' }), h('circle', { cx: 12, cy: 12, r: 3 })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('classes.title'), 'aria-label': t('classes.title'), disabled: !isRepo || content?.external, onClick: () => setClassSeed({ path: target?.path, line: reader.current?.position?.().line ?? target?.line ?? 0 }) }, lucideSvg([h('rect', { x: 8, y: 2, width: 8, height: 6, rx: 1 }), h('path', { d: 'M12 8v5M5 13v3m14-3v3' }), h('rect', { x: 2, y: 16, width: 6, height: 6, rx: 1 }), h('rect', { x: 16, y: 16, width: 6, height: 6, rx: 1 })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.locate'), 'aria-label': t('tree.locate'), disabled: !target || !files?.includes(target.path), onClick: () => { setFilter(''); setRevealRevision(value => value + 1); } }, lucideSvg([h('circle', { cx: 12, cy: 12, r: 6 }), h('path', { d: 'M12 2v6m0 8v6M2 12h6m8 0h6' })], 16)),
             h('button', { type: 'button', className: 'jb-tb-btn', title: t('tree.findDirectory'), 'aria-label': t('tree.findDirectory'), disabled: !isRepo, onClick: () => onFindInFiles('') }, searchGlyph(16))),
@@ -2443,7 +2456,7 @@ const FILE_ICONS = {typescript:[['path',{fill:"#007acc",d:"M23.827 8.243a4.4 4.4
         } catch (failure) {
           const changed = failure.code === 'SOURCE_SAVE_CONFLICT';
           draft.conflict = changed;
-          setError(changed ? t('edit.conflict') : t('edit.failed', { message: failure.message }));
+          setError(changed ? t('edit.conflict') : failure.code === 'SOURCE_SAVE_DENIED' ? t('edit.denied') : t('edit.failed', { message: failure.message }));
         } finally {
           draft.pending = false;
           setSaving(false);

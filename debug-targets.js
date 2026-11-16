@@ -31,7 +31,13 @@ export async function currentFileTarget(ctx, cwd, path) {
     target.arguments.program = dirname(file);
   } else if (['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts'].includes(extension)) {
     target.language = ['.ts', '.mts', '.cts'].includes(extension) ? 'typescript' : 'javascript';
-    Object.assign(target.arguments, { type: 'pwa-node', runtimeExecutable: process.execPath });
+    let runtimeExecutable;
+    try {
+      runtimeExecutable = await ctx.subprocess.resolveExecutable('node');
+    } catch (error) {
+      throw fail('Node.js is unavailable on the Harness PATH; configure an absolute runtimeExecutable in .dsh/debug.json', 'DEBUG_NODE_MISSING');
+    }
+    Object.assign(target.arguments, { type: 'pwa-node', runtimeExecutable });
     if (target.language === 'typescript') {
       const outputExtension = extension === '.mts' ? '.mjs' : extension === '.cts' ? '.cjs' : '.js';
       let candidate = path.slice(0, -extension.length) + outputExtension;
@@ -61,7 +67,12 @@ export async function currentFileTarget(ctx, cwd, path) {
           directory = dirname(directory);
         }
       }
-      if (!output || (!output.text.includes('sourceMappingURL=data:') && !await optionalSource(candidate + '.map'))) throw fail('build JavaScript with source maps, or configure its output path in .dsh/debug.json', 'DEBUG_TS_BUILD');
+      if (!output || (!output.text.includes('sourceMappingURL=data:') && !await optionalSource(candidate + '.map'))) {
+        const loader = await optionalSource('node_modules/tsx/package.json');
+        if (!loader) throw fail('build JavaScript with source maps, install the project’s tsx dependency, or configure .dsh/debug.json', 'DEBUG_TS_BUILD');
+        Object.assign(target.arguments, { runtimeArgs: ['--import', 'tsx'], sourceMaps: true });
+        return target;
+      }
       target.arguments.program = ctx.fs.processPath(output.file);
       target.arguments.sourceMaps = true;
       target.arguments.outFiles = [ctx.fs.processPath(output.file)];

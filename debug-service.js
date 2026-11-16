@@ -220,7 +220,7 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
         });
         input.resume(); const socket = await socketFor(session); input = output = socket;
       }
-      await configurePeer(session, input, output, { ...(language === 'javascript' ? { __workspaceFolder: session.processRoot, pauseForSourceMap: true } : {}), ...(target.language === 'typescript' && target.request === 'launch' ? { stopOnEntry: true } : {}), ...expand(target.arguments, cwd), ...(language === 'python' ? { console: 'internalConsole', subProcess: false } : {}), ...(language === 'javascript' ? { name: target.name, request: target.request, console: 'internalConsole', autoAttachChildProcesses: false } : {}) }, target.request);
+      await configurePeer(session, input, output, { ...(language === 'javascript' ? { __workspaceFolder: session.processRoot, pauseForSourceMap: true } : {}), ...expand(target.arguments, cwd), ...(language === 'python' ? { console: 'internalConsole', subProcess: false } : {}), ...(language === 'javascript' ? { name: target.name, request: target.request, console: 'internalConsole', autoAttachChildProcesses: false } : {}) }, target.request);
       return snapshot(session);
     } catch (error) { session.error = error.message; await close(session); throw error; }
   };
