@@ -6,7 +6,7 @@
 
 ## 安装调试器
 
-Python 使用 [debugpy](https://github.com/microsoft/debugpy)，Go 使用 [Delve](https://github.com/go-delve/delve)，JS／TS 使用 [vscode-js-debug 的 standalone DAP 发行包](https://github.com/microsoft/vscode-js-debug/releases)。适配器文件和机器路径不包含在插件包中；Python 需选择已安装 debugpy 的解释器，Go 需可访问兼容的工具链；TS 需先生成 JS 及 source map，插件不执行构建任务。
+Python 使用 [debugpy](https://github.com/microsoft/debugpy)，Go 使用 [Delve](https://github.com/go-delve/delve)，JS／TS 使用 [vscode-js-debug 的 standalone DAP 发行包](https://github.com/microsoft/vscode-js-debug/releases)。适配器文件和机器路径不包含在插件包中；Python 需选择已安装 debugpy 的解释器，Go 需可访问兼容的工具链；TS 优先使用已有的 JS 和 source map。找不到编译产物时，如果工作区已安装 tsx，工作台会直接启动当前 TS 文件。项目需要的构建任务仍由用户执行。
 
 ```sh
 npm run setup:debuggers -- \
@@ -23,7 +23,7 @@ npm run setup:debuggers -- \
 
 没有启动配置时，在源码区按 F5 即调试当前文件，无需创建 `.dsh/debug.json`：Python 运行该脚本，优先使用工作区 `.venv` 解释器，否则使用适配器的解释器；Go 编译当前文件所在包，`_test.go` 使用测试模式；JS／MJS／CJS 使用宿主 Node 运行当前文件。运行目录默认为工作区根目录。
 
-TS／MTS／CTS 需先生成 JS 和 source map。插件识别同目录输出，或最近 `tsconfig.json` 中同时明确设置的 `rootDir` 与 `outDir`；不自动解析继承配置、执行构建或安装依赖。复杂构建路径、启动参数、环境变量、其他 Python 环境和不同运行目录可使用下面的项目配置。已有启动配置优先于当前文件；配置错误会显示，不会被自动推断掩盖。
+TS／MTS／CTS 可使用已有的 JS 和 source map，也可以通过工作区已安装的 tsx 启动。插件识别同目录输出，或最近 `tsconfig.json` 中同时明确设置的 `rootDir` 与 `outDir`；不自动解析继承配置、执行构建或安装依赖。复杂构建路径、启动参数、环境变量、其他 Python 环境和不同运行目录可使用下面的项目配置。已有启动配置优先于当前文件；配置错误会显示，不会被自动推断掩盖。
 
 右键选择“接入已有进程”：没有接入配置时，弹窗选择语言并填写本机调试端口，Go 也可选择进程 ID。Enter 接入，Esc 取消；不会扫描或自行接入其他程序。端口必须已由目标调试器监听，填写普通服务端口或当前进程 ID 不会自动启用调试器。
 
@@ -68,7 +68,7 @@ TS／MTS／CTS 需先生成 JS 和 source map。插件识别同目录输出，�
 
 Python 接入端口由目标程序的 `debugpy.listen()` 或 `python -m debugpy --listen 127.0.0.1:5678 ...` 提供；Node 接入端口由 `node --inspect=127.0.0.1:9229 ...` 提供。Go 的本机 PID 接入受系统调试权限限制；也支持接入现有 Delve DAP 服务，配置 `mode: "remote"` 与 `connect: { "host": "127.0.0.1", "port": ... }`。Python／Go 的直接 DAP 接入仅允许本机回环地址；Go 服务需按 Delve 文档配置多客户端模式才能在客户端断开后继续保留。JS／TS 通过 js-debug 接入 Node inspector，不是把 inspector 端口当作 DAP 端口。
 
-TS 启动默认先暂停在入口，等待原始源码映射可用；按 F5 继续后可命中 `.ts` 断点并在原始 TS 中单步。`stopOnEntry` 可在配置中显式指定。断点行必须存在于当前工作区源码中，空行或不能执行的行是否能绑定由适配器报告。
+TS 启动后直接运行，遇到已绑定的断点时暂停。如需在入口暂停，可在启动配置的 `arguments` 中设置 `"stopOnEntry": true`。断点行必须存在于当前工作区源码中，空行或不能执行的行是否能绑定由适配器报告。
 
 ## 交互与进程归属
 

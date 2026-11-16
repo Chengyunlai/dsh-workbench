@@ -92,7 +92,7 @@ export function createDebugUI(React, api, { createPortal, usePopupDismiss }) {
           const extension = path?.split('.').at(-1)?.toLowerCase();
           setAttach({ language: extension === 'py' ? 'python' : extension === 'go' ? 'go' : 'javascript' }); return;
         }
-        if (!configs.length) throw new Error(t(data.launchError === 'DEBUG_TS_BUILD' ? 'debug.tsBuild' : 'debug.openFile'));
+        if (!configs.length) throw new Error(t(({ DEBUG_TS_BUILD: 'debug.tsBuild', DEBUG_NODE_MISSING: 'debug.nodeMissing' })[data.launchError] ?? 'debug.openFile'));
         if (configs.length === 1) await action('start', { name: configs[0].name, ...(configs[0].currentFile ? { currentFile: configs[0].currentFile } : {}), breakpoints: refs.current.breakpoints });
         else setChoices(configs);
       } catch (error) { if (refs.current.cwd === cwd) setError(t('debug.failed', { message: error.message })); }

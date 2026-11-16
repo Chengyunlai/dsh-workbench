@@ -159,9 +159,26 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
       const includeIgnored = query.get('includeIgnored') === '1';
       const ignoredDsh = await runGit(ctx, cwd, ['ls-files', '--others', '--ignored', '--exclude-standard', '--full-name', '-z', '--', ...(includeIgnored ? ['.', ...TREE_CACHE_DIRS.map(name => ':(exclude,glob)**/' + name + '/**')] : ['.dsh/'])], { signal });
       const prefix = probe.stdout.replace(/^true\r?\n/, '').replace(/\r?\n$/, '');
-      const files = [...new Set([result, ignoredDsh].flatMap(({ stdout }) => stdout.split('\0'))
-        .filter(path => path && path.startsWith(prefix)).map(path => path.slice(prefix.length)))].sort();
-      return json({ files });
+      const relativeFiles = ({ stdout }) => stdout.split('\0')
+        .filter(path => path && path.startsWith(prefix)).map(path => path.slice(prefix.length));
+      const ignored = relativeFiles(ignoredDsh);
+      const files = new Set(relativeFiles(result).filter(path => !path.endsWith('/')));
+      const root = includeIgnored ? await ctx.fs.resolve(cwd, { signal }) : null;
+      for (const path of ignored) {
+        if (!path.endsWith('/')) { files.add(path); continue; }
+        // Git reports an ignored embedded repository as a directory entry.
+        if (!root) continue;
+        const directory = requireRelativePath(path.slice(0, -1));
+        const target = await ctx.fs.resolve(directory, { cwd, signal });
+        if (!ctx.fs.contains(root, target) || (await ctx.fs.stat(target, signal))?.type !== 'directory') continue;
+        const nested = await runGit(ctx, target.displayPath, [
+          'ls-files', '--cached', '--others', '--exclude-standard', '-z',
+        ], { signal });
+        for (const name of nested.stdout.split('\0')) {
+          if (name && !name.endsWith('/')) files.add(path + name);
+        }
+      }
+      return json({ files: [...files].sort() });
     },
     source: async (ctx, request, signal) => {
       const { query, cwd } = await readQuery(ctx, request, signal);
@@ -193,9 +210,13 @@ export function navigationHandlers({ runGit, requireWorkspacePath, requireRelati
       if (!editablePath(path, source.file)) throw failure('file cannot be edited', 'SOURCE_NOT_EDITABLE', 403);
       if (source.writeVersion !== payload.writeVersion || source.version !== payload.version) throw failure('file changed on disk', 'SOURCE_SAVE_CONFLICT', 409);
       try {
-        const saved = await ctx.fs.writeText(source.file, payload.text, { kind: 'replaceIfVersion', version: source.writeVersion }, signal);
+        const policy = ctx.get?.('sandboxPolicy')?.resolve();
+        // This user action targets the registered workspace selected in the panel.
+        const scopedPolicy = policy && { ...policy, workspaceRoot: ctx.fs.processPath(source.root) };
+        const saved = await ctx.fs.writeText(source.file, payload.text, { kind: 'replaceIfVersion', version: source.writeVersion }, signal, scopedPolicy);
         return json({ version: versionOf(payload.text), writeVersion: saved.version });
       } catch (error) {
+        if (error.code === 'FS_SANDBOX_DENIED') throw failure('workspace policy denied the write', 'SOURCE_SAVE_DENIED', 403);
         if (error.code === 'FS_STALE_VERSION') throw failure('file changed on disk', 'SOURCE_SAVE_CONFLICT', 409);
         throw error;
       }

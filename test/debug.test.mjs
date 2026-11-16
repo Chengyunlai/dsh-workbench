@@ -108,11 +108,21 @@ test('current-file discovery preserves project venv paths and resolves explicit 
  await writeFile(join(h.root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { rootDir: 'src', outDir: 'dist' } }));
  await writeFile(join(h.root, 'dist/main.js'), 'console.log(42);\n//# sourceMappingURL=main.js.map\n');
  await writeFile(join(h.root, 'dist/main.js.map'), '{}');
+ const resolve = h.ctx.subprocess.resolveExecutable;
+ const node = join(h.root, 'bin', 'node');
+ h.ctx.subprocess.resolveExecutable = (command, ...args) => command === 'node' ? node : resolve(command, ...args);
  const ts = await currentFileTarget(h.ctx, h.root, 'src/main.ts');
+ assert.equal(ts.arguments.runtimeExecutable, node);
  assert.equal(ts.arguments.program, join(h.root, 'dist/main.js'));
  assert.deepEqual(ts.arguments.outFiles, [join(h.root, 'dist/main.js')]);
  await writeFile(join(h.root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { rootDir: 'src', outDir: '../../outside' } }));
  await assert.rejects(currentFileTarget(h.ctx, h.root, 'src/main.ts'), { code: 'DEBUG_TS_BUILD' });
+ await mkdir(join(h.root, 'node_modules', 'tsx'), { recursive: true });
+ await writeFile(join(h.root, 'node_modules', 'tsx', 'package.json'), '{"name":"tsx"}');
+ const direct = await currentFileTarget(h.ctx, h.root, 'src/main.ts');
+ assert.equal(direct.arguments.program, join(h.root, 'src/main.ts'));
+ assert.deepEqual(direct.arguments.runtimeArgs, ['--import', 'tsx']);
+ assert.equal(direct.arguments.sourceMaps, true);
 });
 
 async function pausedFixture(t) {

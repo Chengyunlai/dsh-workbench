@@ -110,6 +110,15 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
       if (event === 'initialized') initialized.resolve();
       if (event === 'output' && body.category !== 'telemetry') { session.output = (session.output + String(body.output ?? '')).slice(-config.debugOutputChars); changed(session); }
       if (event === 'stopped') {
+        if (session.resumeEntry && body.reason === 'entry' && !body.hitBreakpointIds?.length && Number.isSafeInteger(body.threadId)) {
+          session.resumeEntry = false;
+          peer.request('continue', { threadId: body.threadId }).catch(error => {
+            if (session.closing) return;
+            session.state = 'unknown'; session.error = error.message; changed(session);
+          });
+          return;
+        }
+
         const epoch = session.stopEpoch = (session.stopEpoch ?? 0) + 1;
         session.activePeer = peer; session.threadId = body.threadId; session.state = 'paused'; changed(session);
         session.refresh = session.refresh.then(async () => {
@@ -220,7 +229,10 @@ export function createDebugService(ctx, config, validateWorkspace, json) {
         });
         input.resume(); const socket = await socketFor(session); input = output = socket;
       }
-      await configurePeer(session, input, output, { ...(language === 'javascript' ? { __workspaceFolder: session.processRoot, pauseForSourceMap: true } : {}), ...(target.language === 'typescript' && target.request === 'launch' ? { stopOnEntry: true } : {}), ...expand(target.arguments, cwd), ...(language === 'python' ? { console: 'internalConsole', subProcess: false } : {}), ...(language === 'javascript' ? { name: target.name, request: target.request, console: 'internalConsole', autoAttachChildProcesses: false } : {}) }, target.request);
+      // Let js-debug finish binding source-mapped breakpoints before short TS programs run.
+      session.resumeEntry = target.language === 'typescript' && target.request === 'launch'
+        && target.arguments.stopOnEntry === undefined && Object.values(points).some(lines => lines.length > 0);
+      await configurePeer(session, input, output, { ...(language === 'javascript' ? { __workspaceFolder: session.processRoot, pauseForSourceMap: true } : {}), ...(session.resumeEntry ? { stopOnEntry: true } : {}), ...expand(target.arguments, cwd), ...(language === 'python' ? { console: 'internalConsole', subProcess: false } : {}), ...(language === 'javascript' ? { name: target.name, request: target.request, console: 'internalConsole', autoAttachChildProcesses: false } : {}) }, target.request);
       return snapshot(session);
     } catch (error) { session.error = error.message; await close(session); throw error; }
   };

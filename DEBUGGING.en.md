@@ -6,7 +6,7 @@ The development workbench supports local Python, Go, and Node.js JavaScript/Type
 
 ## Adapters
 
-Install [debugpy](https://github.com/microsoft/debugpy), [Delve](https://github.com/go-delve/delve), and the [standalone vscode-js-debug DAP release](https://github.com/microsoft/vscode-js-debug/releases) as needed. Adapters and machine paths are excluded from the plugin package. Choose a Python interpreter with debugpy installed, and a Delve-compatible Go toolchain. Compile TS to JS with source maps beforehand; the plugin does not run build tasks.
+Install [debugpy](https://github.com/microsoft/debugpy), [Delve](https://github.com/go-delve/delve), and the [standalone vscode-js-debug DAP release](https://github.com/microsoft/vscode-js-debug/releases) as needed. Adapters and machine paths are excluded from the plugin package. Choose a Python interpreter with debugpy installed, and a Delve-compatible Go toolchain. TypeScript uses existing JS and source maps when available, or launches through tsx if installed in the workspace. Run any build tasks your project requires before debugging.
 
 ```sh
 npm run setup:debuggers -- \
@@ -23,7 +23,7 @@ Alternatively set `debugAdapters.python`, `.go`, or `.javascript` in plugin sett
 
 Without a launch configuration, press F5 in source to debug the current file; `.dsh/debug.json` is optional. Python runs the script using the workspace `.venv` interpreter when present, otherwise the adapter interpreter. Go builds the containing package, using test mode for `_test.go`. JS/MJS/CJS run under the host Node executable. The working directory defaults to the workspace root.
 
-TS/MTS/CTS require existing JavaScript and source maps. Discovery checks adjacent output, then explicit `rootDir` and `outDir` in the nearest `tsconfig.json`; it does not resolve inherited configurations, build, or install dependencies. Use a project configuration for complex output paths, arguments, environment variables, other Python environments, or a different working directory. Existing launch configurations take priority; invalid configurations remain visible errors.
+TS/MTS/CTS can use existing JavaScript and source maps or a workspace tsx installation. Discovery checks adjacent output, then explicit `rootDir` and `outDir` in the nearest `tsconfig.json`; it does not resolve inherited configurations, build, or install dependencies. Use a project configuration for complex output paths, arguments, environment variables, other Python environments, or a different working directory. Existing launch configurations take priority; invalid configurations remain visible errors.
 
 Choose attach from the source context menu. Without an attach configuration, a prompt accepts a language and local debugger port, or a Go process ID. Enter attaches and Escape cancels. Discovery never scans or attaches to other programs automatically. The debugger must already listen on the selected port; an ordinary service port or an unrelated process ID does not enable debugging.
 
@@ -68,7 +68,7 @@ To customize launch or attach arguments, create the optional `.dsh/debug.json` i
 
 Python attaches to the port from `debugpy.listen()` or `python -m debugpy --listen 127.0.0.1:5678 ...`. Node attaches through js-debug to an inspector started with `node --inspect=127.0.0.1:9229 ...`; an inspector port is not a DAP port. Go PID attachment requires operating-system debugging permissions. Existing Delve DAP servers can use `mode: "remote"` and `connect: { "host": "127.0.0.1", "port": ... }`; configure Delve multi-client mode if it must remain alive after disconnect. Direct Python/Go DAP connections accept loopback addresses only.
 
-TS launch pauses at entry by default, allowing original-source maps to become available. Continue with F5 to hit `.ts` breakpoints and step in original TS. `stopOnEntry` may be explicitly configured. Breakpoint lines must exist in workspace source; adapters report whether blank or non-executable lines can bind.
+A TS launch runs immediately and pauses at bound breakpoints. To pause at entry, set `"stopOnEntry": true` in the launch configuration’s `arguments`. Breakpoint lines must exist in workspace source; adapters report whether blank or non-executable lines can bind.
 
 ## Interaction and ownership
 

@@ -1,5 +1,9 @@
 # Upgrade the development workbench
 
+## 1.6.6
+
+The file tree expands ignored nested Git repositories and remembers the visibility toggle. Saves use the selected workspace for permission checks. JS and TS debugging resolves Node.js from PATH. TS can use a workspace tsx installation and runs without pausing at entry by default.
+
 ## 1.6.5
 
 Edit existing UTF-8 text files directly in source view and save with `⌘S` / `Ctrl+S`. Drafts survive tab switches, and save conflicts let you inspect the current disk version. Restoring the original text leaves the caret at the current edit position.

@@ -2190,6 +2190,8 @@ test('file tree toggles ignored local configuration without changing the default
  assert.equal(toggle().getAttribute('aria-pressed'),'true');
  assert.ok(ui.container.textContent.includes('config'));
  await ui.click('config');assert.ok(ui.container.textContent.includes('harness.local.json'));
+ await ui.reopen();
+ assert.equal(toggle().getAttribute('aria-pressed'),'true');
  await ui.click('tree.showIgnored');
  assert.equal(toggle().getAttribute('aria-pressed'),'false');
  assert.ok(!ui.container.textContent.includes('harness.local.json'));
